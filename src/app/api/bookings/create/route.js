@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const bookingSchema = z.object({
-  classScheduleId: z.string().uuid(),
+  classScheduleId: z.string().min(1),
 })
 
 /**
@@ -21,6 +21,7 @@ export async function POST(request) {
     const body = await request.json()
     const parsed = bookingSchema.safeParse(body)
     if (!parsed.success) {
+      console.error('[bookings/create] Invalid input:', JSON.stringify(body), parsed.error.issues)
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
