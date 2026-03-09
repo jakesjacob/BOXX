@@ -482,6 +482,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
   const [selectedDay, setSelectedDay] = useState(null)
   const [shared, setShared] = useState(false)
   const [sharedResolved, setSharedResolved] = useState(!sharedClassId)
+  const [toast, setToast] = useState(null) // { message, type: 'error'|'success', link? }
 
   const maxWeeks = 4 // 1 month in advance
 
@@ -647,9 +648,15 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || 'Booking failed')
+        const isNoCredits = data.error?.toLowerCase().includes('no available credits')
+        setToast({
+          message: isNoCredits ? 'No credits remaining.' : (data.error || 'Booking failed'),
+          type: 'error',
+          link: isNoCredits ? { href: '/buy-classes', label: 'Buy a pack' } : null,
+        })
         return
       }
+      setToast({ message: 'Class booked!', type: 'success' })
       // Re-fetch both schedule and dashboard data
       setWeekOffset((w) => { /* trigger re-fetch */ return w })
       onUpdate()
@@ -664,7 +671,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
         setSchedule(d.schedule || [])
       }
     } catch (err) {
-      alert('Something went wrong. Please try again.')
+      setToast({ message: 'Something went wrong. Please try again.', type: 'error' })
     } finally {
       setConfirming(null)
     }
@@ -687,9 +694,10 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || 'Cancel failed')
+        setToast({ message: data.error || 'Cancel failed', type: 'error' })
         return
       }
+      setToast({ message: 'Booking cancelled', type: 'success' })
       setExpandedId(null)
       onUpdate()
       // Re-fetch schedule
@@ -702,7 +710,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
         setSchedule(d.schedule || [])
       }
     } catch (err) {
-      alert('Something went wrong.')
+      setToast({ message: 'Something went wrong.', type: 'error' })
     } finally {
       setCancelling(null)
     }
@@ -971,8 +979,46 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
     )
   }
 
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   return (
     <div>
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={cn(
+              'mb-4 px-4 py-3 rounded-lg border flex items-center justify-between gap-3',
+              toast.type === 'error'
+                ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                : 'bg-green-500/10 border-green-500/20 text-green-400'
+            )}
+          >
+            <div className="flex items-center gap-2 text-sm">
+              <span>{toast.message}</span>
+              {toast.link && (
+                <Link href={toast.link.href} className="underline font-medium hover:no-underline">
+                  {toast.link.label}
+                </Link>
+              )}
+            </div>
+            <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100 shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header: title + week nav + view toggle */}
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <h2 className="text-lg font-bold text-foreground">Classes</h2>
@@ -1253,6 +1299,7 @@ function BookingsSection({ upcoming, past, onUpdate }) {
   const [cancelling, setCancelling] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   const [shared, setShared] = useState(false)
+  const [toast, setToast] = useState(null)
 
   async function handleShare(classScheduleId) {
     const url = `${window.location.origin}/dashboard?class=${classScheduleId}`
@@ -1283,13 +1330,14 @@ function BookingsSection({ upcoming, past, onUpdate }) {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || 'Cancel failed')
+        setToast({ message: data.error || 'Cancel failed', type: 'error' })
         return
       }
+      setToast({ message: 'Booking cancelled', type: 'success' })
       setExpandedId(null)
       onUpdate()
     } catch (err) {
-      alert('Something went wrong.')
+      setToast({ message: 'Something went wrong.', type: 'error' })
     } finally {
       setCancelling(null)
     }
@@ -1455,8 +1503,39 @@ function BookingsSection({ upcoming, past, onUpdate }) {
     )
   }
 
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   return (
     <div>
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={cn(
+              'mb-4 px-4 py-3 rounded-lg border flex items-center justify-between gap-3',
+              toast.type === 'error'
+                ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                : 'bg-green-500/10 border-green-500/20 text-green-400'
+            )}
+          >
+            <span className="text-sm">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100 shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <h2 className="text-lg font-bold text-foreground mb-4">My Bookings</h2>
 
       {upcoming.length === 0 && past.length === 0 ? (
