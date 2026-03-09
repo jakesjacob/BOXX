@@ -88,11 +88,13 @@ export default function AdminSchedulePage() {
   })
 
   function openAddDialog(date) {
+    const d = date ? new Date(date + 'T00:00:00') : new Date()
+    const dayOfWeek = d.getDay()
     setForm({
       classTypeId: classTypes[0]?.id || '', instructorId: instructors[0]?.id || '',
       date: date || new Date().toISOString().split('T')[0],
       startTime: '07:00', endTime: '07:55', capacity: 6, notes: '',
-      recurring: false, days: [], weeks: 4, everyWeek: false,
+      recurring: false, days: [dayOfWeek], weeks: 4, everyWeek: false,
     })
     setAddDialog(true)
   }
@@ -372,8 +374,8 @@ export default function AdminSchedulePage() {
           {form.recurring && form.days.length > 0 && (
             <p className="text-xs text-muted -mt-2">
               {form.everyWeek
-                ? `Will create ~${form.days.length * 52} classes (${form.days.map((d) => DAY_NAMES[d]).join(', ')} every week for 1 year)`
-                : `Will create ~${form.days.length * form.weeks} classes (${form.days.map((d) => DAY_NAMES[d]).join(', ')} for ${form.weeks} week${form.weeks !== 1 ? 's' : ''})`
+                ? `Will create ~52 classes (every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]} for 1 year)`
+                : `Will create ~${form.weeks} classes (every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]} for ${form.weeks} week${form.weeks !== 1 ? 's' : ''})`
               }
             </p>
           )}
@@ -381,7 +383,7 @@ export default function AdminSchedulePage() {
             <Button variant="outline" onClick={() => setAddDialog(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={submitting || (form.recurring && form.days.length === 0)}>
               {submitting ? 'Creating...' : form.recurring
-                ? `Create ${form.days.length * (form.everyWeek ? 52 : form.weeks)} Classes`
+                ? `Create ${form.everyWeek ? 52 : form.weeks} Classes`
                 : 'Create Class'}
             </Button>
           </DialogFooter>
@@ -402,7 +404,7 @@ export default function AdminSchedulePage() {
               <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} showRecurring recurLabel="Make this recurring" />
               {form.recurring && form.days.length > 0 && (
                 <p className="text-xs text-muted mt-2">
-                  Will create ~{form.days.length * (form.everyWeek ? 52 : form.weeks)} future classes starting after this date
+                  Will create ~{form.everyWeek ? 52 : form.weeks} future classes (every {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]}) starting after this date
                 </p>
               )}
             </div>
@@ -564,7 +566,11 @@ function ClassForm({ form, setForm, classTypes, instructors, showRecurring, recu
           {instructors.map((inst) => <option key={inst.id} value={inst.id}>{inst.name}</option>)}
         </select>
       </div>
-      <div><Label htmlFor="date">{form.recurring ? 'Start Date' : 'Date'}</Label><Input id="date" type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="mt-1" /></div>
+      <div><Label htmlFor="date">{form.recurring ? 'Start Date' : 'Date'}</Label><Input id="date" type="date" value={form.date} onChange={(e) => {
+        const newDate = e.target.value
+        const d = new Date(newDate + 'T00:00:00')
+        setForm((f) => ({ ...f, date: newDate, days: [d.getDay()] }))
+      }} className="mt-1" /></div>
       <div className="grid grid-cols-2 gap-3">
         <div><Label htmlFor="startTime">Start Time</Label><Input id="startTime" type="time" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} className="mt-1" /></div>
         <div><Label htmlFor="endTime">End Time</Label><Input id="endTime" type="time" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="mt-1" /></div>
@@ -578,38 +584,20 @@ function ClassForm({ form, setForm, classTypes, instructors, showRecurring, recu
             <input
               type="checkbox"
               checked={form.recurring}
-              onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked, days: e.target.checked && f.days.length === 0 ? [1, 3, 5] : f.days }))}
+              onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked }))}
               className="w-4 h-4 rounded border-card-border bg-card accent-accent"
             />
             <div>
               <span className="text-sm text-foreground">{recurLabel || 'Make recurring'}</span>
-              <p className="text-xs text-muted">Repeat this class on selected days</p>
+              <p className="text-xs text-muted">Repeat every {DAY_NAMES[form.days[0]] || 'week'}day from the selected date</p>
             </div>
           </label>
 
           {form.recurring && (
             <div className="space-y-3 pl-7">
-              <div>
-                <Label>Days</Label>
-                <div className="flex gap-2 mt-1">
-                  {DAY_NAMES.map((name, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        const days = form.days.includes(idx) ? form.days.filter((d) => d !== idx) : [...form.days, idx]
-                        setForm((f) => ({ ...f, days }))
-                      }}
-                      className={cn(
-                        'w-9 h-9 rounded text-xs font-medium transition-colors border',
-                        form.days.includes(idx) ? 'bg-accent text-background border-accent' : 'bg-card border-card-border text-muted hover:border-accent/30'
-                      )}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <p className="text-xs text-foreground">
+                Repeats every <span className="font-semibold text-accent">{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]}</span>
+              </p>
               <div>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input

@@ -44,14 +44,15 @@ export async function POST(request) {
 
     for (let week = 0; week < weeks; week++) {
       for (const dayOfWeek of days) {
-        // Calculate the date for this day of week
+        // For week 0, start from the exact startDate
+        // The startDate's day-of-week should match the requested day
         const date = new Date(start)
         date.setDate(start.getDate() + week * 7)
 
         // Adjust to the correct day of week
         const currentDay = date.getDay()
         let diff = dayOfWeek - currentDay
-        if (diff < 0 && week === 0) diff += 7 // skip past days in first week
+        if (diff < 0) diff += 7
         date.setDate(date.getDate() + diff)
 
         // Skip if date is before start date
