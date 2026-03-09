@@ -139,13 +139,6 @@ export async function POST(request) {
 
     const { classTypeId, instructorId, startsAt, endsAt, capacity, notes } = parsed.data
 
-    // Auto-detect private from class type
-    const { data: classType } = await supabaseAdmin
-      .from('class_types')
-      .select('is_private')
-      .eq('id', classTypeId)
-      .single()
-
     const { data: cls, error } = await supabaseAdmin
       .from('class_schedule')
       .insert({
@@ -156,7 +149,6 @@ export async function POST(request) {
         capacity: capacity || 6,
         notes: notes || null,
         status: 'active',
-        is_private: classType?.is_private || false,
       })
       .select('*, class_types(id, name, color), instructors(id, name)')
       .single()
@@ -217,13 +209,6 @@ export async function PUT(request) {
     const updates = {}
     if (classTypeId) {
       updates.class_type_id = classTypeId
-      // Auto-update is_private based on class type
-      const { data: ct } = await supabaseAdmin
-        .from('class_types')
-        .select('is_private')
-        .eq('id', classTypeId)
-        .single()
-      updates.is_private = ct?.is_private || false
     }
     if (instructorId) updates.instructor_id = instructorId
     if (startsAt) updates.starts_at = startsAt

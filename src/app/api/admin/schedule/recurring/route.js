@@ -36,13 +36,6 @@ export async function POST(request) {
 
     const { classTypeId, instructorId, startTime, endTime, capacity, days, weeks, startDate, notes } = parsed.data
 
-    // Auto-detect private from class type
-    const { data: classType } = await supabaseAdmin
-      .from('class_types')
-      .select('is_private')
-      .eq('id', classTypeId)
-      .single()
-
     // Generate a recurring_id to group these classes
     const recurringId = crypto.randomUUID()
 
@@ -77,7 +70,6 @@ export async function POST(request) {
           status: 'active',
           notes: notes || null,
           recurring_id: recurringId,
-          is_private: classType?.is_private || false,
         })
       }
     }
