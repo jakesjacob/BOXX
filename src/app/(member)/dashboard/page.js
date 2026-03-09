@@ -967,9 +967,9 @@ function ScheduleSection({ credits, onUpdate, sharedClassId }) {
       {/* ── CALENDAR VIEW ── */}
       {!loading && schedule.length > 0 && view === 'calendar' && (
         <div>
-          <div className="overflow-x-auto -mx-1 px-1 pb-2">
+          <div className="overflow-x-auto -mx-1 px-1 pb-2 relative">
           {/* 7-column calendar grid — scrollable on mobile */}
-          <div className="grid grid-cols-7 gap-1.5 md:gap-2 items-start" style={{ minWidth: '640px' }}>
+          <div className="grid grid-cols-7 gap-1.5 md:gap-2 items-start" style={{ minWidth: '840px' }}>
             {calendarDays.map((day) => {
               const isToday = day.date.toDateString() === today.toDateString()
               return (
@@ -1003,16 +1003,26 @@ function ScheduleSection({ credits, onUpdate, sharedClassId }) {
           </div>
           </div>
 
-          {/* Expanded detail panel (shows below calendar as full branded card) */}
+          {/* Expanded detail panel — overlay on mobile, below calendar on desktop */}
           <AnimatePresence>
             {expandedId && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
+              <>
+                {/* Mobile overlay backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+                  onClick={() => setExpandedId(null)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  transition={{ duration: 0.2 }}
+                  className="md:relative md:z-auto fixed inset-x-0 bottom-0 z-50 md:static max-h-[85vh] md:max-h-none overflow-y-auto"
+                >
                 {(() => {
                   const cls = schedule.find((c) => c.id === expandedId)
                   if (!cls) return null
@@ -1022,9 +1032,14 @@ function ScheduleSection({ credits, onUpdate, sharedClassId }) {
                   const classColor = getClassColor(cls)
                   return (
                     <Card
-                      className="mt-3 ring-1 ring-accent/30 overflow-hidden relative"
+                      className="md:mt-3 ring-1 ring-accent/30 overflow-hidden relative rounded-t-2xl md:rounded-lg"
                       style={{ borderLeftWidth: '4px', borderLeftColor: classColor }}
                     >
+                      {/* Drag handle for mobile */}
+                      <div className="md:hidden flex justify-center pt-3 pb-1">
+                        <div className="w-10 h-1 rounded-full bg-foreground/20" />
+                      </div>
+
                       {/* Blended image from right side */}
                       <div className="absolute top-0 right-0 bottom-0 w-1/3 sm:w-2/5">
                         <Image src={classImage} alt="" fill className="object-cover" sizes="(max-width: 640px) 33vw, 40vw" />
@@ -1074,7 +1089,8 @@ function ScheduleSection({ credits, onUpdate, sharedClassId }) {
                     </Card>
                   )
                 })()}
-              </motion.div>
+                </motion.div>
+              </>
             )}
           </AnimatePresence>
         </div>
