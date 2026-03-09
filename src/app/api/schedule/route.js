@@ -40,7 +40,7 @@ export async function GET(request) {
         class_types(id, name, description, duration_mins, color, icon),
         instructors(id, name, photo_url, bio)
       `)
-      .eq('status', 'active')
+      .in('status', ['active', 'cancelled'])
       .gte('starts_at', startDate.toISOString())
       .lte('starts_at', endDate.toISOString())
       .order('starts_at', { ascending: true })
@@ -66,7 +66,7 @@ export async function GET(request) {
         .eq('status', 'confirmed'),
       supabaseAdmin
         .from('bookings')
-        .select('class_schedule_id')
+        .select('id, class_schedule_id')
         .eq('user_id', userId)
         .in('class_schedule_id', scheduleIds)
         .eq('status', 'confirmed'),
@@ -87,8 +87,10 @@ export async function GET(request) {
       bookingCounts[b.class_schedule_id] = (bookingCounts[b.class_schedule_id] || 0) + 1
     })
 
-    const userBookedSet = new Set()
-    ;(userBookingsRes.data || []).forEach((b) => userBookedSet.add(b.class_schedule_id))
+    const userBookedMap = {}
+    ;(userBookingsRes.data || []).forEach((b) => {
+      userBookedMap[b.class_schedule_id] = b.id
+    })
 
     const userWaitlist = {}
     ;(waitlistRes.data || []).forEach((w) => {
@@ -112,7 +114,8 @@ export async function GET(request) {
       ...cls,
       booked_count: bookingCounts[cls.id] || 0,
       spots_left: cls.capacity - (bookingCounts[cls.id] || 0),
-      is_booked: userBookedSet.has(cls.id),
+      is_booked: !!userBookedMap[cls.id],
+      booking_id: userBookedMap[cls.id] || null,
       waitlist_position: userWaitlist[cls.id] || null,
       roster: rosterByClass[cls.id] || [],
     }))

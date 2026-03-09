@@ -70,7 +70,7 @@ INSERT INTO class_types (id, name, description, duration_mins, color, icon, acti
   ('a1111111-1111-1111-1111-111111111111',
    'BOXXBEGINNER',
    'Perfect for first-timers or anyone new to boxing. Move through shadow boxing, bag work, and 1:1 padwork with a focus on both offence and defence.',
-   55, '#f59e0b', 'beginner', true),
+   55, '#8b5cf6', 'beginner', true),
   ('a2222222-2222-2222-2222-222222222222',
    'BOXXINTER',
    'For those with a basic understanding of boxing fundamentals. Higher pace, higher intensity, with advanced combinations and defensive drills.',
@@ -111,110 +111,110 @@ ON CONFLICT (email) DO NOTHING;
 -- ─── SCHEDULE (next 7 days) ──────────
 
 -- DAY 0 (today)
-INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status, notes) VALUES
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000001-0000-0000-0000-000000000001',
    'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '7 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '7 hours 55 minutes')::timestamptz,
-   6, 1, 'active', 'Bring your own wraps'),
+   6, 1, 'active'),
   ('c0000001-0000-0000-0000-000000000002',
    'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
    (CURRENT_DATE + INTERVAL '9 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '9 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL),
+   6, 1, 'active'),
   ('c0000001-0000-0000-0000-000000000003',
    'a2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222',
    (CURRENT_DATE + INTERVAL '17 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '17 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL);
+   6, 1, 'active');
 
 -- DAY 1 (tomorrow)
-INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status, notes) VALUES
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000002-0000-0000-0000-000000000001',
    'a2222222-2222-2222-2222-222222222222', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '1 day 7 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '1 day 7 hours 55 minutes')::timestamptz,
-   6, 1, 'active', 'Focus on combos 1-6'),
+   6, 1, 'active'),
   ('c0000002-0000-0000-0000-000000000002',
    'a1111111-1111-1111-1111-111111111111', 'b2222222-2222-2222-2222-222222222222',
    (CURRENT_DATE + INTERVAL '1 day 17 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '1 day 17 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL),
+   6, 1, 'active'),
   ('c0000002-0000-0000-0000-000000000003',
    'a4444444-4444-4444-4444-444444444444', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '1 day 10 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '1 day 10 hours 55 minutes')::timestamptz,
-   10, 1, 'active', 'Ages 9+ welcome');
+   10, 1, 'active');
 
 -- DAY 2
-INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status, notes) VALUES
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000003-0000-0000-0000-000000000001',
    'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '2 days 7 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '2 days 7 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL),
+   6, 1, 'active'),
   ('c0000003-0000-0000-0000-000000000002',
    'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
    (CURRENT_DATE + INTERVAL '2 days 9 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '2 days 9 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL),
+   6, 1, 'active'),
   ('c0000003-0000-0000-0000-000000000003',
    'a2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222',
    (CURRENT_DATE + INTERVAL '2 days 17 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '2 days 17 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL);
+   6, 1, 'active');
 
 -- DAY 3
-INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status, notes) VALUES
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000004-0000-0000-0000-000000000001',
    'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
    (CURRENT_DATE + INTERVAL '3 days 7 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '3 days 7 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL),
+   6, 1, 'active'),
   ('c0000004-0000-0000-0000-000000000002',
    'a2222222-2222-2222-2222-222222222222', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '3 days 17 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '3 days 17 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL);
+   6, 1, 'active');
 
 -- DAY 4
-INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status, notes) VALUES
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000005-0000-0000-0000-000000000001',
    'a1111111-1111-1111-1111-111111111111', 'b2222222-2222-2222-2222-222222222222',
    (CURRENT_DATE + INTERVAL '4 days 7 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '4 days 7 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL),
+   6, 1, 'active'),
   ('c0000005-0000-0000-0000-000000000002',
    'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
    (CURRENT_DATE + INTERVAL '4 days 9 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '4 days 9 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL),
+   6, 1, 'active'),
   ('c0000005-0000-0000-0000-000000000003',
    'a4444444-4444-4444-4444-444444444444', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '4 days 10 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '4 days 10 hours 55 minutes')::timestamptz,
-   10, 1, 'active', NULL);
+   10, 1, 'active');
 
 -- DAY 5 (Saturday)
-INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status, notes) VALUES
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000006-0000-0000-0000-000000000001',
    'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '5 days 8 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '5 days 8 hours 55 minutes')::timestamptz,
-   6, 1, 'active', 'Saturday morning boxing'),
+   6, 1, 'active'),
   ('c0000006-0000-0000-0000-000000000002',
    'a2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222',
    (CURRENT_DATE + INTERVAL '5 days 10 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '5 days 10 hours 55 minutes')::timestamptz,
-   6, 1, 'active', NULL);
+   6, 1, 'active');
 
 -- DAY 6 (Sunday)
-INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status, notes) VALUES
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000007-0000-0000-0000-000000000001',
    'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
    (CURRENT_DATE + INTERVAL '6 days 9 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '6 days 9 hours 55 minutes')::timestamptz,
-   6, 1, 'active', 'Sunday strength session');
+   6, 1, 'active');
 
 -- ─── DUMMY BOOKINGS (roster population) ────
 

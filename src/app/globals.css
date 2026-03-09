@@ -2,14 +2,14 @@
 
 :root {
   --background: #0a0a0a;
-  --foreground: #f5f5f5;
+  --foreground: #ededed;
   --accent: #c8a750;
   --accent-dim: #a08535;
   --cta: #f5efe6;
   --cta-hover: #e8dfd2;
-  --muted: #888888;
+  --muted: #9a9a9a;
   --card: #111111;
-  --card-border: #1a1a1a;
+  --card-border: #232323;
 }
 
 @theme inline {
