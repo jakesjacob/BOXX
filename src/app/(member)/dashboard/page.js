@@ -967,8 +967,9 @@ function ScheduleSection({ credits, onUpdate, sharedClassId }) {
       {/* ── CALENDAR VIEW ── */}
       {!loading && schedule.length > 0 && view === 'calendar' && (
         <div>
-          {/* Desktop: 7-column grid */}
-          <div className="hidden md:grid grid-cols-7 gap-2 items-start">
+          <div className="overflow-x-auto -mx-1 px-1 pb-2">
+          {/* 7-column calendar grid — scrollable on mobile */}
+          <div className="grid grid-cols-7 gap-1.5 md:gap-2 items-start" style={{ minWidth: '640px' }}>
             {calendarDays.map((day) => {
               const isToday = day.date.toDateString() === today.toDateString()
               return (
@@ -1000,23 +1001,6 @@ function ScheduleSection({ credits, onUpdate, sharedClassId }) {
               )
             })}
           </div>
-
-          {/* Mobile: scrollable day cards */}
-          <div className="md:hidden space-y-3">
-            {calendarDays.map((day) => {
-              const isToday = day.date.toDateString() === today.toDateString()
-              if (day.classes.length === 0) return null
-              return (
-                <div key={day.key}>
-                  <div className={cn('text-xs font-medium mb-2', isToday ? 'text-accent' : 'text-muted')}>
-                    {isToday ? 'Today' : day.weekday} · {day.key.split(',')[0]}
-                  </div>
-                  <div className="space-y-1.5">
-                    {day.classes.map((cls) => renderClassCard(cls, true))}
-                  </div>
-                </div>
-              )
-            })}
           </div>
 
           {/* Expanded detail panel (shows below calendar as full branded card) */}
