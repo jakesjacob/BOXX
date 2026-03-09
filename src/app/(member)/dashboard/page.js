@@ -518,7 +518,13 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
           document.body.style.left = ''
           document.body.style.right = ''
           document.body.style.overflow = ''
+          // Restore scroll position instantly without smooth scrolling
+          document.documentElement.style.scrollBehavior = 'auto'
           window.scrollTo(0, scrollY)
+          // Restore smooth scrolling on next frame
+          requestAnimationFrame(() => {
+            document.documentElement.style.scrollBehavior = ''
+          })
         }
       }
     }
