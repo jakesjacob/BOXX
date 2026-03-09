@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 const navLinks = [
   { name: 'Home', href: '#hero' },
@@ -52,6 +54,7 @@ const socialLinks = [
 ];
 
 export default function Navbar() {
+  const { data: session } = useSession();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -151,12 +154,19 @@ export default function Navbar() {
               ))}
             </div>
 
-            <button
-              onClick={() => scrollTo('#contact')}
+            <Link
+              href="/book"
               className="ml-2 px-8 py-3.5 text-xs tracking-[0.2em] uppercase bg-cta text-[#0a0a0a] font-semibold hover:bg-cta-hover transition-colors duration-300"
             >
-              Get Started
-            </button>
+              Book a Class
+            </Link>
+
+            <Link
+              href={session ? '/dashboard' : '/login'}
+              className="ml-2 px-6 py-3.5 text-xs tracking-[0.2em] uppercase border border-white/20 hover:border-white/40 text-white/70 hover:text-white transition-all duration-300"
+            >
+              {session ? 'My Account' : 'Log In'}
+            </Link>
           </div>
 
           {/* Mobile toggle */}
@@ -226,15 +236,27 @@ export default function Navbar() {
                 ))}
               </motion.div>
 
-              <motion.button
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: (navLinks.length + 1) * 0.1, duration: 0.4 }}
-                onClick={() => scrollTo('#contact')}
-                className="mt-4 px-10 py-4 text-sm tracking-[0.2em] uppercase bg-cta text-[#0a0a0a] font-semibold"
+                className="flex flex-col items-center gap-4 mt-4"
               >
-                Get Started
-              </motion.button>
+                <Link
+                  href="/book"
+                  onClick={() => setMobileOpen(false)}
+                  className="px-10 py-4 text-sm tracking-[0.2em] uppercase bg-cta text-[#0a0a0a] font-semibold"
+                >
+                  Book a Class
+                </Link>
+                <Link
+                  href={session ? '/dashboard' : '/login'}
+                  onClick={() => setMobileOpen(false)}
+                  className="px-10 py-4 text-sm tracking-[0.2em] uppercase border border-white/20 text-white/70"
+                >
+                  {session ? 'My Account' : 'Log In'}
+                </Link>
+              </motion.div>
             </div>
           </motion.div>
         )}

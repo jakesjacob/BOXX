@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
 
 const classes = [
   {
@@ -131,15 +132,13 @@ function ClassCard({ cls, index, isExpanded, onToggle }) {
               </div>
 
               <div className="pt-3">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    document.querySelector('#contact')?.scrollIntoView({ behavior: 'smooth' });
-                  }}
+                <Link
+                  href="/book"
+                  onClick={(e) => e.stopPropagation()}
                   className="text-xs tracking-[0.2em] uppercase text-accent hover:text-accent-dim transition-colors"
                 >
-                  Get in touch &rarr;
-                </button>
+                  Book this class &rarr;
+                </Link>
               </div>
             </div>
           </motion.div>

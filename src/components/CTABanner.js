@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function CTABanner() {
   const ref = useRef(null);
@@ -60,14 +61,12 @@ export default function CTABanner() {
           transition={{ delay: 0.3 }}
           className="mt-10 flex flex-col sm:flex-row gap-4"
         >
-          <button
-            onClick={() => {
-              document.querySelector('#contact')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="px-14 py-6 bg-cta text-[#0a0a0a] text-sm tracking-[0.2em] uppercase font-semibold hover:bg-cta-hover transition-colors duration-300"
+          <Link
+            href="/book"
+            className="px-14 py-6 bg-cta text-[#0a0a0a] text-sm tracking-[0.2em] uppercase font-semibold hover:bg-cta-hover transition-colors duration-300 text-center"
           >
-            Get in Touch
-          </button>
+            Book a Class
+          </Link>
           <a
             href="https://wa.me/66934972306"
             target="_blank"

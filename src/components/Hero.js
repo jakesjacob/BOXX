@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function Hero() {
   const containerRef = useRef(null);
@@ -116,18 +117,28 @@ export default function Hero() {
           className="w-12 h-[1px] bg-accent mt-12 origin-center"
         />
 
-        {/* CTA */}
-        <motion.button
+        {/* CTAs */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.8, duration: 0.8 }}
-          onClick={() => {
-            document.querySelector('#classes')?.scrollIntoView({ behavior: 'smooth' });
-          }}
-          className="mt-12 px-14 py-6 bg-cta text-[#0a0a0a] text-sm tracking-[0.2em] uppercase font-semibold hover:bg-cta-hover transition-all duration-500"
+          className="mt-12 flex flex-col sm:flex-row gap-4"
         >
-          Explore Classes
-        </motion.button>
+          <Link
+            href="/book"
+            className="px-14 py-6 bg-cta text-[#0a0a0a] text-sm tracking-[0.2em] uppercase font-semibold hover:bg-cta-hover transition-all duration-500 text-center"
+          >
+            Book a Class
+          </Link>
+          <button
+            onClick={() => {
+              document.querySelector('#classes')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-14 py-6 border border-white/20 text-sm tracking-[0.2em] uppercase hover:bg-white/5 transition-all duration-500 text-center"
+          >
+            Explore Classes
+          </button>
+        </motion.div>
       </motion.div>
 
       {/* Scroll indicator */}

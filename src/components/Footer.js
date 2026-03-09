@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 
 const footerLinks = [
   {
@@ -10,6 +11,15 @@ const footerLinks = [
       { name: 'Classes', href: '#classes' },
       { name: 'Community', href: '#community' },
       { name: 'Contact', href: '#contact' },
+    ],
+  },
+  {
+    title: 'Members',
+    links: [
+      { name: 'Book a Class', href: '/book', route: true },
+      { name: 'Buy Class Packs', href: '/buy-classes', route: true },
+      { name: 'Member Login', href: '/login', route: true },
+      { name: 'My Dashboard', href: '/dashboard', route: true },
     ],
   },
   {
@@ -77,7 +87,7 @@ export default function Footer() {
           </div>
 
           {/* Link columns */}
-          <div className="md:col-span-7 lg:col-span-7 grid grid-cols-3 gap-8">
+          <div className="md:col-span-7 lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-8">
             {footerLinks.map((col) => (
               <div key={col.title}>
                 <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">
@@ -95,6 +105,13 @@ export default function Footer() {
                         >
                           {link.name}
                         </a>
+                      ) : link.route ? (
+                        <Link
+                          href={link.href}
+                          className="text-sm text-white/40 hover:text-accent transition-colors duration-300"
+                        >
+                          {link.name}
+                        </Link>
                       ) : (
                         <button
                           onClick={() => scrollTo(link.href)}
