@@ -28,12 +28,12 @@ const DialogContent = forwardRef(({ className, children, ...props }, ref) => (
       ref={ref}
       className={cn(
         'fixed z-50 bg-card border border-card-border shadow-lg',
-        // Mobile: full-height sheet pinned to all edges, scrollable
-        'inset-0 overflow-y-auto overscroll-contain',
+        // Mobile: full-height sheet pinned to all edges, scrollable, no horizontal scroll
+        'inset-0 overflow-y-auto overflow-x-hidden overscroll-contain',
         // Desktop: centered floating dialog
         'sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]',
-        'sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:rounded-lg',
-        'grid gap-4 p-6',
+        'sm:w-full sm:max-w-lg sm:max-h-[85vh] sm:rounded-lg sm:overflow-y-auto',
+        'grid gap-4 p-4 sm:p-6',
         className
       )}
       {...props}

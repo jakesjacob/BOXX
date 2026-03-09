@@ -2,12 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 export default function SettingsPage() {
   return (
@@ -17,40 +17,48 @@ export default function SettingsPage() {
   )
 }
 
+const TABS = [
+  { id: 'payments', label: 'Payments', icon: '💳' },
+  { id: 'studio', label: 'Studio', icon: '🏢' },
+  { id: 'booking', label: 'Booking', icon: '📋' },
+  { id: 'reminders', label: 'Reminders', icon: '🔔' },
+]
+
 function SettingsContent() {
   const searchParams = useSearchParams()
   const defaultTab = searchParams.get('tab') || 'payments'
   const connected = searchParams.get('connected')
   const error = searchParams.get('error')
+  const [activeTab, setActiveTab] = useState(defaultTab)
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">Settings</h1>
 
-      <Tabs defaultValue={defaultTab}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="studio">Studio Info</TabsTrigger>
-          <TabsTrigger value="booking">Booking Rules</TabsTrigger>
-          <TabsTrigger value="reminders">Reminders</TabsTrigger>
-        </TabsList>
+      {/* Tab buttons — horizontal scroll on mobile */}
+      <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors shrink-0',
+              activeTab === tab.id
+                ? 'bg-accent/10 text-accent'
+                : 'text-muted hover:text-foreground hover:bg-white/5'
+            )}
+          >
+            <span className="text-base">{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="payments">
-          <PaymentsTab connected={connected} error={error} />
-        </TabsContent>
-
-        <TabsContent value="studio">
-          <PlaceholderTab title="Studio Info" description="Studio name, address, contact details — coming in Phase 5." />
-        </TabsContent>
-
-        <TabsContent value="booking">
-          <PlaceholderTab title="Booking Rules" description="Cancellation window, capacity, advance booking — coming in Phase 5." />
-        </TabsContent>
-
-        <TabsContent value="reminders">
-          <PlaceholderTab title="Reminders" description="24h and 2h reminder toggles — coming in Phase 5." />
-        </TabsContent>
-      </Tabs>
+      {/* Tab content */}
+      {activeTab === 'payments' && <PaymentsTab connected={connected} error={error} />}
+      {activeTab === 'studio' && <PlaceholderTab title="Studio Info" description="Studio name, address, contact details — coming soon." />}
+      {activeTab === 'booking' && <PlaceholderTab title="Booking Rules" description="Cancellation window, capacity, advance booking — coming soon." />}
+      {activeTab === 'reminders' && <PlaceholderTab title="Reminders" description="24h and 2h reminder toggles — coming soon." />}
     </div>
   )
 }
@@ -59,7 +67,7 @@ function PlaceholderTab({ title, description }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle className="text-base">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
     </Card>
@@ -156,7 +164,7 @@ function PaymentsTab({ connected, error }) {
         <CardContent className="py-8">
           <div className="animate-pulse space-y-4">
             <div className="h-6 bg-card-border rounded w-48" />
-            <div className="h-12 bg-card-border rounded w-64" />
+            <div className="h-12 bg-card-border rounded w-full sm:w-64" />
           </div>
         </CardContent>
       </Card>
@@ -164,15 +172,15 @@ function PaymentsTab({ connected, error }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Connection status messages */}
       {connected && (
-        <div className="p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
+        <div className="p-3 sm:p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
           <p className="text-green-400 text-sm font-medium">Stripe account connected successfully!</p>
         </div>
       )}
       {error && (
-        <div className="p-4 bg-red-600/10 border border-red-600/20 rounded-lg">
+        <div className="p-3 sm:p-4 bg-red-600/10 border border-red-600/20 rounded-lg">
           <p className="text-red-400 text-sm font-medium">
             {error === 'denied' && 'Stripe connection was cancelled.'}
             {error === 'invalid' && 'Invalid connection request.'}
@@ -186,34 +194,35 @@ function PaymentsTab({ connected, error }) {
       {/* Stripe Connection Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2">
             <span>💳</span> Stripe Connection
           </CardTitle>
           <CardDescription>
-            Connect your Stripe account to accept payments directly.
+            Connect your Stripe account to accept payments.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {stripeStatus?.isConnected ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
                 <Badge variant="success">Connected</Badge>
-                <span className="text-sm text-muted break-all">
-                  Account: {stripeStatus.accountId}
-                </span>
               </div>
-              <p className="text-xs text-muted">
-                Payments go directly to your Stripe account — no middleman.
+              <p className="text-xs text-muted break-all">
+                Account: {stripeStatus.accountId}
               </p>
-              <div className="flex flex-wrap gap-2 sm:gap-3">
-                <Button variant="outline" size="sm" asChild>
+              <p className="text-xs text-muted">
+                Payments go directly to your Stripe account.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
                   <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer">
-                    Open Stripe Dashboard ↗
+                    Stripe Dashboard ↗
                   </a>
                 </Button>
                 <Button
                   variant="destructive"
                   size="sm"
+                  className="w-full sm:w-auto"
                   onClick={handleDisconnect}
                   disabled={disconnecting}
                 >
@@ -222,11 +231,11 @@ function PaymentsTab({ connected, error }) {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <p className="text-sm text-muted">
-                Connect your Stripe account to start accepting payments. Payments go directly to you — we never touch your money.
+                Connect your Stripe account to start accepting payments.
               </p>
-              <Button asChild>
+              <Button className="w-full sm:w-auto" asChild>
                 <a href="/api/stripe/connect">Connect with Stripe</a>
               </Button>
             </div>
@@ -238,9 +247,9 @@ function PaymentsTab({ connected, error }) {
       {stripeStatus?.isConnected && (
         <Card>
           <CardHeader>
-            <CardTitle>Stripe Price IDs</CardTitle>
+            <CardTitle className="text-base">Stripe Price IDs</CardTitle>
             <CardDescription>
-              Create products in your Stripe dashboard, then paste the Price IDs here.
+              Create products in Stripe, then paste Price IDs here.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -259,12 +268,12 @@ function PaymentsTab({ connected, error }) {
             ))}
 
             {saveMessage && (
-              <p className={`text-sm ${saveMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={cn('text-sm', saveMessage.type === 'success' ? 'text-green-400' : 'text-red-400')}>
                 {saveMessage.text}
               </p>
             )}
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 pt-2">
+            <div className="space-y-2 pt-2">
               <Button onClick={handleSavePriceIds} disabled={saving} className="w-full sm:w-auto">
                 {saving ? 'Saving...' : 'Save Price IDs'}
               </Button>
@@ -272,7 +281,7 @@ function PaymentsTab({ connected, error }) {
                 href="https://docs.stripe.com/products-prices/how-products-and-prices-work#what-is-a-price"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-accent hover:underline text-center sm:text-left"
+                className="block text-xs text-accent hover:underline"
               >
                 How to find your Price IDs →
               </a>

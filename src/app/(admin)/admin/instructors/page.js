@@ -82,7 +82,8 @@ export default function AdminInstructorsPage() {
     }
   }
 
-  async function handleToggleActive(inst) {
+  async function handleToggleActive(e, inst) {
+    e.stopPropagation()
     try {
       const res = await fetch('/api/admin/instructors', {
         method: 'PUT',
@@ -102,28 +103,24 @@ export default function AdminInstructorsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-foreground">Instructors</h1>
-        <Button onClick={openCreate}>+ Add Instructor</Button>
+        <Button onClick={openCreate}>+ Add</Button>
       </div>
 
       {/* Toast */}
       {toast && (
         <div className={cn(
-          'mb-6 px-4 py-3 rounded-lg border flex items-center justify-between',
+          'fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 px-4 py-3 rounded-lg border flex items-center gap-3 shadow-lg backdrop-blur-sm sm:max-w-sm',
           toast.type === 'error'
             ? 'bg-red-500/10 border-red-500/20 text-red-400'
             : 'bg-green-500/10 border-green-500/20 text-green-400'
         )}>
-          <span className="text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <span className="text-sm flex-1">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100 shrink-0">✕</button>
         </div>
       )}
 
       {loading ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {[1, 2].map((i) => (
             <div key={i} className="h-20 bg-card border border-card-border rounded-lg animate-pulse" />
           ))}
@@ -133,19 +130,19 @@ export default function AdminInstructorsPage() {
           <p className="text-muted">No instructors yet.</p>
         </div>
       ) : (
-        <div className="border border-card-border rounded-lg overflow-hidden">
-          {instructors.map((inst, idx) => (
-            <div
+        <div className="space-y-2">
+          {instructors.map((inst) => (
+            <button
               key={inst.id}
+              onClick={() => openEdit(inst)}
               className={cn(
-                'px-3 sm:px-4 py-3',
-                idx !== instructors.length - 1 && 'border-b border-card-border',
+                'w-full text-left border border-card-border rounded-lg p-3 sm:p-4 transition-colors hover:bg-white/[0.03]',
                 !inst.active && 'opacity-50'
               )}
             >
-              <div className="flex items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-3">
                 {/* Photo */}
-                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-11 h-11 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                   {inst.photo_url ? (
                     <img src={inst.photo_url} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -158,7 +155,7 @@ export default function AdminInstructorsPage() {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{inst.name}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{inst.name}</p>
                     {!inst.active && (
                       <span className="text-[10px] font-medium text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded shrink-0">
                         Inactive
@@ -167,38 +164,19 @@ export default function AdminInstructorsPage() {
                   </div>
                   {inst.bio && <p className="text-xs text-muted truncate mt-0.5">{inst.bio}</p>}
                   {inst.instagram_url && (
-                    <a href={inst.instagram_url} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">
-                      Instagram
-                    </a>
+                    <p className="text-[11px] text-accent mt-0.5">Instagram linked</p>
                   )}
                 </div>
 
-                {/* Actions — visible on sm+ inline */}
-                <div className="hidden sm:flex items-center gap-2 shrink-0">
+                {/* Toggle — stop propagation so tapping switch doesn't open dialog */}
+                <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                   <Switch
                     checked={inst.active}
-                    onCheckedChange={() => handleToggleActive(inst)}
+                    onCheckedChange={() => handleToggleActive({ stopPropagation: () => {} }, inst)}
                   />
-                  <Button variant="outline" className="text-xs h-7 px-2" onClick={() => openEdit(inst)}>
-                    Edit
-                  </Button>
                 </div>
               </div>
-
-              {/* Actions — mobile: below the main row */}
-              <div className="flex sm:hidden items-center gap-3 mt-2 ml-[52px]">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={inst.active}
-                    onCheckedChange={() => handleToggleActive(inst)}
-                  />
-                  <span className="text-xs text-muted">{inst.active ? 'Active' : 'Inactive'}</span>
-                </div>
-                <Button variant="outline" className="text-xs h-7 px-3" onClick={() => openEdit(inst)}>
-                  Edit
-                </Button>
-              </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

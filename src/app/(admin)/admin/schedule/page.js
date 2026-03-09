@@ -447,13 +447,13 @@ export default function AdminSchedulePage() {
             const addHue = form.recurring ? '#a78bfa' : ct?.is_private ? '#fbbf24' : '#38bdf8'
             return <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${addColor}, ${addHue}88)` }} />
           })()}
-          <div className="px-6 pt-5 pb-2">
+          <div className="px-4 sm:px-6 pt-5 pb-2">
             <DialogHeader>
               <DialogTitle>Add Class</DialogTitle>
               <DialogDescription>Schedule a new class — toggle recurring to create multiple.</DialogDescription>
             </DialogHeader>
           </div>
-          <div className="px-6 pb-2 relative">
+          <div className="px-4 sm:px-6 pb-2 relative">
             {(() => {
               const ct = classTypes.find((c) => c.id === form.classTypeId)
               const addHue = form.recurring ? '#a78bfa' : ct?.is_private ? '#fbbf24' : '#38bdf8'
@@ -464,7 +464,7 @@ export default function AdminSchedulePage() {
             </div>
           </div>
           {form.recurring && form.days.length > 0 && (
-            <p className="text-xs text-muted px-6 -mt-1 pb-2">
+            <p className="text-xs text-muted px-4 sm:px-6 -mt-1 pb-2">
               {form.everyWeek
                 ? `Will create ~52 classes (every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]} for 1 year)`
                 : `Will create ~${form.weeks} classes (every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]} for ${form.weeks} week${form.weeks !== 1 ? 's' : ''})`
@@ -478,7 +478,7 @@ export default function AdminSchedulePage() {
             if (!ct?.is_private) return null
             const invitedIds = new Set(inviteMembers.map((m) => m.id))
             return (
-              <div className="px-6 pb-3 space-y-3">
+              <div className="px-4 sm:px-6 pb-3 space-y-3">
                 <div className="border-t border-card-border pt-3">
                   <p className="text-xs font-medium text-muted uppercase tracking-wide mb-2">Invite Members</p>
                   <form onSubmit={(e) => { e.preventDefault(); searchInviteMembers() }} className="flex gap-2">
@@ -554,7 +554,7 @@ export default function AdminSchedulePage() {
             )
           })()}
 
-          <div className="border-t border-card-border px-6 py-4 flex justify-end gap-2">
+          <div className="border-t border-card-border px-4 sm:px-6 py-4 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setAddDialog(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={submitting || (form.recurring && form.days.length === 0)}>
               {submitting ? 'Creating...' : form.recurring
@@ -589,11 +589,11 @@ export default function AdminSchedulePage() {
                 <div className="h-1.5 w-full rounded-t-lg" style={{ background: `linear-gradient(90deg, ${color}, ${categoryHue}88)` }} />
 
                 {/* Header section */}
-                <div className="px-6 pt-5 pb-4">
+                <div className="px-4 sm:px-6 pt-5 pb-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2.5 flex-wrap">
-                        <h2 className="text-xl font-bold text-foreground">{editDialog.class_types?.name || 'Class'}</h2>
+                        <h2 className="text-lg sm:text-xl font-bold text-foreground">{editDialog.class_types?.name || 'Class'}</h2>
                         {isRecurring && (
                           <span className="text-[11px] font-medium text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded-full flex items-center gap-1">
                             <span className="text-sm">↻</span> Recurring
@@ -713,7 +713,7 @@ export default function AdminSchedulePage() {
                 <div className="border-t border-card-border" />
 
                 {/* Edit form section — tinted by category hue */}
-                <div className="px-6 py-5 relative">
+                <div className="px-4 sm:px-6 py-5 relative">
                   <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ background: `linear-gradient(135deg, ${categoryHue}, transparent 60%)` }} />
                   <div className="relative">
                     <p className="text-xs font-medium text-muted uppercase tracking-wide mb-3">Edit Details</p>
