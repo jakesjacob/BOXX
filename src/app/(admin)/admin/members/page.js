@@ -437,7 +437,7 @@ export default function AdminMembersPage() {
                 <select
                   value={editForm.role}
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="mt-1 w-full rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30"
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
@@ -482,7 +482,7 @@ export default function AdminMembersPage() {
                 <select
                   value={grantPackId}
                   onChange={(e) => setGrantPackId(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="mt-1 w-full rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30"
                 >
                   {packs.map((p) => (
                     <option key={p.id} value={p.id}>{p.name} ({p.credits || '∞'} credits, {p.validity_days}d)</option>
@@ -543,7 +543,7 @@ export default function AdminMembersPage() {
             <select
               value={roleFilter}
               onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}
-              className="rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              className="rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30"
             >
               <option value="">All Roles</option>
               <option value="member">Member</option>
@@ -555,7 +555,7 @@ export default function AdminMembersPage() {
             <select
               value={creditsFilter}
               onChange={(e) => { setCreditsFilter(e.target.value); setPage(1) }}
-              className="rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              className="rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30"
             >
               <option value="">All</option>
               <option value="yes">Has Credits</option>
@@ -567,7 +567,7 @@ export default function AdminMembersPage() {
             <select
               value={sortBy}
               onChange={(e) => { setSortBy(e.target.value); setPage(1) }}
-              className="rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              className="rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>

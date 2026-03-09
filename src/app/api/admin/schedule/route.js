@@ -112,7 +112,7 @@ const createClassSchema = z.object({
   startsAt: z.string().min(1),
   endsAt: z.string().min(1),
   capacity: z.number().int().min(1).max(50).optional(),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
 })
 
 /**
@@ -136,6 +136,26 @@ export async function POST(request) {
     }
 
     const { classTypeId, instructorId, startsAt, endsAt, capacity, notes } = parsed.data
+
+    // Business rule: check for time clashes with same instructor
+    const newStart = new Date(startsAt)
+    const newEnd = new Date(endsAt)
+
+    const { data: overlaps } = await supabaseAdmin
+      .from('class_schedule')
+      .select('id, starts_at, ends_at, class_types(name)')
+      .eq('instructor_id', instructorId)
+      .eq('status', 'active')
+      .lt('starts_at', newEnd.toISOString())
+      .gt('ends_at', newStart.toISOString())
+
+    if (overlaps && overlaps.length > 0) {
+      const clash = overlaps[0]
+      const clashTime = new Date(clash.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok' })
+      return NextResponse.json({
+        error: `Time clash: instructor already has "${clash.class_types?.name}" at ${clashTime}`,
+      }, { status: 409 })
+    }
 
     const { data: cls, error } = await supabaseAdmin
       .from('class_schedule')
@@ -180,10 +200,18 @@ const updateClassSchema = z.object({
   endsAt: z.string().min(1).optional(),
   capacity: z.number().int().min(1).max(50).optional(),
   notes: z.string().nullable().optional(),
+  updateAll: z.boolean().optional(),       // Apply shared fields to all recurring siblings
+  unlinkFromRecurring: z.boolean().optional(), // Remove this class from its recurring set
 })
 
 /**
  * PUT /api/admin/schedule — Update an existing class
+ *
+ * Recurring modes:
+ * - unlinkFromRecurring: true → save changes to this class only, set recurring_id = null
+ * - updateAll: true → apply classTypeId, instructorId, capacity, notes, and time-of-day to all
+ *   active siblings (each keeps its own date). The specific class also gets date changes.
+ * - neither → just update this single class (keeps recurring_id)
  */
 export async function PUT(request) {
   try {
@@ -202,18 +230,76 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    const { id, classTypeId, instructorId, startsAt, endsAt, capacity, notes } = parsed.data
+    const { id, classTypeId, instructorId, startsAt, endsAt, capacity, notes, updateAll, unlinkFromRecurring } = parsed.data
 
-    const updates = {}
-    if (classTypeId) {
-      updates.class_type_id = classTypeId
+    // Fetch existing class for validation
+    const { data: existing } = await supabaseAdmin
+      .from('class_schedule')
+      .select('id, class_type_id, capacity, starts_at, ends_at, instructor_id, recurring_id')
+      .eq('id', id)
+      .single()
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Class not found' }, { status: 404 })
     }
+
+    // Business rule: class type cannot change after creation
+    if (classTypeId && classTypeId !== existing.class_type_id) {
+      return NextResponse.json({ error: 'Class type cannot be changed after creation' }, { status: 400 })
+    }
+
+    // Business rule: capacity cannot go below current bookings
+    if (capacity !== undefined) {
+      const { count: bookedCount } = await supabaseAdmin
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_schedule_id', id)
+        .eq('status', 'confirmed')
+
+      if (capacity < (bookedCount || 0)) {
+        return NextResponse.json({ error: `Cannot reduce capacity below ${bookedCount} (current bookings)` }, { status: 400 })
+      }
+    }
+
+    // Business rule: check for time clashes with other classes by the same instructor
+    if (startsAt && endsAt) {
+      const newStart = new Date(startsAt)
+      const newEnd = new Date(endsAt)
+      const checkInstructor = instructorId || existing.instructor_id
+
+      const { data: overlaps } = await supabaseAdmin
+        .from('class_schedule')
+        .select('id, starts_at, ends_at, class_types(name)')
+        .eq('instructor_id', checkInstructor)
+        .eq('status', 'active')
+        .neq('id', id)
+        .lt('starts_at', newEnd.toISOString())
+        .gt('ends_at', newStart.toISOString())
+
+      if (overlaps && overlaps.length > 0) {
+        const clash = overlaps[0]
+        const clashTime = new Date(clash.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok' })
+        return NextResponse.json({
+          error: `Time clash: instructor already has "${clash.class_types?.name}" at ${clashTime}`,
+        }, { status: 409 })
+      }
+    }
+
+    // Build updates for the individual class
+    const updates = {}
+    // classTypeId is intentionally NOT applied (locked after creation)
     if (instructorId) updates.instructor_id = instructorId
     if (startsAt) updates.starts_at = startsAt
     if (endsAt) updates.ends_at = endsAt
     if (capacity !== undefined) updates.capacity = capacity
     if (notes !== undefined) updates.notes = notes
 
+    // If unlinking, clear recurring_id on this class
+    if (unlinkFromRecurring) {
+      updates.recurring_id = null
+    }
+
+    // Update the individual class
     const { data: cls, error } = await supabaseAdmin
       .from('class_schedule')
       .update(updates)
@@ -226,15 +312,70 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Failed to update class' }, { status: 500 })
     }
 
+    let siblingsUpdated = 0
+
+    // If updateAll, apply shared fields to all active recurring siblings
+    if (updateAll && cls.recurring_id) {
+      const sharedUpdates = {}
+      // classTypeId intentionally excluded — locked after creation
+      if (instructorId) sharedUpdates.instructor_id = instructorId
+      if (capacity !== undefined) sharedUpdates.capacity = capacity
+      if (notes !== undefined) sharedUpdates.notes = notes
+
+      // Apply time-of-day change to all siblings (keep each class's date, change the time)
+      if (startsAt && endsAt) {
+        const newStart = new Date(startsAt)
+        const newEnd = new Date(endsAt)
+        const startH = newStart.getUTCHours(), startM = newStart.getUTCMinutes()
+        const endH = newEnd.getUTCHours(), endM = newEnd.getUTCMinutes()
+
+        // Get all active siblings (excluding the one we just updated)
+        const { data: siblings } = await supabaseAdmin
+          .from('class_schedule')
+          .select('id, starts_at, ends_at')
+          .eq('recurring_id', cls.recurring_id)
+          .eq('status', 'active')
+          .neq('id', id)
+
+        for (const sib of (siblings || [])) {
+          const sibStart = new Date(sib.starts_at)
+          const sibEnd = new Date(sib.ends_at)
+          sibStart.setUTCHours(startH, startM, 0, 0)
+          sibEnd.setUTCHours(endH, endM, 0, 0)
+
+          await supabaseAdmin
+            .from('class_schedule')
+            .update({
+              ...sharedUpdates,
+              starts_at: sibStart.toISOString(),
+              ends_at: sibEnd.toISOString(),
+            })
+            .eq('id', sib.id)
+
+          siblingsUpdated++
+        }
+      } else if (Object.keys(sharedUpdates).length > 0) {
+        // No time change — just apply shared fields
+        const { count } = await supabaseAdmin
+          .from('class_schedule')
+          .update(sharedUpdates)
+          .eq('recurring_id', cls.recurring_id)
+          .eq('status', 'active')
+          .neq('id', id)
+
+        siblingsUpdated = count || 0
+      }
+    }
+
     await supabaseAdmin.from('admin_audit_log').insert({
       admin_id: session.user.id,
-      action: 'update_class',
+      action: updateAll ? 'update_recurring_classes' : 'update_class',
       target_type: 'class_schedule',
       target_id: id,
-      details: updates,
+      details: { ...updates, siblingsUpdated },
     })
 
-    return NextResponse.json({ class: cls })
+    return NextResponse.json({ class: cls, siblingsUpdated })
   } catch (error) {
     console.error('[admin/schedule] Error:', error)
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })

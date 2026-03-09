@@ -79,9 +79,38 @@ export async function POST(request) {
       return NextResponse.json({ error: 'No classes to create for the selected days/dates' }, { status: 400 })
     }
 
+    // Business rule: filter out classes that clash with the same instructor's existing schedule
+    const firstStart = classesToInsert[0].starts_at
+    const lastEnd = classesToInsert[classesToInsert.length - 1].ends_at
+
+    const { data: existingClasses } = await supabaseAdmin
+      .from('class_schedule')
+      .select('starts_at, ends_at')
+      .eq('instructor_id', instructorId)
+      .eq('status', 'active')
+      .gte('starts_at', new Date(new Date(firstStart).getTime() - 86400000).toISOString())
+      .lte('starts_at', new Date(new Date(lastEnd).getTime() + 86400000).toISOString())
+
+    let skipped = 0
+    const filtered = classesToInsert.filter((cls) => {
+      const s = new Date(cls.starts_at).getTime()
+      const e = new Date(cls.ends_at).getTime()
+      const hasClash = (existingClasses || []).some((ex) => {
+        const es = new Date(ex.starts_at).getTime()
+        const ee = new Date(ex.ends_at).getTime()
+        return s < ee && e > es
+      })
+      if (hasClash) skipped++
+      return !hasClash
+    })
+
+    if (filtered.length === 0) {
+      return NextResponse.json({ error: 'All classes clash with existing instructor schedule' }, { status: 409 })
+    }
+
     const { data: created, error } = await supabaseAdmin
       .from('class_schedule')
-      .insert(classesToInsert)
+      .insert(filtered)
       .select('id')
 
     if (error) {
@@ -106,8 +135,11 @@ export async function POST(request) {
 
     return NextResponse.json({
       created: created.length,
+      skipped,
       recurringId,
-      message: `Created ${created.length} classes`,
+      message: skipped > 0
+        ? `Created ${created.length} classes (${skipped} skipped due to time clashes)`
+        : `Created ${created.length} classes`,
     })
   } catch (error) {
     console.error('[admin/schedule/recurring] Error:', error)

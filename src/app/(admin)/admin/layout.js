@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 const sidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: '🏠' },
   { name: 'Schedule', href: '/admin/schedule', icon: '📅' },
-  { name: 'Bookings', href: '/admin/bookings', icon: '📋' },
+  { name: 'Activity', href: '/admin/bookings', icon: '📋' },
   { name: 'Members', href: '/admin/members', icon: '👥' },
   { name: 'Class Packs', href: '/admin/packs', icon: '📦' },
   { name: 'Class Types', href: '/admin/class-types', icon: '🏷️' },

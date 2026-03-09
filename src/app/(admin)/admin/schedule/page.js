@@ -33,6 +33,12 @@ export default function AdminSchedulePage() {
     recurring: false, days: [], weeks: 4, everyWeek: false,
   })
 
+  // Private class member invite state
+  const [inviteMembers, setInviteMembers] = useState([]) // { id, name, email, avatar_url }
+  const [inviteSearch, setInviteSearch] = useState('')
+  const [inviteResults, setInviteResults] = useState([])
+  const [inviteSearching, setInviteSearching] = useState(false)
+
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 4000)
@@ -81,10 +87,14 @@ export default function AdminSchedulePage() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
 
   const classesByDay = {}
+  const recurringCounts = {}
   classes.forEach((cls) => {
     const dateKey = new Date(cls.starts_at).toISOString().split('T')[0]
     if (!classesByDay[dateKey]) classesByDay[dateKey] = []
     classesByDay[dateKey].push(cls)
+    if (cls.recurring_id) {
+      recurringCounts[cls.recurring_id] = (recurringCounts[cls.recurring_id] || 0) + 1
+    }
   })
 
   function openAddDialog(date) {
@@ -96,6 +106,9 @@ export default function AdminSchedulePage() {
       startTime: '07:00', endTime: '07:55', capacity: 6, notes: '',
       recurring: false, days: [dayOfWeek], weeks: 4, everyWeek: false,
     })
+    setInviteMembers([])
+    setInviteSearch('')
+    setInviteResults([])
     setAddDialog(true)
   }
 
@@ -118,9 +131,27 @@ export default function AdminSchedulePage() {
     return new Date(`${date}T${time}:00+07:00`).toISOString()
   }
 
+  async function searchInviteMembers() {
+    if (!inviteSearch.trim()) return
+    setInviteSearching(true)
+    try {
+      const res = await fetch(`/api/admin/members?search=${encodeURIComponent(inviteSearch)}&limit=10`)
+      if (res.ok) {
+        const data = await res.json()
+        setInviteResults(data.members || [])
+      }
+    } catch (err) {
+      console.error('Invite search failed:', err)
+    } finally {
+      setInviteSearching(false)
+    }
+  }
+
   async function handleCreate() {
     setSubmitting(true)
     try {
+      let createdClassId = null
+
       if (form.recurring && form.days.length > 0) {
         // Recurring: use the recurring endpoint
         const weeks = form.everyWeek ? 52 : form.weeks
@@ -150,18 +181,40 @@ export default function AdminSchedulePage() {
         })
         const data = await res.json()
         if (!res.ok) { setToast({ message: data.error || 'Failed to create class', type: 'error' }); return }
+        createdClassId = data.class?.id
         setToast({ message: 'Class created', type: 'success' })
       }
+
+      // Add invited members to the class (private classes)
+      if (createdClassId && inviteMembers.length > 0) {
+        let added = 0
+        for (const member of inviteMembers) {
+          const res = await fetch('/api/admin/schedule/roster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ classId: createdClassId, userId: member.id }),
+          })
+          if (res.ok) added++
+        }
+        if (added > 0) {
+          setToast({ message: `Class created with ${added} member${added !== 1 ? 's' : ''} added`, type: 'success' })
+        }
+      }
+
       setAddDialog(false); fetchClasses()
     } catch { setToast({ message: 'Something went wrong', type: 'error' }) }
     finally { setSubmitting(false) }
   }
 
-  async function handleUpdate() {
+  // mode: 'this' = save this only (unlink if recurring), 'all' = apply to all recurring siblings
+  async function handleUpdate(mode = 'this') {
     if (!editDialog) return
     setSubmitting(true)
     try {
-      // First update the existing class
+      const isRecurring = !!editDialog.recurring_id
+      const unlinkFromRecurring = isRecurring && mode === 'this'
+      const updateAll = isRecurring && mode === 'all'
+
       const res = await fetch('/api/admin/schedule', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -169,15 +222,16 @@ export default function AdminSchedulePage() {
           id: editDialog.id, classTypeId: form.classTypeId, instructorId: form.instructorId,
           startsAt: buildDatetime(form.date, form.startTime), endsAt: buildDatetime(form.date, form.endTime),
           capacity: form.capacity, notes: form.notes || null,
+          updateAll,
+          unlinkFromRecurring,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setToast({ message: data.error || 'Failed to update', type: 'error' }); return }
 
-      // If recurring is enabled, create future copies starting from the next occurrence
-      if (form.recurring && form.days.length > 0) {
+      // If "make recurring" toggle is on (for non-recurring classes or extending), create future copies
+      if (form.recurring && form.days.length > 0 && !isRecurring) {
         const weeks = form.everyWeek ? 52 : form.weeks
-        // Start from the day after the current class date so we don't duplicate
         const nextDate = new Date(form.date + 'T00:00:00+07:00')
         nextDate.setDate(nextDate.getDate() + 1)
         const recurRes = await fetch('/api/admin/schedule/recurring', {
@@ -196,6 +250,10 @@ export default function AdminSchedulePage() {
         } else {
           setToast({ message: `Class updated but recurring failed: ${recurData.error}`, type: 'error' })
         }
+      } else if (updateAll && data.siblingsUpdated > 0) {
+        setToast({ message: `Updated this class + ${data.siblingsUpdated} recurring sibling${data.siblingsUpdated !== 1 ? 's' : ''}`, type: 'success' })
+      } else if (unlinkFromRecurring) {
+        setToast({ message: 'Class updated and removed from recurring set', type: 'success' })
       } else {
         setToast({ message: 'Class updated', type: 'success' })
       }
@@ -234,18 +292,22 @@ export default function AdminSchedulePage() {
     }
   }
 
-  async function handleCancel() {
+  async function handleCancel(cancelAll = false) {
     if (!cancelDialog) return
     setSubmitting(true)
     try {
       const res = await fetch('/api/admin/schedule/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classId: cancelDialog.id }),
+        body: JSON.stringify({ classId: cancelDialog.id, cancelAll }),
       })
       const data = await res.json()
       if (!res.ok) { setToast({ message: data.error || 'Failed to cancel', type: 'error' }); return }
-      setToast({ message: `Cancelled. ${data.bookingsCancelled} booking(s), ${data.creditsRefunded} credit(s) refunded.`, type: 'success' })
+      if (cancelAll) {
+        setToast({ message: `Cancelled ${data.classesCancelled} classes. ${data.bookingsCancelled} booking(s), ${data.creditsRefunded} credit(s) refunded.`, type: 'success' })
+      } else {
+        setToast({ message: `Cancelled. ${data.bookingsCancelled} booking(s), ${data.creditsRefunded} credit(s) refunded.`, type: 'success' })
+      }
       setCancelDialog(null); fetchClasses()
     } catch { setToast({ message: 'Something went wrong', type: 'error' }) }
     finally { setSubmitting(false) }
@@ -266,9 +328,9 @@ export default function AdminSchedulePage() {
       </div>
 
       {toast && (
-        <div className={cn('mb-6 px-4 py-3 rounded-lg border flex items-center justify-between', toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400')}>
+        <div className={cn('fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg border flex items-center gap-3 shadow-lg max-w-sm animate-in slide-in-from-bottom-2', toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400 backdrop-blur-sm' : 'bg-green-500/10 border-green-500/20 text-green-400 backdrop-blur-sm')}>
           <span className="text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100">✕</button>
+          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100 shrink-0">✕</button>
         </div>
       )}
 
@@ -309,6 +371,7 @@ export default function AdminSchedulePage() {
                     const isCancelled = cls.status === 'cancelled'
                     const isFull = cls.booked_count >= cls.capacity
                     const isPrivate = cls.is_private || cls.class_types?.is_private
+                    const isRecurring = !!cls.recurring_id
                     const fillPct = cls.capacity > 0 ? Math.min((cls.booked_count / cls.capacity) * 100, 100) : 0
 
                     return (
@@ -316,9 +379,12 @@ export default function AdminSchedulePage() {
                         key={cls.id}
                         onClick={() => isCancelled ? null : openEditDialog(cls)}
                         className={cn(
-                          'w-full text-left px-2.5 py-2 rounded-md transition-colors border-l-[3px]',
+                          'w-full text-left px-2.5 py-2 rounded-md transition-colors border-l-[3px] relative',
                           isCancelled ? 'bg-red-500/5 opacity-50 cursor-default border-l-red-500/40' : 'bg-card hover:bg-white/[0.04] cursor-pointer',
-                          !isCancelled && 'border-l-transparent'
+                          !isCancelled && 'border-l-transparent',
+                          !isCancelled && isRecurring && !isPrivate && 'ring-1 ring-purple-400/20 bg-gradient-to-r from-purple-500/[0.06] to-transparent',
+                          !isCancelled && isPrivate && 'ring-1 ring-amber-400/20 bg-gradient-to-r from-amber-500/[0.06] to-transparent',
+                          !isCancelled && !isRecurring && !isPrivate && 'ring-1 ring-sky-400/15 bg-gradient-to-r from-sky-500/[0.04] to-transparent'
                         )}
                         style={!isCancelled ? { borderLeftColor: cls.class_types?.color || '#c8a750' } : undefined}
                       >
@@ -326,7 +392,12 @@ export default function AdminSchedulePage() {
                           <span className={cn('text-sm font-semibold truncate', isCancelled ? 'line-through text-muted' : 'text-foreground')}>
                             {cls.class_types?.name || 'Class'}
                           </span>
-                          {isPrivate && <span className="text-[9px] text-amber-400 shrink-0">🔒</span>}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isRecurring && !isCancelled && (
+                              <span className="text-sm text-purple-400/70" title="Recurring class">↻</span>
+                            )}
+                            {isPrivate && <span className="text-[9px] text-amber-400">🔒</span>}
+                          </div>
                         </div>
                         <p className="text-[11px] text-muted mt-0.5">{time} – {endTime}</p>
                         {cls.instructors?.name && (
@@ -368,120 +439,324 @@ export default function AdminSchedulePage() {
 
       {/* Add Class Dialog */}
       <Dialog open={addDialog} onOpenChange={(open) => !open && setAddDialog(false)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Add Class</DialogTitle><DialogDescription>Schedule a new class — toggle recurring to create multiple.</DialogDescription></DialogHeader>
-          <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} showRecurring />
+        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+          {/* Color bar — class color into category hue */}
+          {(() => {
+            const ct = classTypes.find((c) => c.id === form.classTypeId)
+            const addColor = ct?.color || '#c8a750'
+            const addHue = form.recurring ? '#a78bfa' : ct?.is_private ? '#fbbf24' : '#38bdf8'
+            return <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${addColor}, ${addHue}88)` }} />
+          })()}
+          <div className="px-6 pt-5 pb-2">
+            <DialogHeader>
+              <DialogTitle>Add Class</DialogTitle>
+              <DialogDescription>Schedule a new class — toggle recurring to create multiple.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="px-6 pb-2 relative">
+            {(() => {
+              const ct = classTypes.find((c) => c.id === form.classTypeId)
+              const addHue = form.recurring ? '#a78bfa' : ct?.is_private ? '#fbbf24' : '#38bdf8'
+              return <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ background: `linear-gradient(135deg, ${addHue}, transparent 60%)` }} />
+            })()}
+            <div className="relative">
+              <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} showRecurring />
+            </div>
+          </div>
           {form.recurring && form.days.length > 0 && (
-            <p className="text-xs text-muted -mt-2">
+            <p className="text-xs text-muted px-6 -mt-1 pb-2">
               {form.everyWeek
                 ? `Will create ~52 classes (every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]} for 1 year)`
                 : `Will create ~${form.weeks} classes (every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]} for ${form.weeks} week${form.weeks !== 1 ? 's' : ''})`
               }
             </p>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+
+          {/* Invite members — shown for private class types */}
+          {(() => {
+            const ct = classTypes.find((c) => c.id === form.classTypeId)
+            if (!ct?.is_private) return null
+            const invitedIds = new Set(inviteMembers.map((m) => m.id))
+            return (
+              <div className="px-6 pb-3 space-y-3">
+                <div className="border-t border-card-border pt-3">
+                  <p className="text-xs font-medium text-muted uppercase tracking-wide mb-2">Invite Members</p>
+                  <form onSubmit={(e) => { e.preventDefault(); searchInviteMembers() }} className="flex gap-2">
+                    <Input
+                      placeholder="Search by name or email..."
+                      value={inviteSearch}
+                      onChange={(e) => setInviteSearch(e.target.value)}
+                      className="text-sm"
+                    />
+                    <Button type="submit" variant="outline" size="sm" disabled={inviteSearching}>
+                      {inviteSearching ? '...' : 'Search'}
+                    </Button>
+                  </form>
+                  {inviteResults.length > 0 && (
+                    <div className="border border-card-border/60 rounded-lg mt-2 max-h-[120px] overflow-y-auto">
+                      {inviteResults.filter((m) => !invitedIds.has(m.id)).map((m) => (
+                        <div key={m.id} className="flex items-center justify-between px-3 py-1.5 border-b border-card-border/40 last:border-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
+                              {m.avatar_url ? (
+                                <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-accent text-[9px] font-bold">{(m.name || m.email)?.[0]?.toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-foreground truncate">{m.name || 'No name'}</p>
+                              <p className="text-[10px] text-muted truncate">{m.email}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setInviteMembers((prev) => [...prev, { id: m.id, name: m.name, email: m.email, avatar_url: m.avatar_url }])}
+                            className="text-xs text-accent hover:text-accent-dim font-medium shrink-0 ml-2"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ))}
+                      {inviteResults.every((m) => invitedIds.has(m.id)) && (
+                        <p className="text-[10px] text-muted text-center py-2">All results already added</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {inviteMembers.length > 0 && (
+                  <div>
+                    <p className="text-[11px] text-muted mb-1.5">{inviteMembers.length} member{inviteMembers.length !== 1 ? 's' : ''} will be added</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {inviteMembers.map((m) => (
+                        <div key={m.id} className="flex items-center gap-1.5 bg-amber-400/5 border border-amber-400/20 rounded-full pl-1 pr-2 py-0.5">
+                          <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center overflow-hidden shrink-0">
+                            {m.avatar_url ? (
+                              <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[8px] font-bold text-accent">{(m.name || '?')[0]?.toUpperCase()}</span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-foreground font-medium">{m.name?.split(' ')[0] || m.email?.split('@')[0]}</span>
+                          <button
+                            type="button"
+                            onClick={() => setInviteMembers((prev) => prev.filter((p) => p.id !== m.id))}
+                            className="text-muted hover:text-red-400 text-[10px] ml-0.5"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          <div className="border-t border-card-border px-6 py-4 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setAddDialog(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={submitting || (form.recurring && form.days.length === 0)}>
               {submitting ? 'Creating...' : form.recurring
                 ? `Create ${form.everyWeek ? 52 : form.weeks} Classes`
                 : 'Create Class'}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Class Dialog */}
       <Dialog open={!!editDialog} onOpenChange={(open) => !open && setEditDialog(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Class</DialogTitle>
-            <DialogDescription>{editDialog?.class_types?.name} — {editDialog?.booked_count || 0} booking{editDialog?.booked_count !== 1 ? 's' : ''}{(editDialog?.waitlist?.length || 0) > 0 ? ` · ${editDialog.waitlist.length} waitlisted` : ''}</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          {/* Color banner header */}
+          {editDialog && (() => {
+            const color = editDialog.class_types?.color || '#c8a750'
+            const isRecurring = !!editDialog.recurring_id
+            const isPrivate = editDialog.class_types?.is_private
+            // Category hue: purple=recurring, amber=private, sky=singular
+            const categoryHue = isRecurring ? '#a78bfa' : isPrivate ? '#fbbf24' : '#38bdf8'
+            const fillPct = editDialog.capacity > 0 ? Math.min(((editDialog.booked_count || 0) / editDialog.capacity) * 100, 100) : 0
+            const isFull = (editDialog.booked_count || 0) >= editDialog.capacity
+            const startsAt = new Date(editDialog.starts_at)
+            const endsAt = new Date(editDialog.ends_at)
+            const dateLabel = startsAt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok' })
+            const timeLabel = startsAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok' })
+            const endLabel = endsAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok' })
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Left: Edit form */}
-            <div>
-              <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} showRecurring recurLabel="Make this recurring" />
-              {form.recurring && form.days.length > 0 && (
-                <p className="text-xs text-muted mt-2">
-                  Will create ~{form.everyWeek ? 52 : form.weeks} future classes (every {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]}) starting after this date
-                </p>
-              )}
-            </div>
+            return (
+              <>
+                {/* Accent top bar — class color fading into category hue */}
+                <div className="h-1.5 w-full rounded-t-lg" style={{ background: `linear-gradient(90deg, ${color}, ${categoryHue}88)` }} />
 
-            {/* Right: Attendees + Waitlist */}
-            <div className="space-y-4">
-              {/* Attendees */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-foreground">Attendees ({editDialog?.roster?.length || 0}/{editDialog?.capacity || 0})</p>
-                  <button
-                    onClick={() => { const cls = editDialog; setEditDialog(null); setRosterDialog(cls) }}
-                    className="text-xs text-accent hover:text-accent-dim transition-colors"
-                  >
-                    Manage →
-                  </button>
-                </div>
-                <div className="space-y-1 max-h-[180px] overflow-y-auto">
-                  {(editDialog?.roster || []).length > 0 ? (editDialog.roster).map((m, i) => (
-                    <div key={m.id || i} className="flex items-center gap-2 p-1.5 rounded border border-card-border">
-                      <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
-                        {m.avatar_url ? (
-                          <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-accent text-[9px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
+                {/* Header section */}
+                <div className="px-6 pt-5 pb-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h2 className="text-xl font-bold text-foreground">{editDialog.class_types?.name || 'Class'}</h2>
+                        {isRecurring && (
+                          <span className="text-[11px] font-medium text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="text-sm">↻</span> Recurring
+                          </span>
+                        )}
+                        {isPrivate && (
+                          <span className="text-[11px] font-medium text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">🔒 Private</span>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-foreground truncate">{m.name || 'No name'}</p>
-                        <p className="text-[10px] text-muted truncate">{m.email}</p>
-                      </div>
-                      <Badge variant="success" className="text-[9px] capitalize shrink-0">
-                        {m.status}
-                      </Badge>
-                    </div>
-                  )) : (
-                    <p className="text-xs text-muted text-center py-3 border border-dashed border-card-border rounded">No bookings yet</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Waitlist */}
-              <div>
-                <p className="text-sm font-medium text-foreground mb-2">Waitlist ({editDialog?.waitlist?.length || 0})</p>
-                <div className="space-y-1 max-h-[120px] overflow-y-auto">
-                  {(editDialog?.waitlist || []).length > 0 ? (editDialog.waitlist).map((m, i) => (
-                    <div key={m.id || i} className="flex items-center gap-2 p-1.5 rounded border border-card-border">
-                      <div className="w-5 h-5 rounded-full bg-card-border flex items-center justify-center shrink-0">
-                        <span className="text-[8px] text-muted font-bold">#{m.position || i + 1}</span>
-                      </div>
-                      <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
-                        {m.avatar_url ? (
-                          <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-accent text-[9px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
+                      <div className="flex items-center gap-3 text-sm text-muted">
+                        <span className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                          </svg>
+                          {dateLabel}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {timeLabel} – {endLabel}
+                        </span>
+                        {editDialog.instructors?.name && (
+                          <span className="flex items-center gap-1.5">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0" />
+                            </svg>
+                            {editDialog.instructors.name}
+                          </span>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-foreground truncate">{m.name || 'No name'}</p>
-                        <p className="text-[10px] text-muted truncate">{m.email}</p>
-                      </div>
                     </div>
-                  )) : (
-                    <p className="text-xs text-muted text-center py-3 border border-dashed border-card-border rounded">No one on the waitlist</p>
+
+                    {/* Capacity ring */}
+                    <div className="shrink-0 text-center">
+                      <div className="relative w-14 h-14">
+                        <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                          <circle cx="28" cy="28" r="24" fill="none" stroke="currentColor" strokeWidth="3" className="text-card-border" />
+                          <circle cx="28" cy="28" r="24" fill="none" strokeWidth="3" strokeLinecap="round"
+                            stroke={isFull ? '#ef4444' : fillPct >= 75 ? '#f59e0b' : '#22c55e'}
+                            strokeDasharray={`${fillPct * 1.508} 150.8`}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className={cn('text-sm font-bold', isFull ? 'text-red-400' : 'text-foreground')}>
+                            {editDialog.booked_count || 0}/{editDialog.capacity}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-muted mt-1">{isFull ? 'Full' : `${editDialog.capacity - (editDialog.booked_count || 0)} spots`}</p>
+                    </div>
+                  </div>
+
+                  {/* Roster pills — "Who's coming" */}
+                  {(editDialog.roster?.length > 0 || editDialog.waitlist?.length > 0) && (
+                    <div className="mt-4 space-y-3">
+                      {editDialog.roster?.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted mb-2">Who&apos;s booked ({editDialog.roster.length})</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {editDialog.roster.map((m, i) => (
+                              <div key={m.id || i} className="flex items-center gap-1.5 bg-background rounded-full pl-1 pr-2.5 py-1 border border-card-border">
+                                <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center overflow-hidden shrink-0">
+                                  {m.avatar_url ? (
+                                    <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-[8px] font-bold text-accent">{(m.name || '?')[0]?.toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-foreground font-medium">{m.name?.split(' ')[0] || m.email?.split('@')[0]}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {editDialog.waitlist?.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted/60 mb-2">Waitlist ({editDialog.waitlist.length})</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {editDialog.waitlist.map((m, i) => (
+                              <div key={m.id || i} className="flex items-center gap-1.5 bg-background/50 rounded-full pl-1 pr-2.5 py-1 border border-card-border opacity-60">
+                                <div className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center overflow-hidden shrink-0">
+                                  {m.avatar_url ? (
+                                    <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-[8px] font-bold text-muted">{(m.name || '?')[0]?.toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-muted">#{m.position || i + 1} {m.name?.split(' ')[0] || 'Member'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => { const cls = editDialog; setEditDialog(null); setRosterDialog(cls) }}
+                        className="text-xs text-accent hover:text-accent-dim transition-colors font-medium"
+                      >
+                        Manage roster →
+                      </button>
+                    </div>
+                  )}
+                  {!editDialog.roster?.length && !editDialog.waitlist?.length && (
+                    <div className="mt-4 flex items-center justify-between py-3 px-4 rounded-lg border border-dashed border-card-border">
+                      <p className="text-xs text-muted">No bookings yet</p>
+                      <button
+                        onClick={() => { const cls = editDialog; setEditDialog(null); setRosterDialog(cls) }}
+                        className="text-xs text-accent hover:text-accent-dim transition-colors font-medium"
+                      >
+                        Add members →
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
-            </div>
-          </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" className="text-red-400 border-red-400/30 hover:bg-red-400/10" onClick={() => { setEditDialog(null); setCancelDialog(editDialog) }}>Cancel Class</Button>
-            <div className="flex gap-2 sm:ml-auto">
-              <Button variant="outline" onClick={() => setEditDialog(null)}>Close</Button>
-              <Button onClick={handleUpdate} disabled={submitting}>{submitting ? 'Saving...' : form.recurring ? 'Save & Create Recurring' : 'Save Changes'}</Button>
-            </div>
-          </DialogFooter>
+                {/* Divider */}
+                <div className="border-t border-card-border" />
+
+                {/* Edit form section — tinted by category hue */}
+                <div className="px-6 py-5 relative">
+                  <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ background: `linear-gradient(135deg, ${categoryHue}, transparent 60%)` }} />
+                  <div className="relative">
+                    <p className="text-xs font-medium text-muted uppercase tracking-wide mb-3">Edit Details</p>
+                    <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} showRecurring={!isRecurring} recurLabel="Make this recurring" isEditing bookedCount={editDialog.booked_count || 0} />
+                    {form.recurring && form.days.length > 0 && !isRecurring && (
+                      <p className="text-xs text-muted mt-2">
+                        Will create ~{form.everyWeek ? 52 : form.weeks} future classes (every {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]}) starting after this date
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer actions */}
+                <div className="border-t border-card-border px-6 py-4 flex flex-col sm:flex-row gap-2">
+                  <Button variant="outline" className="text-red-400 border-red-400/30 hover:bg-red-400/10" onClick={() => { setEditDialog(null); setCancelDialog(editDialog) }}>
+                    {isRecurring ? 'Cancel...' : 'Cancel Class'}
+                  </Button>
+                  <div className="flex gap-2 sm:ml-auto">
+                    <Button variant="outline" onClick={() => setEditDialog(null)}>Close</Button>
+                    {isRecurring ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleUpdate('this')}
+                          disabled={submitting}
+                          title="Save changes to this class only and remove it from the recurring set"
+                        >
+                          {submitting ? 'Saving...' : 'Save This Only'}
+                        </Button>
+                        <Button onClick={() => handleUpdate('all')} disabled={submitting}>
+                          {submitting ? 'Saving...' : 'Save All Recurring'}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => handleUpdate('this')} disabled={submitting}>
+                        {submitting ? 'Saving...' : form.recurring ? 'Save & Create Recurring' : 'Save Changes'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -491,7 +766,12 @@ export default function AdminSchedulePage() {
           <DialogHeader><DialogTitle>Cancel Class</DialogTitle><DialogDescription>This cannot be undone. All bookings will be cancelled and credits refunded.</DialogDescription></DialogHeader>
           {cancelDialog && (
             <div className="py-4 space-y-2">
-              <p className="text-sm font-medium text-foreground">{cancelDialog.class_types?.name}</p>
+              <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                {cancelDialog.class_types?.name}
+                {cancelDialog.recurring_id && (
+                  <span className="text-[10px] text-accent/70 bg-accent/10 px-1.5 py-0.5 rounded-full">↻ Recurring</span>
+                )}
+              </p>
               <p className="text-xs text-muted">
                 {new Date(cancelDialog.starts_at).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok' })} at {new Date(cancelDialog.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok' })}
               </p>
@@ -501,11 +781,29 @@ export default function AdminSchedulePage() {
                   {cancelDialog.booked_count} member{cancelDialog.booked_count !== 1 ? 's' : ''} will be notified and credits will be refunded.
                 </div>
               )}
+              {cancelDialog.recurring_id && (
+                <div className="mt-2 px-3 py-2 bg-accent/5 border border-accent/20 rounded text-xs text-accent/80">
+                  This class is part of a recurring series. You can cancel just this one, or all upcoming classes in the series.
+                </div>
+              )}
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setCancelDialog(null)}>Keep Class</Button>
-            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleCancel} disabled={submitting}>{submitting ? 'Cancelling...' : 'Cancel Class'}</Button>
+            <div className="flex gap-2 sm:ml-auto">
+              {cancelDialog?.recurring_id && (
+                <Button
+                  className="bg-red-600/80 hover:bg-red-700 text-white text-xs"
+                  onClick={() => handleCancel(true)}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Cancelling...' : 'Cancel All Recurring'}
+                </Button>
+              )}
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => handleCancel(false)} disabled={submitting}>
+                {submitting ? 'Cancelling...' : cancelDialog?.recurring_id ? 'Cancel This Only' : 'Cancel Class'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -541,7 +839,10 @@ export default function AdminSchedulePage() {
   )
 }
 
-function ClassForm({ form, setForm, classTypes, instructors, showRecurring, recurLabel }) {
+const selectClass = 'mt-1.5 w-full h-10 rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 focus:bg-background/80 [color-scheme:dark]'
+const selectDisabled = 'mt-1.5 w-full h-10 rounded-lg bg-card-border/20 border border-card-border/40 px-3.5 py-2 text-sm text-muted cursor-not-allowed'
+
+function ClassForm({ form, setForm, classTypes, instructors, showRecurring, recurLabel, isEditing, bookedCount }) {
   const selectedType = classTypes.find((ct) => ct.id === form.classTypeId)
   const isPrivateType = selectedType?.is_private
 
@@ -549,47 +850,92 @@ function ClassForm({ form, setForm, classTypes, instructors, showRecurring, recu
     <div className="space-y-4 py-2">
       <div>
         <Label htmlFor="classType">Class Type</Label>
-        <select id="classType" value={form.classTypeId} onChange={(e) => setForm((f) => ({ ...f, classTypeId: e.target.value }))} className="mt-1 w-full rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent">
-          <option value="">Select class type</option>
-          {classTypes.map((ct) => (
-            <option key={ct.id} value={ct.id}>{ct.name}{ct.is_private ? ' (Private)' : ''}</option>
-          ))}
-        </select>
-        {isPrivateType && (
-          <p className="text-xs text-amber-400 mt-1">This class type is private — it won&apos;t appear on the public schedule.</p>
+        {isEditing ? (
+          <>
+            <select id="classType" value={form.classTypeId} disabled className={selectDisabled}>
+              {classTypes.map((ct) => (
+                <option key={ct.id} value={ct.id}>{ct.name}{ct.is_private ? ' (Private)' : ''}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted/50 mt-1">Class type cannot be changed after creation</p>
+          </>
+        ) : (
+          <>
+            <select id="classType" value={form.classTypeId} onChange={(e) => {
+              const newId = e.target.value
+              const ct = classTypes.find((c) => c.id === newId)
+              setForm((f) => ({
+                ...f,
+                classTypeId: newId,
+                capacity: ct?.is_private ? 1 : (f.capacity === 1 ? 6 : f.capacity),
+              }))
+            }} className={selectClass}>
+              <option value="">Select class type</option>
+              {classTypes.map((ct) => (
+                <option key={ct.id} value={ct.id}>{ct.name}{ct.is_private ? ' (Private)' : ''}</option>
+              ))}
+            </select>
+            {isPrivateType && (
+              <p className="text-xs text-amber-400 mt-1.5">This class type is private — it won&apos;t appear on the public schedule.</p>
+            )}
+          </>
         )}
       </div>
       <div>
         <Label htmlFor="instructor">Instructor</Label>
-        <select id="instructor" value={form.instructorId} onChange={(e) => setForm((f) => ({ ...f, instructorId: e.target.value }))} className="mt-1 w-full rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent">
+        <select id="instructor" value={form.instructorId} onChange={(e) => setForm((f) => ({ ...f, instructorId: e.target.value }))} className={selectClass}>
           <option value="">Select instructor</option>
           {instructors.map((inst) => <option key={inst.id} value={inst.id}>{inst.name}</option>)}
         </select>
       </div>
-      <div><Label htmlFor="date">{form.recurring ? 'Start Date' : 'Date'}</Label><Input id="date" type="date" value={form.date} onChange={(e) => {
-        const newDate = e.target.value
-        const d = new Date(newDate + 'T00:00:00')
-        setForm((f) => ({ ...f, date: newDate, days: [d.getDay()] }))
-      }} className="mt-1" /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label htmlFor="startTime">Start Time</Label><Input id="startTime" type="time" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} className="mt-1" /></div>
-        <div><Label htmlFor="endTime">End Time</Label><Input id="endTime" type="time" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="mt-1" /></div>
+      <div>
+        <Label htmlFor="date">{form.recurring ? 'Start Date' : 'Date'}</Label>
+        <Input id="date" type="date" value={form.date} onChange={(e) => {
+          const newDate = e.target.value
+          const d = new Date(newDate + 'T00:00:00')
+          setForm((f) => ({ ...f, date: newDate, days: [d.getDay()] }))
+        }} className="mt-1.5" />
       </div>
-      <div><Label htmlFor="capacity">Capacity</Label><Input id="capacity" type="number" min={1} max={50} value={form.capacity} onChange={(e) => setForm((f) => ({ ...f, capacity: parseInt(e.target.value) || 6 }))} className="mt-1" /></div>
-      <div><Label htmlFor="notes">Notes (optional)</Label><Input id="notes" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="e.g. Special event, substitute instructor" className="mt-1" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label htmlFor="startTime">Start Time</Label>
+          <Input id="startTime" type="time" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} className="mt-1.5" />
+        </div>
+        <div>
+          <Label htmlFor="endTime">End Time</Label>
+          <Input id="endTime" type="time" value={form.endTime} onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))} className="mt-1.5" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label htmlFor="capacity">Capacity</Label>
+          <Input id="capacity" type="number" min={isEditing ? (bookedCount || 1) : 1} max={50} value={form.capacity} onChange={(e) => {
+            const val = parseInt(e.target.value) || 1
+            const min = isEditing ? (bookedCount || 1) : 1
+            setForm((f) => ({ ...f, capacity: Math.max(val, min) }))
+          }} className="mt-1.5" />
+          {isEditing && bookedCount > 0 && (
+            <p className="text-[10px] text-muted/50 mt-1">Min {bookedCount} (current bookings)</p>
+          )}
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="notes">Notes</Label>
+        <Input id="notes" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="e.g. Special event, substitute instructor" className="mt-1.5" />
+      </div>
 
       {showRecurring && (
         <>
-          <label className="flex items-center gap-3 cursor-pointer pt-2 border-t border-card-border">
+          <label className="flex items-center gap-3 cursor-pointer pt-3 border-t border-card-border/40">
             <input
               type="checkbox"
               checked={form.recurring}
               onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked }))}
-              className="w-4 h-4 rounded border-card-border bg-card accent-accent"
+              className="w-4 h-4 rounded-md border-card-border bg-background/50 accent-accent"
             />
             <div>
               <span className="text-sm text-foreground">{recurLabel || 'Make recurring'}</span>
-              <p className="text-xs text-muted">Repeat every {DAY_NAMES[form.days[0]] || 'week'}day from the selected date</p>
+              <p className="text-[11px] text-muted/60">Repeat every {DAY_NAMES[form.days[0]] || 'week'}day from the selected date</p>
             </div>
           </label>
 
@@ -598,21 +944,19 @@ function ClassForm({ form, setForm, classTypes, instructors, showRecurring, recu
               <p className="text-xs text-foreground">
                 Repeats every <span className="font-semibold text-accent">{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][form.days[0]]}</span>
               </p>
-              <div>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.everyWeek}
-                    onChange={(e) => setForm((f) => ({ ...f, everyWeek: e.target.checked }))}
-                    className="w-4 h-4 rounded border-card-border bg-card accent-accent"
-                  />
-                  <span className="text-sm text-foreground">Every week (1 year)</span>
-                </label>
-              </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.everyWeek}
+                  onChange={(e) => setForm((f) => ({ ...f, everyWeek: e.target.checked }))}
+                  className="w-4 h-4 rounded-md border-card-border bg-background/50 accent-accent"
+                />
+                <span className="text-sm text-foreground">Every week (1 year)</span>
+              </label>
               {!form.everyWeek && (
                 <div>
-                  <Label>Number of weeks</Label>
-                  <Input type="number" min={1} max={52} value={form.weeks} onChange={(e) => setForm((f) => ({ ...f, weeks: parseInt(e.target.value) || 4 }))} className="mt-1 w-24" />
+                  <Label>Weeks</Label>
+                  <Input type="number" min={1} max={52} value={form.weeks} onChange={(e) => setForm((f) => ({ ...f, weeks: parseInt(e.target.value) || 4 }))} className="mt-1.5 w-24" />
                 </div>
               )}
             </div>

@@ -264,7 +264,7 @@ function ClassTypeForm({ form, setForm }) {
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           placeholder="Brief description of this class type"
           rows={2}
-          className="mt-1 w-full rounded-md border border-card-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+          className="mt-1 w-full rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 resize-none"
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
