@@ -169,7 +169,7 @@ export default function Gallery() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
               onClick={() => handleSelect(active === i ? -1 : i)}
-              className={`relative overflow-hidden cursor-pointer transition-all duration-700 ${
+              className={`relative overflow-hidden cursor-pointer transition-[height] duration-700 ${
                 active === i ? 'h-72' : 'h-24'
               }`}
             >

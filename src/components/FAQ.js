@@ -37,16 +37,13 @@ const faqs = [
 ];
 
 function FAQItem({ faq, index, isOpen, onToggle }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-50px' });
-
   return (
     <motion.div
-      ref={ref}
       initial={{ opacity: 0, y: 20 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-50px' }}
       transition={{ duration: 0.6, delay: index * 0.08 }}
-      className={`border border-white/[0.04] transition-all duration-500 ${
+      className={`border border-white/[0.04] transition-[border-color,background-color] duration-500 ${
         isOpen ? 'bg-white/[0.02] border-white/[0.08]' : 'hover:border-white/[0.08]'
       }`}
     >
