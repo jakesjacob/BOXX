@@ -63,7 +63,7 @@ function ClassCard({ cls, index, isExpanded, onToggle }) {
       viewport={{ once: true, margin: '-50px' }}
       transition={{ duration: 0.7, delay: index * 0.15, ease: [0.22, 1, 0.36, 1] }}
       onClick={onToggle}
-      className={`group cursor-pointer relative overflow-hidden border transition-all duration-700 ${
+      className={`group cursor-pointer relative overflow-hidden border transition-[border-color,background-color] duration-700 ${
         isExpanded
           ? 'border-accent/30 bg-card'
           : 'border-card-border bg-card/50 hover:border-white/10'

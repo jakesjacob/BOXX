@@ -114,12 +114,12 @@ export default function About() {
             {/* Image + quote — mobile only, inline */}
             <div className="md:hidden mt-10">
               <div className="relative">
-                <div className="relative aspect-[4/3] overflow-hidden">
+                <div className="relative aspect-[3/4] overflow-hidden">
                   <Image
                     src="/images/studio/about-bert.webp"
                     alt="Bert, founder of BOXX"
                     fill
-                    className="object-cover scale-150 object-[70%_15%]"
+                    className="object-cover scale-[1.3] object-[70%_15%]"
                     sizes="100vw"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
