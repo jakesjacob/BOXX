@@ -10,7 +10,7 @@ const recurringSchema = z.object({
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
   capacity: z.number().int().min(1).max(50).optional(),
   days: z.array(z.number().int().min(0).max(6)).min(1), // 0=Sun, 1=Mon, ..., 6=Sat
-  weeks: z.number().int().min(1).max(12), // how many weeks to generate
+  weeks: z.number().int().min(1).max(52), // how many weeks to generate (52 = every week for 1 year)
   startDate: z.string().min(1), // YYYY-MM-DD, first date to start from
   notes: z.string().optional(),
 })

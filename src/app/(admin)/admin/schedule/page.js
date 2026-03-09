@@ -30,7 +30,7 @@ export default function AdminSchedulePage() {
   // Form state for add/edit (recurring fields included)
   const [form, setForm] = useState({
     classTypeId: '', instructorId: '', date: '', startTime: '07:00', endTime: '07:55', capacity: 6, notes: '',
-    recurring: false, days: [], weeks: 4,
+    recurring: false, days: [], weeks: 4, everyWeek: false,
   })
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export default function AdminSchedulePage() {
       classTypeId: classTypes[0]?.id || '', instructorId: instructors[0]?.id || '',
       date: date || new Date().toISOString().split('T')[0],
       startTime: '07:00', endTime: '07:55', capacity: 6, notes: '',
-      recurring: false, days: [], weeks: 4,
+      recurring: false, days: [], weeks: 4, everyWeek: false,
     })
     setAddDialog(true)
   }
@@ -100,13 +100,14 @@ export default function AdminSchedulePage() {
   function openEditDialog(cls) {
     const startsAt = new Date(cls.starts_at)
     const endsAt = new Date(cls.ends_at)
+    const dayOfWeek = startsAt.getDay()
     setForm({
       classTypeId: cls.class_type_id, instructorId: cls.instructor_id,
       date: startsAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }),
       startTime: startsAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }),
       endTime: endsAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }),
       capacity: cls.capacity, notes: cls.notes || '',
-      recurring: false, days: [], weeks: 4,
+      recurring: false, days: [dayOfWeek], weeks: 4, everyWeek: false,
     })
     setEditDialog(cls)
   }
@@ -120,6 +121,7 @@ export default function AdminSchedulePage() {
     try {
       if (form.recurring && form.days.length > 0) {
         // Recurring: use the recurring endpoint
+        const weeks = form.everyWeek ? 52 : form.weeks
         const res = await fetch('/api/admin/schedule/recurring', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -127,7 +129,7 @@ export default function AdminSchedulePage() {
             classTypeId: form.classTypeId, instructorId: form.instructorId,
             startTime: form.startTime, endTime: form.endTime,
             capacity: form.capacity, notes: form.notes || undefined,
-            days: form.days, weeks: form.weeks, startDate: form.date,
+            days: form.days, weeks, startDate: form.date,
           }),
         })
         const data = await res.json()
@@ -157,6 +159,7 @@ export default function AdminSchedulePage() {
     if (!editDialog) return
     setSubmitting(true)
     try {
+      // First update the existing class
       const res = await fetch('/api/admin/schedule', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -168,7 +171,33 @@ export default function AdminSchedulePage() {
       })
       const data = await res.json()
       if (!res.ok) { setToast({ message: data.error || 'Failed to update', type: 'error' }); return }
-      setToast({ message: 'Class updated', type: 'success' })
+
+      // If recurring is enabled, create future copies starting from the next occurrence
+      if (form.recurring && form.days.length > 0) {
+        const weeks = form.everyWeek ? 52 : form.weeks
+        // Start from the day after the current class date so we don't duplicate
+        const nextDate = new Date(form.date + 'T00:00:00+07:00')
+        nextDate.setDate(nextDate.getDate() + 1)
+        const recurRes = await fetch('/api/admin/schedule/recurring', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classTypeId: form.classTypeId, instructorId: form.instructorId,
+            startTime: form.startTime, endTime: form.endTime,
+            capacity: form.capacity, notes: form.notes || undefined,
+            days: form.days, weeks, startDate: nextDate.toLocaleDateString('en-CA'),
+          }),
+        })
+        const recurData = await recurRes.json()
+        if (recurRes.ok) {
+          setToast({ message: `Class updated + ${recurData.created} recurring classes created`, type: 'success' })
+        } else {
+          setToast({ message: `Class updated but recurring failed: ${recurData.error}`, type: 'error' })
+        }
+      } else {
+        setToast({ message: 'Class updated', type: 'success' })
+      }
+
       // If the class has bookings, offer to notify members
       const bookedCount = editDialog.booked_count || 0
       const savedClassId = editDialog.id
@@ -323,13 +352,18 @@ export default function AdminSchedulePage() {
           <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} showRecurring />
           {form.recurring && form.days.length > 0 && (
             <p className="text-xs text-muted -mt-2">
-              Will create ~{form.days.length * form.weeks} classes ({form.days.map((d) => DAY_NAMES[d]).join(', ')} for {form.weeks} week{form.weeks !== 1 ? 's' : ''})
+              {form.everyWeek
+                ? `Will create ~${form.days.length * 52} classes (${form.days.map((d) => DAY_NAMES[d]).join(', ')} every week for 1 year)`
+                : `Will create ~${form.days.length * form.weeks} classes (${form.days.map((d) => DAY_NAMES[d]).join(', ')} for ${form.weeks} week${form.weeks !== 1 ? 's' : ''})`
+              }
             </p>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setAddDialog(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={submitting || (form.recurring && form.days.length === 0)}>
-              {submitting ? 'Creating...' : form.recurring ? `Create ${form.days.length * form.weeks} Classes` : 'Create Class'}
+              {submitting ? 'Creating...' : form.recurring
+                ? `Create ${form.days.length * (form.everyWeek ? 52 : form.weeks)} Classes`
+                : 'Create Class'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -342,12 +376,17 @@ export default function AdminSchedulePage() {
             <DialogTitle>Edit Class</DialogTitle>
             <DialogDescription>{editDialog?.class_types?.name} — {editDialog?.booked_count || 0} booking{editDialog?.booked_count !== 1 ? 's' : ''}</DialogDescription>
           </DialogHeader>
-          <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} />
+          <ClassForm form={form} setForm={setForm} classTypes={classTypes} instructors={instructors} showRecurring recurLabel="Make this recurring" />
+          {form.recurring && form.days.length > 0 && (
+            <p className="text-xs text-muted -mt-2">
+              Will create ~{form.days.length * (form.everyWeek ? 52 : form.weeks)} future classes starting after this date
+            </p>
+          )}
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" className="text-red-400 border-red-400/30 hover:bg-red-400/10" onClick={() => { setEditDialog(null); setCancelDialog(editDialog) }}>Cancel Class</Button>
             <div className="flex gap-2 sm:ml-auto">
               <Button variant="outline" onClick={() => setEditDialog(null)}>Close</Button>
-              <Button onClick={handleUpdate} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</Button>
+              <Button onClick={handleUpdate} disabled={submitting}>{submitting ? 'Saving...' : form.recurring ? 'Save & Create Recurring' : 'Save Changes'}</Button>
             </div>
           </DialogFooter>
         </DialogContent>
@@ -379,44 +418,14 @@ export default function AdminSchedulePage() {
       </Dialog>
 
       {/* Roster Dialog */}
-      <Dialog open={!!rosterDialog} onOpenChange={(open) => !open && setRosterDialog(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Class Roster</DialogTitle>
-            <DialogDescription>
-              {rosterDialog?.class_types?.name} — {new Date(rosterDialog?.starts_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok' })}
-              {' · '}{rosterDialog?.booked_count}/{rosterDialog?.capacity} booked
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2 space-y-2 max-h-[400px] overflow-y-auto">
-            {rosterDialog?.roster?.length > 0 ? rosterDialog.roster.map((m, i) => (
-              <div key={m.id || i} className="flex items-center justify-between p-2 rounded-lg border border-card-border">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
-                    {m.avatar_url ? (
-                      <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-accent text-[10px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-foreground">{m.name || 'No name'}</p>
-                    <p className="text-[10px] text-muted">{m.email}</p>
-                  </div>
-                </div>
-                <Badge variant={m.status === 'confirmed' ? 'success' : m.status === 'attended' ? 'default' : 'outline'} className="text-[10px] capitalize">
-                  {m.status}
-                </Badge>
-              </div>
-            )) : (
-              <p className="text-sm text-muted text-center py-4">No bookings yet</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRosterDialog(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {rosterDialog && (
+        <RosterDialog
+          cls={rosterDialog}
+          onClose={() => setRosterDialog(null)}
+          onUpdate={() => fetchClasses()}
+          setToast={setToast}
+        />
+      )}
 
       {/* Notify Members Dialog */}
       <Dialog open={!!notifyDialog} onOpenChange={(open) => !open && setNotifyDialog(null)}>
@@ -439,7 +448,7 @@ export default function AdminSchedulePage() {
   )
 }
 
-function ClassForm({ form, setForm, classTypes, instructors, showRecurring }) {
+function ClassForm({ form, setForm, classTypes, instructors, showRecurring, recurLabel }) {
   const selectedType = classTypes.find((ct) => ct.id === form.classTypeId)
   const isPrivateType = selectedType?.is_private
 
@@ -478,12 +487,12 @@ function ClassForm({ form, setForm, classTypes, instructors, showRecurring }) {
             <input
               type="checkbox"
               checked={form.recurring}
-              onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked, days: e.target.checked ? [1, 3, 5] : [] }))}
+              onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked, days: e.target.checked && f.days.length === 0 ? [1, 3, 5] : f.days }))}
               className="w-4 h-4 rounded border-card-border bg-card accent-accent"
             />
             <div>
-              <span className="text-sm text-foreground">Make recurring</span>
-              <p className="text-xs text-muted">Repeat this class on selected days for multiple weeks</p>
+              <span className="text-sm text-foreground">{recurLabel || 'Make recurring'}</span>
+              <p className="text-xs text-muted">Repeat this class on selected days</p>
             </div>
           </label>
 
@@ -511,13 +520,197 @@ function ClassForm({ form, setForm, classTypes, instructors, showRecurring }) {
                 </div>
               </div>
               <div>
-                <Label>Weeks</Label>
-                <Input type="number" min={1} max={12} value={form.weeks} onChange={(e) => setForm((f) => ({ ...f, weeks: parseInt(e.target.value) || 4 }))} className="mt-1 w-24" />
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.everyWeek}
+                    onChange={(e) => setForm((f) => ({ ...f, everyWeek: e.target.checked }))}
+                    className="w-4 h-4 rounded border-card-border bg-card accent-accent"
+                  />
+                  <span className="text-sm text-foreground">Every week (1 year)</span>
+                </label>
               </div>
+              {!form.everyWeek && (
+                <div>
+                  <Label>Number of weeks</Label>
+                  <Input type="number" min={1} max={52} value={form.weeks} onChange={(e) => setForm((f) => ({ ...f, weeks: parseInt(e.target.value) || 4 }))} className="mt-1 w-24" />
+                </div>
+              )}
             </div>
           )}
         </>
       )}
     </div>
+  )
+}
+
+function RosterDialog({ cls, onClose, onUpdate, setToast }) {
+  const [roster, setRoster] = useState(cls.roster || [])
+  const [searchInput, setSearchInput] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
+  const [actionLoading, setActionLoading] = useState(null)
+
+  const rosterUserIds = new Set(roster.map((m) => m.id))
+
+  async function searchMembers() {
+    if (!searchInput.trim()) return
+    setSearching(true)
+    try {
+      const res = await fetch(`/api/admin/members?search=${encodeURIComponent(searchInput)}&limit=10`)
+      if (res.ok) {
+        const data = await res.json()
+        setSearchResults(data.members || [])
+      }
+    } catch (err) {
+      console.error('Search failed:', err)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  async function addMember(userId) {
+    setActionLoading(userId)
+    try {
+      const res = await fetch('/api/admin/schedule/roster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classId: cls.id, userId }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setToast({ message: data.error || 'Failed to add', type: 'error' }); return }
+      const member = searchResults.find((m) => m.id === userId)
+      if (member) setRoster((r) => [...r, { id: member.id, name: member.name, email: member.email, avatar_url: member.avatar_url, status: 'confirmed' }])
+      setToast({ message: `${member?.name || 'Member'} added`, type: 'success' })
+      onUpdate()
+    } catch {
+      setToast({ message: 'Something went wrong', type: 'error' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function removeMember(userId) {
+    setActionLoading(userId)
+    try {
+      const res = await fetch('/api/admin/schedule/roster', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classId: cls.id, userId, refundCredit: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setToast({ message: data.error || 'Failed to remove', type: 'error' }); return }
+      setRoster((r) => r.filter((m) => m.id !== userId))
+      setToast({ message: 'Member removed', type: 'success' })
+      onUpdate()
+    } catch {
+      setToast({ message: 'Something went wrong', type: 'error' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Manage Roster</DialogTitle>
+          <DialogDescription>
+            {cls.class_types?.name} — {new Date(cls.starts_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok' })}
+            {' · '}{roster.length}/{cls.capacity} booked
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Add member search */}
+        <div className="space-y-2">
+          <Label>Add Member</Label>
+          <form onSubmit={(e) => { e.preventDefault(); searchMembers() }} className="flex gap-2">
+            <Input
+              placeholder="Search by name or email..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            <Button type="submit" variant="outline" disabled={searching}>
+              {searching ? '...' : 'Search'}
+            </Button>
+          </form>
+          {searchResults.length > 0 && (
+            <div className="border border-card-border rounded-lg max-h-[150px] overflow-y-auto">
+              {searchResults.filter((m) => !rosterUserIds.has(m.id)).map((m) => (
+                <div key={m.id} className="flex items-center justify-between px-3 py-2 border-b border-card-border last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
+                      {m.avatar_url ? (
+                        <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-accent text-[9px] font-bold">{(m.name || m.email)?.[0]?.toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{m.name || 'No name'}</p>
+                      <p className="text-[10px] text-muted truncate">{m.email}</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => addMember(m.id)}
+                    disabled={actionLoading === m.id}
+                  >
+                    {actionLoading === m.id ? '...' : '+ Add'}
+                  </Button>
+                </div>
+              ))}
+              {searchResults.every((m) => rosterUserIds.has(m.id)) && (
+                <p className="text-xs text-muted text-center py-2">All results already in roster</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Current roster */}
+        <div>
+          <Label className="mb-2 block">Attendees ({roster.length})</Label>
+          <div className="space-y-1 max-h-[250px] overflow-y-auto">
+            {roster.length > 0 ? roster.map((m, i) => (
+              <div key={m.id || i} className="flex items-center justify-between p-2 rounded-lg border border-card-border">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
+                    {m.avatar_url ? (
+                      <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-accent text-[10px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-foreground">{m.name || 'No name'}</p>
+                    <p className="text-[10px] text-muted">{m.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={m.status === 'confirmed' ? 'success' : m.status === 'attended' ? 'default' : 'outline'} className="text-[10px] capitalize">
+                    {m.status}
+                  </Badge>
+                  <button
+                    onClick={() => removeMember(m.id)}
+                    disabled={actionLoading === m.id}
+                    className="text-red-400 hover:text-red-300 text-xs transition-colors disabled:opacity-50"
+                    title="Remove from class"
+                  >
+                    {actionLoading === m.id ? '...' : '✕'}
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <p className="text-sm text-muted text-center py-4">No bookings yet</p>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
