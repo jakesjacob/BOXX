@@ -51,7 +51,7 @@ DELETE FROM class_schedule WHERE id IN (
   'c0000007-0000-0000-0000-000000000001'
 );
 DELETE FROM user_credits WHERE stripe_payment_id LIKE 'seed_%' OR stripe_payment_id LIKE 'direct_%' OR stripe_payment_id LIKE 'bert_seed_%';
-DELETE FROM users WHERE email IN ('sarah@example.com','tom@example.com','mia@example.com','jake@example.com','luna@example.com','bert@boxxthailand.com');
+DELETE FROM users WHERE email IN ('sarah@example.com','tom@example.com','mia@example.com','jake@example.com','luna@example.com','bertduff@gmail.com');
 DELETE FROM instructors WHERE id IN (
   'b1111111-1111-1111-1111-111111111111',
   'b2222222-2222-2222-2222-222222222222',
@@ -109,9 +109,10 @@ INSERT INTO users (id, email, name, bio, show_in_roster, role) VALUES
 ON CONFLICT (email) DO NOTHING;
 
 -- ─── BERT'S ACCOUNT (admin + heavy user) ────
+-- Creates if not exists, promotes to admin if already signed in via Google
 INSERT INTO users (id, email, name, bio, show_in_roster, role) VALUES
-  ('d0000000-0000-0000-0000-000000000001', 'bert@boxxthailand.com', 'Bert S.', 'Founder. Glasgow-raised, Chiang Mai-based. Building BOXX.', true, 'admin')
-ON CONFLICT (email) DO UPDATE SET role = 'admin', name = 'Bert S.', bio = 'Founder. Glasgow-raised, Chiang Mai-based. Building BOXX.';
+  ('d0000000-0000-0000-0000-000000000001', 'bertduff@gmail.com', 'Bert S.', 'Founder. Glasgow-raised, Chiang Mai-based. Building BOXX.', true, 'admin')
+ON CONFLICT (email) DO UPDATE SET role = 'admin', bio = 'Founder. Glasgow-raised, Chiang Mai-based. Building BOXX.';
 
 -- ─── SCHEDULE (next 7 days) ──────────
 
@@ -244,8 +245,7 @@ INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d2222222-2222-2222-2222-222222222222', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
   ('d3333333-3333-3333-3333-333333333333', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
   ('d4444444-4444-4444-4444-444444444444', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
-  ('d5555555-5555-5555-5555-555555555555', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
-  ('d0000000-0000-0000-0000-000000000001', 'c0000003-0000-0000-0000-000000000001', 'confirmed');
+  ('d5555555-5555-5555-5555-555555555555', 'c0000003-0000-0000-0000-000000000001', 'confirmed');
 
 -- Sarah, Tom were in Day 3 BOXX&TRAIN (now cancelled by admin — credits returned)
 INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned) VALUES
@@ -261,12 +261,19 @@ INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
 
 DO $$
 DECLARE
-  v_bert_id UUID := 'd0000000-0000-0000-0000-000000000001';
+  v_bert_id UUID;
   v_pack_10 UUID;
   v_pack_5 UUID;
   v_pack_1 UUID;
   v_pack_unlimited UUID;
 BEGIN
+  -- Look up Bert by email (works whether he signed in via Google or was seeded above)
+  SELECT id INTO v_bert_id FROM users WHERE email = 'bertduff@gmail.com' LIMIT 1;
+  IF v_bert_id IS NULL THEN
+    RAISE NOTICE 'Bert not found — skipping';
+    RETURN;
+  END IF;
+
   SELECT id INTO v_pack_10 FROM class_packs WHERE credits = 10 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_5 FROM class_packs WHERE credits = 5 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_1 FROM class_packs WHERE credits = 1 AND NOT is_intro LIMIT 1;
@@ -299,6 +306,7 @@ BEGIN
   -- Bert's upcoming bookings
   INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
     (v_bert_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed'),
+    (v_bert_id, 'c0000003-0000-0000-0000-000000000001', 'confirmed'),  -- fills Day 2 BOXXBEGINNER to 6/6
     (v_bert_id, 'c0000003-0000-0000-0000-000000000002', 'confirmed'),
     (v_bert_id, 'c0000005-0000-0000-0000-000000000001', 'confirmed');
 
@@ -328,7 +336,7 @@ DECLARE
 BEGIN
   SELECT id INTO v_user_id FROM users
     WHERE email NOT LIKE '%@example.com'
-      AND email != 'bert@boxxthailand.com'
+      AND email != 'bertduff@gmail.com'
     ORDER BY created_at ASC LIMIT 1;
 
   IF v_user_id IS NULL THEN

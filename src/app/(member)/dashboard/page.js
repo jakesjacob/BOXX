@@ -266,25 +266,28 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
           })
           const isLow = totalCredits !== Infinity && totalCredits <= 2 && totalCredits > 0
 
+          // Color logic: green = healthy, amber = low credits, red = expiring soon
+          const creditColor = hasExpiring ? '#f87171' : isLow ? '#f59e0b' : '#22c55e'
+
           return activePacks.length > 0 ? (
             <div className="mt-5">
               {/* Compact total display */}
-              <button
+              <motion.button
                 onClick={() => setShowCredits(!showCredits)}
-                className={cn(
-                  'w-full flex items-center justify-between p-3 rounded-lg border transition-colors',
-                  creditAnimation
-                    ? 'border-green-500/40 bg-green-500/5'
-                    : 'border-card-border bg-background hover:border-accent/20'
-                )}
+                animate={creditAnimation
+                  ? { boxShadow: ['0 0 0px rgba(34,197,94,0)', '0 0 20px rgba(34,197,94,0.4)', '0 0 0px rgba(34,197,94,0)'] }
+                  : { boxShadow: '0 0 0px rgba(34,197,94,0)' }
+                }
+                transition={creditAnimation ? { duration: 2, ease: 'easeInOut' } : {}}
+                className="w-full flex items-center justify-between p-3 rounded-lg border border-card-border bg-background hover:border-accent/20 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex items-baseline gap-1.5">
                     <motion.span
                       key={creditAnimation ? 'animate' : 'static'}
-                      initial={creditAnimation ? { scale: 1.5, color: '#22c55e' } : false}
-                      animate={{ scale: 1, color: isLow || hasExpiring ? '#f87171' : '#c8a750' }}
-                      transition={{ duration: 0.8, ease: 'easeOut' }}
+                      initial={creditAnimation ? { scale: 1.4, color: '#22c55e' } : false}
+                      animate={{ scale: 1, color: creditColor }}
+                      transition={{ duration: 1.2, ease: 'easeOut' }}
                       className="text-2xl font-bold"
                     >
                       {totalCredits === Infinity ? '∞' : totalCredits}
@@ -293,14 +296,13 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
                       {totalCredits === Infinity ? 'unlimited' : `credit${totalCredits !== 1 ? 's' : ''}`}
                     </span>
                   </div>
-                  {creditAnimation && <Badge className="text-[10px] bg-green-500/15 text-green-400 border-green-500/30">New credits added!</Badge>}
-                  {!creditAnimation && hasExpiring && <Badge variant="destructive" className="text-[10px]">Expiring soon</Badge>}
-                  {!creditAnimation && isLow && !hasExpiring && <Badge variant="outline" className="text-[10px] text-red-400 border-red-400/30">Running low</Badge>}
+                  {hasExpiring && <Badge variant="destructive" className="text-[10px]">Expiring soon</Badge>}
+                  {isLow && !hasExpiring && <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-400/30">Running low</Badge>}
                 </div>
                 <svg className={cn('w-4 h-4 text-muted transition-transform', showCredits && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
-              </button>
+              </motion.button>
 
               {/* Expandable pack details */}
               <AnimatePresence>
@@ -317,15 +319,19 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
                         const isUnlimited = c.credits_remaining === null
                         const usedCredits = isUnlimited ? null : (c.credits_total - c.credits_remaining)
                         const percentUsed = isUnlimited ? 0 : c.credits_total > 0 ? (usedCredits / c.credits_total) * 100 : 0
-                        const packLow = !isUnlimited && c.credits_remaining <= 1
+                        const packLow = !isUnlimited && c.credits_remaining <= 2 && c.credits_remaining > 0
                         const isExpiringSoon = daysLeft <= 5
+                        // Bar color: red = expiring, amber = low credits, green = healthy
+                        const barColor = isExpiringSoon ? 'bg-red-500' : packLow ? 'bg-amber-500' : 'bg-green-500'
 
                         return (
                           <div
                             key={c.id}
                             className={cn(
                               'rounded-lg border p-4 space-y-3',
-                              isExpiringSoon ? 'border-red-500/30 bg-red-500/5' : 'border-card-border bg-background'
+                              isExpiringSoon ? 'border-red-500/30 bg-red-500/5'
+                                : packLow ? 'border-amber-500/20 bg-amber-500/5'
+                                : 'border-card-border bg-background'
                             )}
                           >
                             <div className="flex items-start justify-between gap-2">
@@ -335,9 +341,11 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
                                   <Badge variant="default" className="text-[10px] mt-1">Subscription</Badge>
                                 )}
                               </div>
-                              {isExpiringSoon && (
+                              {isExpiringSoon ? (
                                 <Badge variant="destructive" className="text-[10px] shrink-0">Expiring</Badge>
-                              )}
+                              ) : packLow ? (
+                                <Badge variant="outline" className="text-[10px] shrink-0 text-amber-400 border-amber-400/30">Low</Badge>
+                              ) : null}
                             </div>
 
                             <div>
@@ -356,10 +364,7 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
                               {!isUnlimited && (
                                 <div className="mt-2 h-1.5 rounded-full bg-card-border overflow-hidden">
                                   <div
-                                    className={cn(
-                                      'h-full rounded-full transition-all',
-                                      packLow ? 'bg-red-500' : 'bg-accent'
-                                    )}
+                                    className={cn('h-full rounded-full transition-all', barColor)}
                                     style={{ width: `${Math.max(100 - percentUsed, 0)}%` }}
                                   />
                                 </div>

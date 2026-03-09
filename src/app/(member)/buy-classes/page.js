@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 export default function BuyClassesPage() {
@@ -27,6 +28,7 @@ function BuyClassesContent() {
   const [purchasing, setPurchasing] = useState(null)
   const [success, setSuccess] = useState(false)
   const [toast, setToast] = useState(null)
+  const [confirmPack, setConfirmPack] = useState(null) // pack object for confirmation dialog
 
   // Check for success return from Stripe
   useEffect(() => {
@@ -63,6 +65,7 @@ function BuyClassesContent() {
   }, [toast])
 
   async function handleBuy(packId) {
+    setConfirmPack(null)
     setPurchasing(packId)
     try {
       const res = await fetch('/api/packs/purchase', {
@@ -193,7 +196,7 @@ function BuyClassesContent() {
                 <CardContent>
                   <Button
                     className="w-full"
-                    onClick={() => handleBuy(pack.id)}
+                    onClick={() => setConfirmPack(pack)}
                     disabled={purchasing === pack.id || (isIntro && !canBuyIntro)}
                   >
                     {purchasing === pack.id
@@ -208,6 +211,47 @@ function BuyClassesContent() {
           })}
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <Dialog open={!!confirmPack} onOpenChange={(open) => !open && setConfirmPack(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Purchase</DialogTitle>
+            <DialogDescription>
+              You&apos;re about to purchase the following pack:
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmPack && (
+            <div className="py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">{confirmPack.name}</span>
+                <span className="text-xl font-bold text-foreground">฿{confirmPack.price_thb.toLocaleString()}</span>
+              </div>
+              <div className="text-sm text-muted space-y-1">
+                <p>
+                  {confirmPack.credits === null
+                    ? 'Unlimited classes'
+                    : `${confirmPack.credits} class credit${confirmPack.credits !== 1 ? 's' : ''}`}
+                </p>
+                <p>Valid for {confirmPack.validity_days} days from purchase</p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmPack(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => confirmPack && handleBuy(confirmPack.id)}
+              disabled={purchasing === confirmPack?.id}
+            >
+              {purchasing === confirmPack?.id ? 'Processing...' : 'Confirm Purchase'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Purchase History */}
       {!loading && purchaseHistory.length > 0 && (
