@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 /**
- * GET /api/admin/packs — Get all class packs (admin)
+ * GET /api/admin/instructors — Get all instructors
  */
 export async function GET() {
   try {
@@ -18,36 +18,30 @@ export async function GET() {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('class_packs')
+      .from('instructors')
       .select('*')
-      .order('display_order', { ascending: true })
+      .order('name')
 
     if (error) {
-      console.error('[admin/packs] Error:', error)
-      return NextResponse.json({ error: 'Failed to load packs' }, { status: 500 })
+      console.error('[admin/instructors] Error:', error)
+      return NextResponse.json({ error: 'Failed to load instructors' }, { status: 500 })
     }
 
-    return NextResponse.json({ packs: data || [] })
+    return NextResponse.json({ instructors: data || [] })
   } catch (error) {
-    console.error('[admin/packs] Error:', error)
+    console.error('[admin/instructors] Error:', error)
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }
 
-const createPackSchema = z.object({
+const createSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
-  credits: z.number().int().min(1).nullable(),
-  validity_days: z.number().int().min(1),
-  price_thb: z.number().int().min(0),
-  is_membership: z.boolean().optional(),
-  is_intro: z.boolean().optional(),
-  badge_text: z.string().nullable().optional(),
-  display_order: z.number().int().optional(),
+  bio: z.string().optional(),
+  instagram_url: z.string().optional(),
 })
 
 /**
- * POST /api/admin/packs — Create a new pack
+ * POST /api/admin/instructors — Create an instructor
  */
 export async function POST(request) {
   try {
@@ -61,49 +55,44 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const parsed = createPackSchema.safeParse(body)
+    const parsed = createSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    const { data: pack, error } = await supabaseAdmin
-      .from('class_packs')
+    const { data: instructor, error } = await supabaseAdmin
+      .from('instructors')
       .insert({
-        ...parsed.data,
+        name: parsed.data.name,
+        bio: parsed.data.bio || null,
+        instagram_url: parsed.data.instagram_url || null,
         active: true,
       })
       .select()
       .single()
 
     if (error) {
-      console.error('[admin/packs] Create error:', error)
-      return NextResponse.json({ error: 'Failed to create pack' }, { status: 500 })
+      console.error('[admin/instructors] Create error:', error)
+      return NextResponse.json({ error: 'Failed to create instructor' }, { status: 500 })
     }
 
-    return NextResponse.json({ pack })
+    return NextResponse.json({ instructor })
   } catch (error) {
-    console.error('[admin/packs] Error:', error)
+    console.error('[admin/instructors] Error:', error)
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }
 
-const updatePackSchema = z.object({
+const updateSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  credits: z.number().int().min(1).nullable().optional(),
-  validity_days: z.number().int().min(1).optional(),
-  price_thb: z.number().int().min(0).optional(),
-  is_membership: z.boolean().optional(),
-  is_intro: z.boolean().optional(),
-  badge_text: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
+  instagram_url: z.string().nullable().optional(),
   active: z.boolean().optional(),
-  display_order: z.number().int().optional(),
-  stripe_price_id: z.string().nullable().optional(),
 })
 
 /**
- * PUT /api/admin/packs — Update a pack
+ * PUT /api/admin/instructors — Update an instructor
  */
 export async function PUT(request) {
   try {
@@ -117,28 +106,28 @@ export async function PUT(request) {
     }
 
     const body = await request.json()
-    const parsed = updatePackSchema.safeParse(body)
+    const parsed = updateSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
     const { id, ...updates } = parsed.data
 
-    const { data: pack, error } = await supabaseAdmin
-      .from('class_packs')
+    const { data: instructor, error } = await supabaseAdmin
+      .from('instructors')
       .update(updates)
       .eq('id', id)
       .select()
       .single()
 
     if (error) {
-      console.error('[admin/packs] Update error:', error)
-      return NextResponse.json({ error: 'Failed to update pack' }, { status: 500 })
+      console.error('[admin/instructors] Update error:', error)
+      return NextResponse.json({ error: 'Failed to update instructor' }, { status: 500 })
     }
 
-    return NextResponse.json({ pack })
+    return NextResponse.json({ instructor })
   } catch (error) {
-    console.error('[admin/packs] Error:', error)
+    console.error('[admin/instructors] Error:', error)
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }

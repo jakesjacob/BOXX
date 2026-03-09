@@ -1,13 +1,32 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
 import Image from 'next/image';
+
+const communityImages = [
+  { src: '/images/studio/community.webp', alt: 'BOXX Community run club' },
+  { src: '/images/studio/mirror-1.webp', alt: 'Members at the #BOXXCNX mirror' },
+  { src: '/images/studio/mirror-2.webp', alt: 'Post-session selfie at BOXX' },
+  { src: '/images/studio/mirror-3.webp', alt: 'Family training session at BOXX' },
+];
+
+// Grid template based on which index is featured
+// [0]=top-left, [1]=top-right, [2]=bottom-left, [3]=bottom-right
+const gridTemplates = [
+  { cols: '2.5fr 1fr', rows: '2.5fr 1fr' },  // 0: top-left big
+  { cols: '1fr 2.5fr', rows: '2.5fr 1fr' },  // 1: top-right big
+  { cols: '2.5fr 1fr', rows: '1fr 2.5fr' },  // 2: bottom-left big
+  { cols: '1fr 2.5fr', rows: '1fr 2.5fr' },  // 3: bottom-right big
+];
 
 export default function Community() {
   const sectionRef = useRef(null);
   const headingRef = useRef(null);
+  const gridRef = useRef(null);
   const headingInView = useInView(headingRef, { once: true, margin: '-100px' });
+  const gridInView = useInView(gridRef, { margin: '-100px' });
+  const [featured, setFeatured] = useState(0);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -15,6 +34,17 @@ export default function Community() {
   });
 
   const imageY = useTransform(scrollYProgress, [0, 1], [40, -40]);
+
+  // Auto-cycle every 3s when visible
+  useEffect(() => {
+    if (!gridInView) return;
+    const timer = setInterval(() => {
+      setFeatured((prev) => (prev + 1) % communityImages.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [gridInView]);
+
+  const template = gridTemplates[featured];
 
   return (
     <section id="community" ref={sectionRef} className="relative py-34 md:py-44 lg:py-52 overflow-hidden">
@@ -46,17 +76,55 @@ export default function Community() {
 
         {/* Content */}
         <div className="grid lg:grid-cols-2 gap-14 lg:gap-24 items-center">
-          {/* Image side — vertical parallax only (no horizontal to avoid mobile overflow) */}
-          <motion.div style={{ y: imageY }} className="relative">
-            <div className="relative aspect-[4/3] overflow-hidden">
-              <Image
-                src="/images/studio/community.webp"
-                alt="BOXX Community"
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 50vw"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/20 to-transparent" />
+          {/* Image side — animated reshuffling grid */}
+          <motion.div ref={gridRef} style={{ y: imageY }} className="relative">
+            <div
+              className="grid gap-2 aspect-square"
+              style={{
+                gridTemplateColumns: template.cols,
+                gridTemplateRows: template.rows,
+                transition: 'grid-template-columns 0.8s cubic-bezier(0.22, 1, 0.36, 1), grid-template-rows 0.8s cubic-bezier(0.22, 1, 0.36, 1)',
+              }}
+            >
+              {communityImages.map((img, i) => {
+                const isFeatured = i === featured;
+
+                return (
+                  <div
+                    key={img.src}
+                    onClick={() => setFeatured(i)}
+                    className="relative overflow-hidden cursor-pointer group"
+                  >
+                    <Image
+                      src={img.src}
+                      alt={img.alt}
+                      fill
+                      className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                      sizes="(max-width: 1024px) 50vw, 25vw"
+                    />
+
+                    {/* Dim overlay on non-featured */}
+                    <div
+                      className="absolute inset-0 transition-all duration-700"
+                      style={{
+                        background: isFeatured
+                          ? 'linear-gradient(to top, rgba(10,10,10,0.4) 0%, transparent 50%)'
+                          : 'rgba(0,0,0,0.35)',
+                      }}
+                    />
+
+                    {/* Label on featured */}
+                    <div
+                      className="absolute bottom-3 left-3 transition-opacity duration-500"
+                      style={{ opacity: isFeatured ? 1 : 0 }}
+                    >
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-white/70 font-medium">
+                        #BOXXCNX
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Floating BOXXRUN badge */}
@@ -65,7 +133,7 @@ export default function Community() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4, duration: 0.6 }}
-              className="absolute -bottom-5 right-4 lg:right-8 bg-accent text-black px-6 py-4"
+              className="absolute -bottom-5 right-4 lg:right-8 bg-accent text-black px-6 py-4 z-10"
             >
               <p className="text-xs tracking-[0.2em] uppercase font-bold">BOXXRUN</p>
               <p className="text-[10px] tracking-wider mt-1 opacity-60">Free Run Club</p>

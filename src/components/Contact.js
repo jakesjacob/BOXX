@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
+import Image from 'next/image';
 
 const socialLinks = [
   { name: 'Instagram', href: 'https://instagram.com/boxxthailand' },
@@ -74,12 +75,30 @@ export default function Contact() {
                 love to hear from you. Drop us a message or find us on social media.
               </motion.p>
 
+              {/* Storefront image */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.25 }}
+                className="mt-12 relative aspect-[16/9] overflow-hidden"
+              >
+                <Image
+                  src="/images/studio/about-1.webp"
+                  alt="BOXX Boxing Studio entrance in Chiang Mai"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#080808]/60 via-transparent to-transparent" />
+              </motion.div>
+
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.3 }}
-                className="mt-16 space-y-10"
+                className="mt-10 space-y-10"
               >
                 <div>
                   <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-3">

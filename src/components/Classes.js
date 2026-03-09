@@ -14,6 +14,7 @@ const classes = [
     capacity: '6 max',
     rounds: '10 rounds',
     image: '/images/studio/class-boxing.webp',
+    imagePosition: 'top',
     description:
       'Perfect for first-timers or anyone new to boxing. Move through shadow boxing, bag work, and 1:1 padwork with a focus on both offence and defence.',
     features: ['Shadow boxing', 'Bag work', '1:1 Padwork', 'Technique focus'],
@@ -83,6 +84,7 @@ function ClassCard({ cls, index, isExpanded, onToggle }) {
           className={`object-cover transition-transform duration-700 ${
             isExpanded ? 'scale-105' : 'group-hover:scale-105'
           }`}
+          style={cls.imagePosition ? { objectPosition: cls.imagePosition } : undefined}
           sizes="(max-width: 768px) 100vw, 50vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
