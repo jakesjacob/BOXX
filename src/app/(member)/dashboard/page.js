@@ -38,6 +38,7 @@ function DashboardContent() {
   const sharedClassId = searchParams.get('class')
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState(tabParam === 'bookings' ? 'bookings' : 'classes')
+  const [scheduleView, setScheduleView] = useState('calendar') // persists across tab switches
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -95,7 +96,7 @@ function DashboardContent() {
       </div>
 
       {activeTab === 'classes' && (
-        <ScheduleSection credits={data.credits} onUpdate={fetchDashboard} sharedClassId={sharedClassId} />
+        <ScheduleSection credits={data.credits} onUpdate={fetchDashboard} sharedClassId={sharedClassId} view={scheduleView} onViewChange={setScheduleView} />
       )}
       {activeTab === 'bookings' && (
         <BookingsSection
@@ -424,9 +425,9 @@ function getWeekStart(offset = 0) {
   return d
 }
 
-function ScheduleSection({ credits, onUpdate, sharedClassId }) {
+function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange }) {
   const router = useRouter()
-  const [view, setView] = useState('calendar') // 'calendar' | 'list'
+  const setView = onViewChange
   const [weekOffset, setWeekOffset] = useState(0) // 0 = this week, 1 = next, etc.
   const [schedule, setSchedule] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1255,6 +1256,7 @@ function BookingsSection({ upcoming, past, onUpdate }) {
     const hoursUntil = isUpcoming ? (new Date(cls.starts_at) - Date.now()) / (1000 * 60 * 60) : 0
     const isLate = hoursUntil <= 24
 
+    const isClassCancelled = cls.status === 'cancelled'
     const statusColors = {
       attended: 'success',
       cancelled: 'destructive',
@@ -1298,9 +1300,13 @@ function BookingsSection({ upcoming, past, onUpdate }) {
             </div>
             {!isUpcoming && (
               <div className="shrink-0 z-10">
-                <Badge variant={statusColors[b.status] || 'secondary'} className="text-[10px] capitalize">
-                  {b.status}{b.late_cancel ? ' (late)' : ''}
-                </Badge>
+                {isClassCancelled ? (
+                  <Badge variant="destructive" className="text-[10px]">Class Cancelled</Badge>
+                ) : (
+                  <Badge variant={statusColors[b.status] || 'secondary'} className="text-[10px] capitalize">
+                    {b.status}{b.late_cancel ? ' (late)' : ''}
+                  </Badge>
+                )}
               </div>
             )}
             <svg className={cn('w-5 h-5 text-foreground/40 transition-transform shrink-0 z-10', isExpanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1320,6 +1326,12 @@ function BookingsSection({ upcoming, past, onUpdate }) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mt-4 pt-4 border-t border-card-border space-y-4">
+                  {isClassCancelled && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded bg-red-500/10 border border-red-500/20">
+                      <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                      <span className="text-xs text-red-400">This class was cancelled by the studio{b.credit_returned ? ' — your credit has been returned' : ''}</span>
+                    </div>
+                  )}
                   <div className="flex items-start gap-4">
                     {cls.instructors?.photo_url && (
                       <Image src={cls.instructors.photo_url} alt={cls.instructors.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />

@@ -170,7 +170,7 @@ INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at
    'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
    (CURRENT_DATE + INTERVAL '3 days 7 hours')::timestamptz,
    (CURRENT_DATE + INTERVAL '3 days 7 hours 55 minutes')::timestamptz,
-   6, 1, 'active'),
+   6, 1, 'cancelled'),
   ('c0000004-0000-0000-0000-000000000002',
    'a2222222-2222-2222-2222-222222222222', 'b1111111-1111-1111-1111-111111111111',
    (CURRENT_DATE + INTERVAL '3 days 17 hours')::timestamptz,
@@ -239,6 +239,11 @@ INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d3333333-3333-3333-3333-333333333333', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
   ('d4444444-4444-4444-4444-444444444444', 'c0000003-0000-0000-0000-000000000001', 'confirmed');
 
+-- Sarah, Tom were in Day 3 BOXX&TRAIN (now cancelled by admin — credits returned)
+INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned) VALUES
+  ('d1111111-1111-1111-1111-111111111111', 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true),
+  ('d2222222-2222-2222-2222-222222222222', 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
+
 -- Sarah, Tom in Day 3 BOXXINTER
 INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d1111111-1111-1111-1111-111111111111', 'c0000004-0000-0000-0000-000000000002', 'confirmed'),
@@ -262,14 +267,17 @@ BEGIN
 
   SELECT id INTO v_pack_id FROM class_packs WHERE credits = 10 LIMIT 1;
 
-  -- 10 credits, 8 remaining
+  -- 10 credits, 9 remaining (1 used for attended class, 1 returned from cancelled class)
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status)
-  VALUES (v_user_id, v_pack_id, 10, 8, NOW() + INTERVAL '60 days', 'seed_payment_001', 'active');
+  VALUES (v_user_id, v_pack_id, 10, 9, NOW() + INTERVAL '60 days', 'seed_payment_001', 'active');
 
-  -- Upcoming: tomorrow's BOXXINTER + Day 3 BOXX&TRAIN
+  -- Upcoming: tomorrow's BOXXINTER
   INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
-    (v_user_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed'),
-    (v_user_id, 'c0000004-0000-0000-0000-000000000001', 'confirmed');
+    (v_user_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed');
+
+  -- Admin-cancelled: Day 3 BOXX&TRAIN was cancelled, credit returned
+  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned)
+  VALUES (v_user_id, 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
 
   -- Past: attended today's morning class
   INSERT INTO bookings (user_id, class_schedule_id, status, created_at)

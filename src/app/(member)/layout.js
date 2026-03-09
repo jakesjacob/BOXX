@@ -83,9 +83,31 @@ export default function MemberLayout({ children }) {
       </nav>
 
       {/* Page content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8 min-h-[calc(100vh-12rem)]">
         {children}
       </main>
+
+      {/* Spacer + footer */}
+      <div className="mt-16" />
+      <footer className="border-t border-card-border py-8 px-4">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <Link href="/">
+            <Image
+              src="/images/brand/logo-primary-white.png"
+              alt="BOXX"
+              width={80}
+              height={32}
+              className="h-6 w-auto opacity-40"
+            />
+          </Link>
+          <div className="flex items-center gap-4 text-xs text-muted">
+            <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
+            <Link href="/dashboard" className="hover:text-foreground transition-colors">Book Classes</Link>
+            <Link href="/buy-classes" className="hover:text-foreground transition-colors">Buy Packs</Link>
+          </div>
+          <p className="text-[10px] text-muted/50">&copy; {new Date().getFullYear()} BOXX Thailand</p>
+        </div>
+      </footer>
     </div>
   )
 }
