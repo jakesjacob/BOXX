@@ -139,7 +139,7 @@ export async function DELETE(request) {
       .select('id, credit_id')
       .eq('class_schedule_id', classId)
       .eq('user_id', userId)
-      .in('status', ['confirmed', 'attended'])
+      .eq('status', 'confirmed')
       .maybeSingle()
 
     if (!booking) {

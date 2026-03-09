@@ -434,7 +434,7 @@ export default function AdminSchedulePage() {
                         <p className="text-xs font-medium text-foreground truncate">{m.name || 'No name'}</p>
                         <p className="text-[10px] text-muted truncate">{m.email}</p>
                       </div>
-                      <Badge variant={m.status === 'confirmed' ? 'success' : m.status === 'attended' ? 'default' : 'outline'} className="text-[9px] capitalize shrink-0">
+                      <Badge variant="success" className="text-[9px] capitalize shrink-0">
                         {m.status}
                       </Badge>
                     </div>
@@ -827,7 +827,7 @@ function RosterDialog({ cls, onClose, onUpdate, setToast }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={m.status === 'confirmed' ? 'success' : m.status === 'attended' ? 'default' : 'outline'} className="text-[10px] capitalize">
+                  <Badge variant="success" className="text-[10px] capitalize">
                     {m.status}
                   </Badge>
                   <button

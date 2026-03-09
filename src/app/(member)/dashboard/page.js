@@ -1684,9 +1684,7 @@ function BookingsSection({ upcoming, past, onUpdate }) {
 
     const isClassCancelled = cls.status === 'cancelled'
     const statusColors = {
-      attended: 'success',
       cancelled: 'destructive',
-      no_show: 'destructive',
       confirmed: 'secondary',
     }
 

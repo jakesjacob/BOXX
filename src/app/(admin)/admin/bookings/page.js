@@ -94,8 +94,6 @@ export default function AdminBookingsPage() {
             >
               <option value="all">All</option>
               <option value="confirmed">Confirmed</option>
-              <option value="attended">Attended</option>
-              <option value="no_show">No-show</option>
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
@@ -191,8 +189,6 @@ export default function AdminBookingsPage() {
               }) : '—'
               const statusStyles = {
                 confirmed: 'text-green-400 bg-green-400/10',
-                attended: 'text-blue-400 bg-blue-400/10',
-                no_show: 'text-amber-400 bg-amber-400/10',
                 cancelled: 'text-red-400 bg-red-400/10',
               }
 
@@ -245,7 +241,7 @@ export default function AdminBookingsPage() {
                       'text-[10px] font-medium px-1.5 py-0.5 rounded',
                       statusStyles[booking.status] || 'text-muted bg-muted/10'
                     )}>
-                      {booking.status === 'no_show' ? 'no-show' : booking.status}
+                      {booking.status}
                       {booking.late_cancel && ' (late)'}
                     </span>
                   </div>

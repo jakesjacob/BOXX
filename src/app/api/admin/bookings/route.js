@@ -19,7 +19,7 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') // confirmed, cancelled, attended, no_show, all
+    const status = searchParams.get('status') // confirmed, cancelled, all
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
     const search = searchParams.get('search') || ''
@@ -102,12 +102,12 @@ export async function GET(request) {
 
 const updateBookingSchema = z.object({
   bookingId: z.string().min(1),
-  action: z.enum(['attended', 'no_show', 'cancel']),
+  action: z.enum(['cancel']),
   refundCredit: z.boolean().optional(),
 })
 
 /**
- * PUT /api/admin/bookings — Mark attendance or cancel booking on behalf of member
+ * PUT /api/admin/bookings — Cancel booking on behalf of member
  */
 export async function PUT(request) {
   try {
@@ -125,7 +125,7 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    const { bookingId, action, refundCredit } = parsed.data
+    const { bookingId, refundCredit } = parsed.data
 
     const { data: booking } = await supabaseAdmin
       .from('bookings')
@@ -137,46 +137,34 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
-    if (action === 'attended') {
-      await supabaseAdmin
-        .from('bookings')
-        .update({ status: 'attended' })
-        .eq('id', bookingId)
-    } else if (action === 'no_show') {
-      await supabaseAdmin
-        .from('bookings')
-        .update({ status: 'no_show' })
-        .eq('id', bookingId)
-    } else if (action === 'cancel') {
-      await supabaseAdmin
-        .from('bookings')
-        .update({
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          credit_returned: refundCredit !== false,
-        })
-        .eq('id', bookingId)
+    await supabaseAdmin
+      .from('bookings')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        credit_returned: refundCredit !== false,
+      })
+      .eq('id', bookingId)
 
-      // Refund credit if requested
-      if (refundCredit !== false && booking.credit_id) {
-        const { data: credit } = await supabaseAdmin
+    // Refund credit if requested
+    if (refundCredit !== false && booking.credit_id) {
+      const { data: credit } = await supabaseAdmin
+        .from('user_credits')
+        .select('id, credits_remaining')
+        .eq('id', booking.credit_id)
+        .single()
+
+      if (credit && credit.credits_remaining !== null) {
+        await supabaseAdmin
           .from('user_credits')
-          .select('id, credits_remaining')
-          .eq('id', booking.credit_id)
-          .single()
-
-        if (credit && credit.credits_remaining !== null) {
-          await supabaseAdmin
-            .from('user_credits')
-            .update({ credits_remaining: credit.credits_remaining + 1 })
-            .eq('id', credit.id)
-        }
+          .update({ credits_remaining: credit.credits_remaining + 1 })
+          .eq('id', credit.id)
       }
     }
 
     await supabaseAdmin.from('admin_audit_log').insert({
       admin_id: session.user.id,
-      action: `booking_${action}`,
+      action: 'booking_cancel',
       target_type: 'booking',
       target_id: bookingId,
       details: { userId: booking.user_id, refundCredit },

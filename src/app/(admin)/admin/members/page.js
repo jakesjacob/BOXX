@@ -193,7 +193,7 @@ export default function AdminMembersPage() {
         setToast({ message: data.error || 'Action failed', type: 'error' })
         return
       }
-      setToast({ message: `Booking ${action === 'cancel' ? 'cancelled' : action === 'attended' ? 'marked attended' : 'marked no-show'}`, type: 'success' })
+      setToast({ message: 'Booking cancelled', type: 'success' })
       openDetail(selectedMember) // refresh
     } catch {
       setToast({ message: 'Something went wrong', type: 'error' })
@@ -293,8 +293,6 @@ export default function AdminMembersPage() {
                     { label: 'Active Credits', value: detail.stats.activeCredits },
                     { label: 'Total Bookings', value: detail.stats.totalBookings },
                     { label: 'Cancelled', value: detail.stats.cancelledBookings },
-                    { label: 'No-shows', value: detail.stats.noShows },
-                    { label: 'Attendance', value: `${detail.stats.attendanceRate}%` },
                   ].map((stat) => (
                     <div key={stat.label}>
                       <p className="text-xs text-muted">{stat.label}</p>
@@ -354,7 +352,7 @@ export default function AdminMembersPage() {
                     {detail.bookings.map((b) => {
                       const cls = b.class_schedule
                       const isUpcoming = cls && new Date(cls.starts_at) > new Date()
-                      const statusColor = b.status === 'confirmed' ? 'text-green-400' : b.status === 'attended' ? 'text-blue-400' : b.status === 'no_show' ? 'text-amber-400' : 'text-red-400'
+                      const statusColor = b.status === 'confirmed' ? 'text-green-400' : 'text-red-400'
 
                       return (
                         <div key={b.id} className="flex items-center justify-between p-3 rounded-lg border border-card-border">
@@ -373,30 +371,12 @@ export default function AdminMembersPage() {
                           <div className="flex items-center gap-2">
                             <span className={cn('text-xs font-medium capitalize', statusColor)}>{b.status}</span>
                             {b.status === 'confirmed' && isUpcoming && (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => handleBookingAction(b.id, 'cancel', true)}
-                                  className="text-[10px] px-2 py-1 rounded border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-colors"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            )}
-                            {b.status === 'confirmed' && !isUpcoming && (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => handleBookingAction(b.id, 'attended')}
-                                  className="text-[10px] px-2 py-1 rounded border border-green-400/30 text-green-400 hover:bg-green-400/10 transition-colors"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={() => handleBookingAction(b.id, 'no_show')}
-                                  className="text-[10px] px-2 py-1 rounded border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 transition-colors"
-                                >
-                                  NS
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => handleBookingAction(b.id, 'cancel', true)}
+                                className="text-[10px] px-2 py-1 rounded border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-colors"
+                              >
+                                Cancel
+                              </button>
                             )}
                           </div>
                         </div>

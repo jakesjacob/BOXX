@@ -50,11 +50,7 @@ export async function GET(request, { params }) {
     const bookings = bookingsRes.data || []
     const totalBookings = bookings.filter((b) => b.status === 'confirmed').length
     const cancelledBookings = bookings.filter((b) => b.status === 'cancelled').length
-    const noShows = bookings.filter((b) => b.status === 'no_show').length
     const lastBooking = bookings.find((b) => b.status === 'confirmed')
-    const attendanceRate = totalBookings + noShows > 0
-      ? Math.round((totalBookings / (totalBookings + noShows)) * 100)
-      : 100
 
     const credits = creditsRes.data || []
     const activeCredits = credits
@@ -69,8 +65,6 @@ export async function GET(request, { params }) {
       stats: {
         totalBookings,
         cancelledBookings,
-        noShows,
-        attendanceRate,
         activeCredits,
         lastVisit: lastBooking?.class_schedule?.starts_at || null,
       },

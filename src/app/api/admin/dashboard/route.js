@@ -115,7 +115,7 @@ export async function GET(request) {
           .from('bookings')
           .select('id, class_schedule_id, status, users(id, name, avatar_url, email)')
           .in('class_schedule_id', classIds)
-          .in('status', ['confirmed', 'attended', 'no_show']),
+          .eq('status', 'confirmed'),
         supabaseAdmin
           .from('waitlist')
           .select('class_schedule_id, position, users(id, name, avatar_url, email)')
@@ -126,9 +126,7 @@ export async function GET(request) {
       const countMap = {}
       const rosterMap = {}
       ;(bookingsRes.data || []).forEach((b) => {
-        if (b.status === 'confirmed' || b.status === 'attended') {
           countMap[b.class_schedule_id] = (countMap[b.class_schedule_id] || 0) + 1
-        }
         if (!rosterMap[b.class_schedule_id]) rosterMap[b.class_schedule_id] = []
         rosterMap[b.class_schedule_id].push({
           id: b.users?.id,

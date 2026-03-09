@@ -53,7 +53,7 @@ export async function GET(request) {
           .from('bookings')
           .select('class_schedule_id, status, users(id, name, avatar_url, email)')
           .in('class_schedule_id', classIds)
-          .in('status', ['confirmed', 'attended', 'no_show']),
+          .eq('status', 'confirmed'),
         supabaseAdmin
           .from('waitlist')
           .select('class_schedule_id, position, users(id, name, avatar_url, email)')
@@ -64,9 +64,7 @@ export async function GET(request) {
       const bookings = bookingsRes.data || []
 
       bookings.forEach((b) => {
-        if (b.status === 'confirmed' || b.status === 'attended') {
-          bookingCounts[b.class_schedule_id] = (bookingCounts[b.class_schedule_id] || 0) + 1
-        }
+        bookingCounts[b.class_schedule_id] = (bookingCounts[b.class_schedule_id] || 0) + 1
       })
 
       // Build roster per class

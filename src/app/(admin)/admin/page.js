@@ -17,7 +17,6 @@ export default function AdminDashboard() {
   const [dayOffset, setDayOffset] = useState(0)
   const [dayClasses, setDayClasses] = useState(null) // null = use data.todayClasses, array = fetched
   const [dayLoading, setDayLoading] = useState(false)
-  const [attendanceLoading, setAttendanceLoading] = useState(null) // booking_id being updated
 
   const selectedDate = new Date()
   selectedDate.setDate(selectedDate.getDate() + dayOffset)
@@ -62,36 +61,6 @@ export default function AdminDashboard() {
     }
     fetchDay()
   }, [dayOffset]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function markAttendance(bookingId, action) {
-    setAttendanceLoading(bookingId)
-    try {
-      const res = await fetch('/api/admin/bookings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, action }),
-      })
-      if (res.ok) {
-        // Update roster status locally
-        const updateRoster = (classes) =>
-          classes.map((cls) => ({
-            ...cls,
-            roster: (cls.roster || []).map((m) =>
-              m.booking_id === bookingId ? { ...m, status: action } : m
-            ),
-          }))
-        if (dayClasses) {
-          setDayClasses(updateRoster(dayClasses))
-        } else if (data) {
-          setData({ ...data, todayClasses: updateRoster(data.todayClasses || []) })
-        }
-      }
-    } catch (err) {
-      console.error('Failed to mark attendance:', err)
-    } finally {
-      setAttendanceLoading(null)
-    }
-  }
 
   const activeClasses = dayClasses ?? data?.todayClasses ?? []
 
@@ -289,7 +258,7 @@ export default function AdminDashboard() {
                             <p className="text-xs text-muted mt-2 italic">{cls.notes}</p>
                           )}
 
-                          {/* Attendees with attendance buttons */}
+                          {/* Attendees */}
                           <div className="mt-3">
                             <p className="text-xs font-medium text-foreground mb-1.5">Attendees ({roster.length})</p>
                             {roster.length > 0 ? (
@@ -304,35 +273,6 @@ export default function AdminDashboard() {
                                       )}
                                     </div>
                                     <span className="text-xs text-foreground truncate flex-1">{m.name || 'No name'}</span>
-                                    {/* Attendance buttons */}
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <button
-                                        onClick={() => markAttendance(m.booking_id, 'attended')}
-                                        disabled={attendanceLoading === m.booking_id}
-                                        className={cn(
-                                          'text-[10px] font-medium px-2 py-0.5 rounded border transition-colors',
-                                          m.status === 'attended'
-                                            ? 'bg-green-500/20 border-green-500/40 text-green-400'
-                                            : 'border-card-border text-muted hover:text-green-400 hover:border-green-500/30'
-                                        )}
-                                        title="Mark attended"
-                                      >
-                                        {attendanceLoading === m.booking_id ? '...' : 'Attended'}
-                                      </button>
-                                      <button
-                                        onClick={() => markAttendance(m.booking_id, 'no_show')}
-                                        disabled={attendanceLoading === m.booking_id}
-                                        className={cn(
-                                          'text-[10px] font-medium px-2 py-0.5 rounded border transition-colors',
-                                          m.status === 'no_show'
-                                            ? 'bg-red-500/20 border-red-500/40 text-red-400'
-                                            : 'border-card-border text-muted hover:text-red-400 hover:border-red-500/30'
-                                        )}
-                                        title="Mark no show"
-                                      >
-                                        {attendanceLoading === m.booking_id ? '...' : 'No Show'}
-                                      </button>
-                                    </div>
                                   </div>
                                 ))}
                               </div>
