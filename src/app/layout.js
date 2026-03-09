@@ -7,6 +7,7 @@ const geistSans = Geist({
 });
 
 export const metadata = {
+  metadataBase: new URL("https://www.boxxthailand.com"),
   title: "BOXX | Luxury Boutique Boxing & Personal Training Studio in Chiang Mai",
   description:
     "Chiang Mai's first luxury boutique boxing and personal training studio. UK-qualified coaches delivering authentic British boxing and strength training. Small-group classes, max 6 per session.",
@@ -27,6 +28,13 @@ export const metadata = {
     type: "website",
     locale: "en_US",
     url: "https://www.boxxthailand.com",
+    siteName: "BOXX Boxing Studio",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BOXX | Luxury Boutique Boxing Studio in Chiang Mai",
+    description:
+      "Boxing and strength training, done properly. Small-group classes led by UK-qualified coaches.",
   },
 };
 
