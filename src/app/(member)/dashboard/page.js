@@ -1079,6 +1079,14 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: '100%' }}
                   transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                  drag={typeof window !== 'undefined' && window.innerWidth < 768 ? 'y' : false}
+                  dragConstraints={{ top: 0 }}
+                  dragElastic={0.2}
+                  onDragEnd={(_, info) => {
+                    if (info.offset.y > 100 || info.velocity.y > 500) {
+                      setExpandedId(null)
+                    }
+                  }}
                   className="md:relative md:z-auto fixed inset-x-0 bottom-0 z-50 md:static max-h-[85vh] md:max-h-none overflow-y-auto"
                 >
                 {(() => {
@@ -1104,7 +1112,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
                         <div className="absolute inset-0 bg-gradient-to-r from-card via-card/70 to-card/40" />
                       </div>
 
-                      <CardContent className="p-5 relative">
+                      <CardContent className="p-5 pb-10 md:pb-5 relative">
                         {/* Header row */}
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-4 flex-1 min-w-0">

@@ -83,7 +83,7 @@ export default function MemberLayout({ children }) {
       </nav>
 
       {/* Page content */}
-      <main className="max-w-6xl mx-auto px-4 py-8 min-h-[1200px]">
+      <main className="max-w-6xl mx-auto px-4 py-8 min-h-[600px]">
         {children}
       </main>
 
