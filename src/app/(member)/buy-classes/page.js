@@ -21,6 +21,7 @@ function BuyClassesContent() {
   const searchParams = useSearchParams()
   const [packs, setPacks] = useState([])
   const [activeCredits, setActiveCredits] = useState([])
+  const [purchaseHistory, setPurchaseHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState(null)
   const [success, setSuccess] = useState(false)
@@ -41,6 +42,7 @@ function BuyClassesContent() {
           const data = await res.json()
           setPacks(data.packs || [])
           setActiveCredits(data.activeCredits || [])
+          setPurchaseHistory(data.purchaseHistory || [])
         }
       } catch (err) {
         console.error('Failed to fetch packs:', err)
@@ -178,6 +180,79 @@ function BuyClassesContent() {
               </Card>
             )
           })}
+        </div>
+      )}
+
+      {/* Purchase History */}
+      {!loading && purchaseHistory.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Purchase History</h2>
+          <div className="border border-card-border rounded-lg overflow-hidden">
+            {purchaseHistory.map((purchase, idx) => {
+              const isExpired = new Date(purchase.expires_at) < new Date()
+              const isActive = purchase.status === 'active' && !isExpired
+              const isUnlimited = purchase.credits_total === null
+              const purchaseDate = new Date(purchase.created_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                timeZone: 'Asia/Bangkok',
+              })
+              const expiryDate = new Date(purchase.expires_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                timeZone: 'Asia/Bangkok',
+              })
+
+              return (
+                <div
+                  key={purchase.id}
+                  className={cn(
+                    'flex items-center justify-between gap-4 px-4 py-3',
+                    idx !== purchaseHistory.length - 1 && 'border-b border-card-border'
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {purchase.class_packs?.name || 'Unknown Pack'}
+                      </p>
+                      {isActive ? (
+                        <span className="shrink-0 text-[10px] font-medium text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded">
+                          Active
+                        </span>
+                      ) : isExpired ? (
+                        <span className="shrink-0 text-[10px] font-medium text-muted bg-card px-1.5 py-0.5 rounded">
+                          Expired
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[10px] font-medium text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">
+                          Used
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted mt-0.5">
+                      {purchaseDate} &middot; Expires {expiryDate}
+                    </p>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {purchase.class_packs?.price_thb
+                        ? `฿${purchase.class_packs.price_thb.toLocaleString()}`
+                        : '—'}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {isUnlimited
+                        ? 'Unlimited'
+                        : `${purchase.credits_remaining}/${purchase.credits_total} left`}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

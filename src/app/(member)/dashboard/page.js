@@ -122,6 +122,7 @@ function ProfileSection({ user, credits, onUpdate }) {
   })
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [showCredits, setShowCredits] = useState(false)
   const fileInputRef = useRef(null)
 
   async function handleSave() {
@@ -236,90 +237,134 @@ function ProfileSection({ user, credits, onUpdate }) {
           </Button>
         </div>
 
-        {/* Active packs */}
-        {credits.length > 0 ? (
-          <div className="grid gap-3 mt-5 sm:grid-cols-2 lg:grid-cols-3">
-            {credits.map((c) => {
-              const daysLeft = Math.ceil((new Date(c.expires_at) - Date.now()) / (1000 * 60 * 60 * 24))
-              const isUnlimited = c.credits_remaining === null
-              const usedCredits = isUnlimited ? null : (c.credits_total - c.credits_remaining)
-              const percentUsed = isUnlimited ? 0 : c.credits_total > 0 ? (usedCredits / c.credits_total) * 100 : 0
-              const isLow = !isUnlimited && c.credits_remaining <= 1
-              const isExpiringSoon = daysLeft <= 5
+        {/* Credits summary */}
+        {(() => {
+          const totalCredits = credits.reduce((sum, c) => {
+            if (c.credits_remaining === null) return Infinity
+            return sum + (c.credits_remaining || 0)
+          }, 0)
+          const hasExpiring = credits.some((c) => {
+            const daysLeft = Math.ceil((new Date(c.expires_at) - Date.now()) / (1000 * 60 * 60 * 24))
+            return daysLeft <= 5
+          })
+          const isLow = totalCredits !== Infinity && totalCredits <= 2 && totalCredits > 0
 
-              return (
-                <div
-                  key={c.id}
-                  className={cn(
-                    'rounded-lg border p-4 space-y-3',
-                    isExpiringSoon ? 'border-red-500/30 bg-red-500/5' : 'border-card-border bg-background'
-                  )}
-                >
-                  {/* Pack name + badge */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{c.class_packs?.name}</p>
-                      {c.class_packs?.is_membership && (
-                        <Badge variant="default" className="text-[10px] mt-1">Subscription</Badge>
-                      )}
-                    </div>
-                    {isExpiringSoon && (
-                      <Badge variant="destructive" className="text-[10px] shrink-0">Expiring</Badge>
-                    )}
-                  </div>
-
-                  {/* Credits display */}
-                  <div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-2xl font-bold text-accent">
-                        {isUnlimited ? '∞' : c.credits_remaining}
-                      </span>
-                      {!isUnlimited && (
-                        <span className="text-sm text-muted">/ {c.credits_total}</span>
-                      )}
-                      <span className="text-xs text-muted ml-0.5">
-                        {isUnlimited ? 'unlimited' : `credit${c.credits_remaining !== 1 ? 's' : ''} left`}
-                      </span>
-                    </div>
-
-                    {/* Progress bar (finite packs only) */}
-                    {!isUnlimited && (
-                      <div className="mt-2 h-1.5 rounded-full bg-card-border overflow-hidden">
-                        <div
-                          className={cn(
-                            'h-full rounded-full transition-all',
-                            isLow ? 'bg-red-500' : 'bg-accent'
-                          )}
-                          style={{ width: `${Math.max(100 - percentUsed, 0)}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Expiry */}
-                  <div className="flex items-center justify-between text-xs text-muted">
-                    <span>
-                      {daysLeft > 0
-                        ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining`
-                        : 'Expires today'}
+          return credits.length > 0 ? (
+            <div className="mt-5">
+              {/* Compact total display */}
+              <button
+                onClick={() => setShowCredits(!showCredits)}
+                className="w-full flex items-center justify-between p-3 rounded-lg border border-card-border bg-background hover:border-accent/20 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={cn('text-2xl font-bold', isLow || hasExpiring ? 'text-red-400' : 'text-accent')}>
+                      {totalCredits === Infinity ? '∞' : totalCredits}
                     </span>
-                    <span>
-                      {new Date(c.expires_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        timeZone: 'Asia/Bangkok',
-                      })}
+                    <span className="text-xs text-muted">
+                      {totalCredits === Infinity ? 'unlimited' : `credit${totalCredits !== 1 ? 's' : ''}`}
                     </span>
                   </div>
+                  {hasExpiring && <Badge variant="destructive" className="text-[10px]">Expiring soon</Badge>}
+                  {isLow && !hasExpiring && <Badge variant="outline" className="text-[10px] text-red-400 border-red-400/30">Running low</Badge>}
                 </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="mt-5 p-4 rounded-lg border border-card-border bg-background text-center">
-            <p className="text-sm text-muted">No active packs. Purchase a class pack below to start booking.</p>
-          </div>
-        )}
+                <svg className={cn('w-4 h-4 text-muted transition-transform', showCredits && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Expandable pack details */}
+              <AnimatePresence>
+                {showCredits && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid gap-3 mt-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {credits.map((c) => {
+                        const daysLeft = Math.ceil((new Date(c.expires_at) - Date.now()) / (1000 * 60 * 60 * 24))
+                        const isUnlimited = c.credits_remaining === null
+                        const usedCredits = isUnlimited ? null : (c.credits_total - c.credits_remaining)
+                        const percentUsed = isUnlimited ? 0 : c.credits_total > 0 ? (usedCredits / c.credits_total) * 100 : 0
+                        const packLow = !isUnlimited && c.credits_remaining <= 1
+                        const isExpiringSoon = daysLeft <= 5
+
+                        return (
+                          <div
+                            key={c.id}
+                            className={cn(
+                              'rounded-lg border p-4 space-y-3',
+                              isExpiringSoon ? 'border-red-500/30 bg-red-500/5' : 'border-card-border bg-background'
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-semibold text-foreground">{c.class_packs?.name}</p>
+                                {c.class_packs?.is_membership && (
+                                  <Badge variant="default" className="text-[10px] mt-1">Subscription</Badge>
+                                )}
+                              </div>
+                              {isExpiringSoon && (
+                                <Badge variant="destructive" className="text-[10px] shrink-0">Expiring</Badge>
+                              )}
+                            </div>
+
+                            <div>
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-2xl font-bold text-accent">
+                                  {isUnlimited ? '∞' : c.credits_remaining}
+                                </span>
+                                {!isUnlimited && (
+                                  <span className="text-sm text-muted">/ {c.credits_total}</span>
+                                )}
+                                <span className="text-xs text-muted ml-0.5">
+                                  {isUnlimited ? 'unlimited' : `credit${c.credits_remaining !== 1 ? 's' : ''} left`}
+                                </span>
+                              </div>
+
+                              {!isUnlimited && (
+                                <div className="mt-2 h-1.5 rounded-full bg-card-border overflow-hidden">
+                                  <div
+                                    className={cn(
+                                      'h-full rounded-full transition-all',
+                                      packLow ? 'bg-red-500' : 'bg-accent'
+                                    )}
+                                    style={{ width: `${Math.max(100 - percentUsed, 0)}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-muted">
+                              <span>
+                                {daysLeft > 0
+                                  ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining`
+                                  : 'Expires today'}
+                              </span>
+                              <span>
+                                {new Date(c.expires_at).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  timeZone: 'Asia/Bangkok',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="mt-5 p-4 rounded-lg border border-card-border bg-background text-center">
+              <p className="text-sm text-muted">No active packs. Purchase a class pack to start booking.</p>
+            </div>
+          )
+        })()}
 
         {/* Edit form */}
         <AnimatePresence>

@@ -254,7 +254,8 @@ INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
 DO $$
 DECLARE
   v_user_id UUID;
-  v_pack_id UUID;
+  v_pack_10 UUID;
+  v_pack_5 UUID;
 BEGIN
   SELECT id INTO v_user_id FROM users
     WHERE email NOT LIKE '%@example.com'
@@ -265,11 +266,16 @@ BEGIN
     RETURN;
   END IF;
 
-  SELECT id INTO v_pack_id FROM class_packs WHERE credits = 10 LIMIT 1;
+  SELECT id INTO v_pack_10 FROM class_packs WHERE credits = 10 LIMIT 1;
+  SELECT id INTO v_pack_5 FROM class_packs WHERE credits = 5 LIMIT 1;
 
   -- 10 credits, 9 remaining (1 used for attended class, 1 returned from cancelled class)
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status)
-  VALUES (v_user_id, v_pack_id, 10, 9, NOW() + INTERVAL '60 days', 'seed_payment_001', 'active');
+  VALUES (v_user_id, v_pack_10, 10, 9, NOW() + INTERVAL '60 days', 'seed_payment_001', 'active');
+
+  -- 5 credits, 1 remaining — expiring in 3 days (triggers low + expiring soon)
+  INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status)
+  VALUES (v_user_id, v_pack_5, 5, 1, NOW() + INTERVAL '3 days', 'seed_payment_002', 'active');
 
   -- Upcoming: tomorrow's BOXXINTER
   INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
