@@ -373,3 +373,5 @@ My notes for claude to pick up and add into the file, mark as crossed out when r
 - ~~Test the admin on mobile~~ (done — mobile responsive fixes applied across all admin pages)
 - Add a new image for the private classes for when it shows in a users my bookings
 - redo the buy packs screen
+- open new tab when logging in
+- change location of toast message on the public app, make it like a proper bottom screen toast

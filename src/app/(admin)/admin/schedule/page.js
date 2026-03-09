@@ -975,6 +975,7 @@ function RosterDialog({ cls, onClose, onUpdate, setToast }) {
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [actionLoading, setActionLoading] = useState(null)
+  const [confirmRemove, setConfirmRemove] = useState(null) // { userId, type: 'roster' | 'waitlist', name }
   const [activeTab, setActiveTab] = useState('attendees')
 
   const rosterUserIds = new Set(roster.map((m) => m.id))
@@ -1160,17 +1161,37 @@ function RosterDialog({ cls, onClose, onUpdate, setToast }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="success" className="text-[10px] capitalize">
-                    {m.status}
-                  </Badge>
-                  <button
-                    onClick={() => removeMember(m.id)}
-                    disabled={actionLoading === m.id}
-                    className="text-red-400 hover:text-red-300 text-xs transition-colors disabled:opacity-50"
-                    title="Remove from class"
-                  >
-                    {actionLoading === m.id ? '...' : '✕'}
-                  </button>
+                  {confirmRemove?.userId === m.id && confirmRemove?.type === 'roster' ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-red-400">Remove?</span>
+                      <button
+                        onClick={() => { setConfirmRemove(null); removeMember(m.id) }}
+                        disabled={actionLoading === m.id}
+                        className="text-[10px] font-medium text-red-400 hover:text-red-300 px-1.5 py-0.5 border border-red-400/30 rounded transition-colors"
+                      >
+                        {actionLoading === m.id ? '...' : 'Yes'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemove(null)}
+                        className="text-[10px] font-medium text-muted hover:text-foreground px-1.5 py-0.5 border border-card-border rounded transition-colors"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Badge variant="success" className="text-[10px] capitalize">
+                        {m.status}
+                      </Badge>
+                      <button
+                        onClick={() => setConfirmRemove({ userId: m.id, type: 'roster', name: m.name })}
+                        className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                        title="Remove from class"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )) : (
@@ -1201,22 +1222,42 @@ function RosterDialog({ cls, onClose, onUpdate, setToast }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => promoteFromWaitlist(m.id)}
-                    disabled={actionLoading === m.id}
-                    className="text-green-400 hover:text-green-300 text-[10px] font-medium transition-colors disabled:opacity-50 px-1.5 py-0.5 border border-green-400/20 rounded"
-                    title="Move to attendees"
-                  >
-                    {actionLoading === m.id ? '...' : 'Promote'}
-                  </button>
-                  <button
-                    onClick={() => removeFromWaitlist(m.id)}
-                    disabled={actionLoading === `wl-${m.id}`}
-                    className="text-red-400 hover:text-red-300 text-xs transition-colors disabled:opacity-50"
-                    title="Remove from waitlist"
-                  >
-                    {actionLoading === `wl-${m.id}` ? '...' : '✕'}
-                  </button>
+                  {confirmRemove?.userId === m.id && confirmRemove?.type === 'waitlist' ? (
+                    <>
+                      <span className="text-[10px] text-red-400">Remove?</span>
+                      <button
+                        onClick={() => { setConfirmRemove(null); removeFromWaitlist(m.id) }}
+                        disabled={actionLoading === `wl-${m.id}`}
+                        className="text-[10px] font-medium text-red-400 hover:text-red-300 px-1.5 py-0.5 border border-red-400/30 rounded transition-colors"
+                      >
+                        {actionLoading === `wl-${m.id}` ? '...' : 'Yes'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemove(null)}
+                        className="text-[10px] font-medium text-muted hover:text-foreground px-1.5 py-0.5 border border-card-border rounded transition-colors"
+                      >
+                        No
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => promoteFromWaitlist(m.id)}
+                        disabled={actionLoading === m.id}
+                        className="text-green-400 hover:text-green-300 text-[10px] font-medium transition-colors disabled:opacity-50 px-1.5 py-0.5 border border-green-400/20 rounded"
+                        title="Move to attendees"
+                      >
+                        {actionLoading === m.id ? '...' : 'Promote'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemove({ userId: m.id, type: 'waitlist', name: m.name })}
+                        className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                        title="Remove from waitlist"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )) : (
