@@ -198,37 +198,39 @@
 - [ ] **Roster tab** — default show/hide setting
 - [ ] **Data tab** — export all data, danger zone
 
-### Email Notifications (all need `RESEND_API_KEY`)
+### Email Notifications
 
-All email templates live in `src/lib/email.js` (Resend, branded dark HTML).
+All 15 email templates live in `src/lib/email.js` (Resend, branded dark HTML).
+`EMAIL_FROM` env var controls sender address. Currently `onboarding@resend.dev` for testing.
 
-**Coded & wired — just needs RESEND_API_KEY to go live:**
-| # | Email Event | Trigger | Template fn | Called from |
-|---|-------------|---------|-------------|------------|
-| 1 | Booking confirmation | Member books a class | `sendBookingConfirmation` | `/api/bookings/create` |
-| 2 | Class reminder (1hr before) | Cron every 15min | `sendClassReminder` | `/api/cron/reminders` |
-| 3 | Waitlist auto-promotion | Spot opens (cancel/remove) | `sendWaitlistPromotion` | `src/lib/waitlist.js` (called from cancel, roster remove, admin booking cancel) |
-| 4 | Waitlist promotion (cron) | Cron every 5min safety net | `sendWaitlistPromotion` | `/api/cron/process-waitlist` |
-| 5 | Credit expiry warning (3 days) | Cron daily midnight | `sendCreditExpiryWarning` | `/api/cron/expire-credits` |
+**Test results (2026-03-10, tested on Vercel staging with Resend test mode):**
 
-**Fully coded & wired:**
-| # | Email Event | Trigger | Status |
-|---|-------------|---------|--------|
-| 6 | Class change notification | Admin edits class with bookings | `sendClassChanged` wired in `/api/admin/schedule/notify` |
-| 7 | Private class invitation | Admin adds member to private class | `sendPrivateClassInvitation` wired in `/api/admin/schedule/roster` |
+| # | Email Event | Trigger | Status | Tested |
+|---|-------------|---------|--------|--------|
+| 1 | Booking confirmation | Member books a class | Wired in `/api/bookings/create` | PASS |
+| 2 | Class reminder (1hr before) | Cron every 15min | Wired in `/api/cron/reminders` | Not tested (cron) |
+| 3 | Waitlist promotion | Spot opens (cancel/remove) | Wired in `src/lib/waitlist.js` | PASS |
+| 4 | Waitlist promotion (cron) | Cron every 5min safety net | Wired in `/api/cron/process-waitlist` | Not tested (cron) |
+| 5 | Credit expiry warning | Cron daily midnight | Wired in `/api/cron/expire-credits` | Not tested (cron) |
+| 6 | Cancellation confirmation | Member cancels booking | Wired in `/api/bookings/cancel` | PASS |
+| 7 | Class cancelled by admin | Admin cancels a class | Wired in `/api/admin/schedule/cancel` | PASS |
+| 8 | Class change notification | Admin edits class with bookings | Wired in `/api/admin/schedule/notify` | PASS |
+| 9 | Pack purchase confirmation | Purchase completes | Wired in `/api/packs/purchase` + `/api/stripe/webhook` | PASS |
+| 10 | Credits low warning | Credit drops to 1 remaining | Wired in `/api/bookings/create` | PASS |
+| 11 | Welcome email | User registers | Wired in `/api/auth/register` | Not tested |
+| 12 | Admin direct email | Admin sends message to member | Wired in `/api/admin/emails` | PASS |
+| 13 | Removed from class | Admin removes member via roster | Wired in `/api/admin/schedule/roster` | PASS |
+| 14 | Admin added to class | Admin adds member to any class roster | Wired in `/api/admin/schedule/roster` | PASS |
+| 15 | Password reset | User requests reset | Wired in `/api/auth/forgot-password` | TODO — needs debugging |
 
-**Not yet built — needs template + API + wiring:**
-| # | Email Event | Trigger | Notes |
-|---|-------------|---------|-------|
-| 8 | Welcome email | User registers | Send from `/api/auth/register` |
-| 9 | Cancellation confirmation | Member cancels booking | Send from `/api/bookings/cancel` |
-| 10 | Class cancelled by admin | Admin cancels a class | Notify all booked members |
-| 11 | Pack purchase confirmation | Stripe webhook payment success | Send from `/api/stripe/webhook` |
-| 12 | Credits low warning | Credit drops to 1 remaining | Could be in booking create or cron |
-| 13 | Admin direct email | Admin sends message to member | Done — compose UI on Emails page + engagement widget reminder |
-| 14 | Password reset | User requests reset | Done — `/forgot-password` + `/reset-password/[token]` + email template |
-| 15 | Admin removes from class | Admin removes member via roster | Notify the removed member |
-| 16 | Admin cancels booking | Admin cancels on behalf of member | Notify the member |
+**Production email setup (before go-live):**
+- [ ] Verify `boxxthailand.com` domain on Resend (add SPF, DKIM, DMARC DNS records)
+- [ ] Change `EMAIL_FROM` env var to `BOXX Thailand <noreply@boxxthailand.com>` (or remove to use default)
+- [ ] Update `RESEND_API_KEY` on Vercel with production key if different
+- [ ] Set `NEXTAUTH_URL` to `https://boxxthailand.com` on Vercel (password reset links use this)
+- [ ] Test password reset flow end-to-end
+- [ ] Test cron-triggered emails (reminders, credit expiry, waitlist safety net)
+- [ ] Verify all emails land in inbox (not spam) with verified domain
 
 ### Dashboard Enhancements
 - [x] **Today's classes** — schedule-style cards on admin dashboard (colored border, time range, capacity bar, clickable to schedule page)
