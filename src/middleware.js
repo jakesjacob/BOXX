@@ -15,15 +15,24 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Check admin routes — redirect non-admins to dashboard (don't reveal admin exists)
+  // Check admin routes — allow admin and employee roles
   if (pathname.startsWith('/admin')) {
     if (!session) {
       const loginUrl = new URL('/login', req.url)
       loginUrl.searchParams.set('callbackUrl', pathname)
       return NextResponse.redirect(loginUrl)
     }
-    if (session.user.role !== 'admin') {
+    const role = session.user.role
+    if (role !== 'admin' && role !== 'employee') {
       return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+
+    // Employee restrictions — block admin-only pages
+    if (role === 'employee') {
+      const adminOnlyPaths = ['/admin/settings', '/admin/packs']
+      if (adminOnlyPaths.some((p) => pathname.startsWith(p))) {
+        return NextResponse.redirect(new URL('/admin', req.url))
+      }
     }
   }
 

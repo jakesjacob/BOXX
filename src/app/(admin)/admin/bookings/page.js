@@ -4,13 +4,38 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 const eventTypeConfig = {
-  booking: { icon: '📅', color: 'text-green-400 bg-green-400/10' },
-  cancellation: { icon: '❌', color: 'text-red-400 bg-red-400/10' },
-  signup: { icon: '👤', color: 'text-blue-400 bg-blue-400/10' },
-  admin: { icon: '🔧', color: 'text-amber-400 bg-amber-400/10' },
+  booking: { icon: '📅', label: 'Booking', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/20' },
+  cancellation: { icon: '❌', label: 'Cancellation', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' },
+  signup: { icon: '👤', label: 'Signup', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
+  admin: { icon: '🔧', label: 'Admin', color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
+}
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok',
+  })
+}
+
+function formatDate(ts) {
+  return new Date(ts).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok',
+  })
+}
+
+function groupByDate(events) {
+  const groups = {}
+  for (const event of events) {
+    const dateKey = new Date(event.timestamp).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Asia/Bangkok',
+    })
+    if (!groups[dateKey]) groups[dateKey] = []
+    groups[dateKey].push(event)
+  }
+  return groups
 }
 
 export default function AdminEventsPage() {
@@ -24,6 +49,8 @@ export default function AdminEventsPage() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
+  const [expandedId, setExpandedId] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     async function fetchEvents() {
@@ -57,13 +84,67 @@ export default function AdminEventsPage() {
     setPage(1)
   }
 
+  async function handleExportCSV() {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (typeFilter !== 'all') params.set('type', typeFilter)
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
+      if (search) params.set('search', search)
+      if (sortBy) params.set('sort', sortBy)
+
+      const res = await fetch(`/api/admin/events?${params}`)
+      if (!res.ok) return
+
+      const data = await res.json()
+      const rows = [['Date', 'Type', 'Event', 'Detail', 'Member', 'Email']]
+      for (const evt of (data.events || [])) {
+        rows.push([
+          new Date(evt.timestamp).toISOString(),
+          evt.type,
+          evt.label,
+          evt.detail || '',
+          evt.user?.name || 'System',
+          evt.user?.email || '',
+        ])
+      }
+
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `boxx-activity-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Export failed:', err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const totalPages = Math.ceil(total / 30)
+  const grouped = groupByDate(events)
+  const hasFilters = typeFilter !== 'all' || dateFrom || dateTo || search || sortBy !== 'newest'
+
+  // Count by type for filter badges
+  const typeCounts = {}
+  for (const e of events) {
+    typeCounts[e.type] = (typeCounts[e.type] || 0) + 1
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Activity</h1>
-        <span className="text-sm text-muted">{total} events</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Activity</h1>
+          <p className="text-sm text-muted mt-0.5">{total} events</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={exporting}>
+          {exporting ? 'Exporting...' : 'Export CSV'}
+        </Button>
       </div>
 
       {/* Search & Filters */}
@@ -80,21 +161,30 @@ export default function AdminEventsPage() {
             <Button variant="outline" className="shrink-0" onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }}>Clear</Button>
           )}
         </form>
-        <div className="flex flex-wrap items-end gap-2 sm:gap-3">
-          <div>
-            <label className="text-xs text-muted block mb-1">Event Type</label>
-            <select
-              value={typeFilter}
-              onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
-              className="rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30"
+
+        {/* Type filter pills */}
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { id: 'all', label: 'All' },
+            ...Object.entries(eventTypeConfig).map(([id, cfg]) => ({ id, label: cfg.label, icon: cfg.icon })),
+          ].map((f) => (
+            <button
+              key={f.id}
+              onClick={() => { setTypeFilter(f.id); setPage(1) }}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                typeFilter === f.id
+                  ? 'bg-accent/15 text-accent border border-accent/30'
+                  : 'bg-card border border-card-border text-muted hover:text-foreground hover:border-card-border/80'
+              )}
             >
-              <option value="all">All Events</option>
-              <option value="booking">Bookings</option>
-              <option value="cancellation">Cancellations</option>
-              <option value="signup">Signups</option>
-              <option value="admin">Admin Actions</option>
-            </select>
-          </div>
+              {f.icon && <span className="mr-1">{f.icon}</span>}
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2 sm:gap-3">
           <div>
             <label className="text-xs text-muted block mb-1">From</label>
             <Input
@@ -124,7 +214,7 @@ export default function AdminEventsPage() {
               <option value="oldest">Oldest First</option>
             </select>
           </div>
-          {(typeFilter !== 'all' || dateFrom || dateTo || search || sortBy !== 'newest') && (
+          {hasFilters && (
             <Button
               variant="outline"
               className="text-xs"
@@ -138,113 +228,147 @@ export default function AdminEventsPage() {
 
       {/* Loading */}
       {loading ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 bg-card border border-card-border rounded-lg animate-pulse" />
+            <div key={i} className="h-20 bg-card border border-card-border rounded-lg animate-pulse" />
           ))}
         </div>
       ) : events.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted">No events found.</p>
+            <p className="text-3xl mb-3">📭</p>
+            <p className="text-foreground font-medium">No events found</p>
+            <p className="text-sm text-muted mt-1">Try adjusting your filters</p>
           </CardContent>
         </Card>
       ) : (
         <>
-          {/* Events list */}
-          <div className="border border-card-border rounded-lg overflow-hidden">
-            {/* Header */}
-            <div className="hidden sm:grid sm:grid-cols-[40px_1fr_1fr_100px_100px] gap-4 px-4 py-2 bg-card border-b border-card-border text-xs text-muted font-medium uppercase tracking-wide">
-              <span></span>
-              <span>Event</span>
-              <span>Member</span>
-              <span>Type</span>
-              <span>When</span>
-            </div>
-
-            {events.map((event, idx) => {
-              const config = eventTypeConfig[event.type] || eventTypeConfig.admin
-              const time = new Date(event.timestamp).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-                timeZone: 'Asia/Bangkok',
-              })
-
-              return (
-                <div
-                  key={event.id}
-                  className={cn(
-                    'sm:grid sm:grid-cols-[40px_1fr_1fr_100px_100px] gap-2 sm:gap-4 px-4 py-3 sm:items-center',
-                    idx !== events.length - 1 && 'border-b border-card-border'
-                  )}
-                >
-                  {/* Icon */}
-                  <div className="hidden sm:flex items-center justify-center">
-                    <span className="text-base">{config.icon}</span>
-                  </div>
-
-                  {/* Event description */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 sm:block">
-                      <span className="sm:hidden text-base">{config.icon}</span>
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {event.label}
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted truncate">
-                      {event.detail}
-                      {event.meta?.classTime && (
-                        <> &middot; {new Date(event.meta.classTime).toLocaleString('en-US', {
-                          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok'
-                        })}</>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Member */}
-                  <div className="hidden sm:flex items-center gap-2">
-                    {event.user ? (
-                      <>
-                        <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
-                          {event.user.avatar_url ? (
-                            <img src={event.user.avatar_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-accent text-[10px] font-medium">
-                              {(event.user.name || event.user.email)?.[0]?.toUpperCase() || '?'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm text-foreground truncate">{event.user.name || 'Unknown'}</p>
-                          <p className="text-xs text-muted truncate">{event.user.email}</p>
-                        </div>
-                      </>
-                    ) : (
-                      <span className="text-sm text-muted">System</span>
-                    )}
-                  </div>
-
-                  {/* Type badge + Timestamp — inline on mobile */}
-                  <div className="flex items-center gap-2 mt-1.5 sm:mt-0 sm:block">
-                    <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded capitalize', config.color)}>
-                      {event.type}
-                    </span>
-                    <span className="text-xs text-muted sm:hidden">{time}</span>
-                  </div>
-
-                  {/* Timestamp — desktop only */}
-                  <span className="hidden sm:block text-xs text-muted">{time}</span>
+          {/* Grouped events by date */}
+          <div className="space-y-6">
+            {Object.entries(grouped).map(([dateKey, dateEvents]) => (
+              <div key={dateKey}>
+                {/* Date header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 className="text-sm font-medium text-muted whitespace-nowrap">{dateKey}</h3>
+                  <div className="flex-1 h-px bg-card-border" />
+                  <span className="text-xs text-muted">{dateEvents.length} events</span>
                 </div>
-              )
-            })}
+
+                {/* Event cards */}
+                <div className="space-y-2">
+                  {dateEvents.map((event) => {
+                    const config = eventTypeConfig[event.type] || eventTypeConfig.admin
+                    const isExpanded = expandedId === event.id
+                    const time = new Date(event.timestamp).toLocaleTimeString('en-US', {
+                      hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok',
+                    })
+
+                    return (
+                      <div
+                        key={event.id}
+                        className={cn(
+                          'rounded-lg border transition-colors cursor-pointer',
+                          config.bg,
+                          config.border,
+                          isExpanded && 'ring-1 ring-white/10'
+                        )}
+                        onClick={() => setExpandedId(isExpanded ? null : event.id)}
+                      >
+                        {/* Main row */}
+                        <div className="flex items-start gap-3 p-3 sm:p-4">
+                          {/* Type icon */}
+                          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-lg', config.bg)}>
+                            {config.icon}
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground">{event.label}</p>
+                                <p className="text-xs text-muted mt-0.5 truncate">{event.detail}</p>
+                              </div>
+                              <span className="text-xs text-muted whitespace-nowrap shrink-0">{time}</span>
+                            </div>
+
+                            {/* Member info inline */}
+                            {event.user && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <div className="w-5 h-5 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                  {event.user.avatar_url ? (
+                                    <img src={event.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-accent text-[8px] font-medium">
+                                      {(event.user.name || event.user.email)?.[0]?.toUpperCase() || '?'}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-muted truncate">
+                                  {event.user.name || 'Unknown'} &middot; {event.user.email}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expanded detail */}
+                        {isExpanded && (
+                          <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-0 border-t border-white/5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-xs">
+                              <div className="p-2 rounded bg-background/30">
+                                <span className="text-muted">Event Type</span>
+                                <p className={cn('font-medium capitalize mt-0.5', config.color)}>{event.type}</p>
+                              </div>
+                              <div className="p-2 rounded bg-background/30">
+                                <span className="text-muted">Timestamp</span>
+                                <p className="text-foreground mt-0.5">{formatTime(event.timestamp)}</p>
+                              </div>
+                              {event.meta?.classTime && (
+                                <div className="p-2 rounded bg-background/30">
+                                  <span className="text-muted">Class Time</span>
+                                  <p className="text-foreground mt-0.5">{formatTime(event.meta.classTime)}</p>
+                                </div>
+                              )}
+                              {event.meta?.lateCancellation && (
+                                <div className="p-2 rounded bg-background/30">
+                                  <span className="text-muted">Late Cancel</span>
+                                  <p className="text-red-400 mt-0.5">Yes — no credit refund</p>
+                                </div>
+                              )}
+                              {event.meta?.creditReturned !== undefined && (
+                                <div className="p-2 rounded bg-background/30">
+                                  <span className="text-muted">Credit</span>
+                                  <p className={cn('mt-0.5', event.meta.creditReturned ? 'text-green-400' : 'text-red-400')}>
+                                    {event.meta.creditReturned ? 'Refunded' : 'Not refunded'}
+                                  </p>
+                                </div>
+                              )}
+                              {event.user && (
+                                <div className="p-2 rounded bg-background/30 sm:col-span-2">
+                                  <span className="text-muted">Member</span>
+                                  <p className="text-foreground mt-0.5">{event.user.name || 'Unknown'} ({event.user.email})</p>
+                                </div>
+                              )}
+                              {event.meta?.adminAction && (
+                                <div className="p-2 rounded bg-background/30 sm:col-span-2">
+                                  <span className="text-muted">Admin Action</span>
+                                  <p className="text-foreground mt-0.5">{event.meta.adminAction}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center justify-between mt-6">
               <Button
                 variant="outline"
                 disabled={page <= 1}

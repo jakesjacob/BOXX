@@ -115,6 +115,7 @@ function DashboardContent() {
         <BookingsSection
           upcoming={data.upcomingBookings}
           past={data.pastBookings}
+          waitlist={data.waitlist || []}
           onUpdate={fetchDashboard}
         />
       )}
@@ -646,6 +647,9 @@ function getClassImage(cls) {
 }
 
 function getClassColor(cls) {
+  // Category hue system: amber=private, purple=recurring, otherwise class type color
+  if (cls.is_private) return '#f59e0b'
+  if (cls.recurring_id) return '#8b5cf6'
   if (cls.class_types?.color) return cls.class_types.color
   const icon = cls.class_types?.icon?.toLowerCase() || ''
   const name = (cls.class_types?.name || '').toLowerCase()
@@ -1229,7 +1233,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
                 {(new Date(cls.starts_at) - Date.now()) / 36e5 <= 24 ? 'Credit will not be returned' : 'Free cancellation'}
               </span>
               <button
-                onClick={() => window.open(`/api/bookings/ical?id=${cls.booking_id}`, '_blank')}
+                onClick={async (e) => { e.stopPropagation(); try { const r = await fetch(`/api/bookings/ical?id=${cls.booking_id}`); if (!r.ok) return; const blob = await r.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'boxx-class.ics'; a.click(); URL.revokeObjectURL(url); } catch {} }}
                 className="p-1.5 text-muted hover:text-accent transition-colors"
                 title="Add to calendar"
               >
@@ -1605,7 +1609,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
 /* ─────────────────────────────────────────────────────────
    BOOKINGS SECTION
    ───────────────────────────────────────────────────────── */
-function BookingsSection({ upcoming, past, onUpdate }) {
+function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
   const [showPast, setShowPast] = useState(false)
   const [cancelling, setCancelling] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
@@ -1721,17 +1725,22 @@ function BookingsSection({ upcoming, past, onUpdate }) {
                 {cls.class_types?.name || 'Class'}
               </h3>
               <p className="text-xs text-muted mt-0.5">{cls.instructors?.name || 'TBA'}</p>
-              {!isUpcoming && (
-                <div className="mt-1">
-                  {isClassCancelled ? (
-                    <Badge variant="destructive" className="text-[10px]">Class Cancelled</Badge>
-                  ) : (
-                    <Badge variant={statusColors[b.status] || 'secondary'} className="text-[10px] capitalize">
-                      {b.status}{b.late_cancel ? ' (late)' : ''}
-                    </Badge>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-1.5 mt-1">
+                {cls.is_private && (
+                  <Badge className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20">Private</Badge>
+                )}
+                {!isUpcoming && (
+                  <>
+                    {isClassCancelled ? (
+                      <Badge variant="destructive" className="text-[10px]">Class Cancelled</Badge>
+                    ) : (
+                      <Badge variant={statusColors[b.status] || 'secondary'} className="text-[10px] capitalize">
+                        {b.status}{b.late_cancel ? ' (late)' : ''}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
             <svg className={cn('w-5 h-5 text-foreground/40 transition-transform shrink-0 z-10', isExpanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -1792,7 +1801,7 @@ function BookingsSection({ upcoming, past, onUpdate }) {
                           {isLate ? 'Credit will not be returned' : 'Free cancellation'}
                         </span>
                         <button
-                          onClick={() => window.open(`/api/bookings/ical?id=${b.id}`, '_blank')}
+                          onClick={async (e) => { e.stopPropagation(); try { const r = await fetch(`/api/bookings/ical?id=${b.id}`); if (!r.ok) return; const blob = await r.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'boxx-class.ics'; a.click(); URL.revokeObjectURL(url); } catch {} }}
                           className="p-1.5 text-muted hover:text-accent transition-colors"
                           title="Add to calendar"
                         >
@@ -1856,12 +1865,63 @@ function BookingsSection({ upcoming, past, onUpdate }) {
 
       <h2 className="text-lg font-bold text-foreground mb-4">My Bookings</h2>
 
+      {/* Waitlist positions (F1) */}
+      {waitlist.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-medium text-muted mb-2">Waitlisted ({waitlist.length})</h3>
+          <div className="space-y-2">
+            {waitlist.map((w) => {
+              const cls = w.class_schedule
+              if (!cls) return null
+              const startTime = new Date(cls.starts_at).toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok',
+              })
+              const dateStr = new Date(cls.starts_at).toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok',
+              })
+              return (
+                <Card key={w.id} className="border-l-4" style={{ borderLeftColor: '#f59e0b' }}>
+                  <CardContent className="p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Badge className="bg-amber-400/10 text-amber-400 border border-amber-400/20 text-[10px] shrink-0">
+                        #{w.position}
+                      </Badge>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{cls.class_types?.name || 'Class'}</p>
+                        <p className="text-xs text-muted">{dateStr} at {startTime} &middot; {cls.instructors?.name || 'TBA'}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/waitlist/leave', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ classScheduleId: cls.id }),
+                          })
+                          if (res.ok) onUpdate()
+                        } catch {}
+                      }}
+                      className="text-xs text-muted hover:text-red-400 transition-colors shrink-0"
+                    >
+                      Leave
+                    </button>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {upcoming.length === 0 && past.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-muted">No bookings yet. Book a class above to get started!</p>
-          </CardContent>
-        </Card>
+        waitlist.length === 0 && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-muted">No bookings yet. Book a class above to get started!</p>
+            </CardContent>
+          </Card>
+        )
       ) : (
         <div className="space-y-2">
           {upcoming.map((b) => renderBookingCard(b, { isUpcoming: true }))}

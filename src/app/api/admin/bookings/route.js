@@ -11,7 +11,7 @@ import { z } from 'zod'
 export async function GET(request) {
   try {
     const session = await auth()
-    if (!session || session.user.role !== 'admin') {
+    if (!session || session.user.role !== 'admin' && session.user.role !== 'employee') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -113,7 +113,7 @@ const updateBookingSchema = z.object({
 export async function PUT(request) {
   try {
     const session = await auth()
-    if (!session || session.user.role !== 'admin') {
+    if (!session || session.user.role !== 'admin' && session.user.role !== 'employee') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     if (!supabaseAdmin) {

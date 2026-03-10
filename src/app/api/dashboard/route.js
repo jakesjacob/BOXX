@@ -164,6 +164,24 @@ export async function GET() {
       }
     }
 
+    // Get user's active waitlist entries with class details
+    const { data: userWaitlist } = await supabaseAdmin
+      .from('waitlist')
+      .select(`
+        id, position, created_at,
+        class_schedule(
+          id, starts_at, ends_at, status,
+          class_types(name, icon, color),
+          instructors(name)
+        )
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+
+    const activeWaitlist = (userWaitlist || []).filter(
+      (w) => w.class_schedule?.status === 'active' && new Date(w.class_schedule.starts_at) > new Date()
+    )
+
     // Separate bookings into upcoming and past
     const allBookings = bookingsRes.data || []
     const upcomingBookings = allBookings.filter(
@@ -180,6 +198,7 @@ export async function GET() {
       schedule: scheduleRes.data || [],
       upcomingBookings,
       pastBookings,
+      waitlist: activeWaitlist,
     })
   } catch (error) {
     console.error('[dashboard] Error:', error)

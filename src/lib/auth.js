@@ -110,8 +110,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.id
       session.user.role = token.role
 
-      // Admin sessions expire after 8 hours
-      if (token.role === 'admin') {
+      // Admin and employee sessions expire after 8 hours
+      if (token.role === 'admin' || token.role === 'employee') {
         const eightHours = 8 * 60 * 60 * 1000
         const tokenAge = Date.now() - (token.iat * 1000)
         if (tokenAge > eightHours) {

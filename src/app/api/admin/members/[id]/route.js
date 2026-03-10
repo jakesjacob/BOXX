@@ -9,7 +9,7 @@ import { z } from 'zod'
 export async function GET(request, { params }) {
   try {
     const session = await auth()
-    if (!session || session.user.role !== 'admin') {
+    if (!session || session.user.role !== 'admin' && session.user.role !== 'employee') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     if (!supabaseAdmin) {
@@ -79,7 +79,7 @@ const editMemberSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   email: z.string().email().optional(),
   phone: z.string().max(20).nullable().optional(),
-  role: z.enum(['member', 'admin']).optional(),
+  role: z.enum(['member', 'admin', 'employee']).optional(),
 })
 
 /**
@@ -88,7 +88,7 @@ const editMemberSchema = z.object({
 export async function PUT(request, { params }) {
   try {
     const session = await auth()
-    if (!session || session.user.role !== 'admin') {
+    if (!session || session.user.role !== 'admin' && session.user.role !== 'employee') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     if (!supabaseAdmin) {
@@ -100,6 +100,11 @@ export async function PUT(request, { params }) {
     const parsed = editMemberSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+    }
+
+    // Employees cannot change roles
+    if (session.user.role === 'employee' && parsed.data.role !== undefined) {
+      return NextResponse.json({ error: 'Employees cannot change member roles' }, { status: 403 })
     }
 
     const updates = {}
@@ -142,11 +147,16 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const session = await auth()
-    if (!session || session.user.role !== 'admin') {
+    if (!session || session.user.role !== 'admin' && session.user.role !== 'employee') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     if (!supabaseAdmin) {
       return NextResponse.json({ error: 'Database unavailable' }, { status: 500 })
+    }
+
+    // Employees cannot deactivate members
+    if (session.user.role === 'employee') {
+      return NextResponse.json({ error: 'Employees cannot deactivate members' }, { status: 403 })
     }
 
     const { id } = await params

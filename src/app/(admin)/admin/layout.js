@@ -7,16 +7,16 @@ import Image from 'next/image'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 
-const sidebarLinks = [
+const allSidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: '🏠' },
   { name: 'Schedule', href: '/admin/schedule', icon: '📅' },
   { name: 'Activity', href: '/admin/bookings', icon: '📋' },
   { name: 'Members', href: '/admin/members', icon: '👥' },
-  { name: 'Class Packs', href: '/admin/packs', icon: '📦' },
+  { name: 'Class Packs', href: '/admin/packs', icon: '📦', adminOnly: true },
   { name: 'Class Types', href: '/admin/class-types', icon: '🏷️' },
   { name: 'Instructors', href: '/admin/instructors', icon: '🥊' },
   { name: 'Emails', href: '/admin/emails', icon: '✉️' },
-  { name: 'Settings', href: '/admin/settings', icon: '⚙️' },
+  { name: 'Settings', href: '/admin/settings', icon: '⚙️', adminOnly: true },
 ]
 
 export default function AdminLayout({ children }) {
@@ -24,6 +24,12 @@ export default function AdminLayout({ children }) {
   const { data: session } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+
+  const userRole = session?.user?.role || 'admin'
+  const isEmployee = userRole === 'employee'
+  const sidebarLinks = isEmployee
+    ? allSidebarLinks.filter((link) => !link.adminOnly)
+    : allSidebarLinks
 
   const isActive = (href) => {
     if (href === '/admin') return pathname === '/admin'
