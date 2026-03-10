@@ -333,7 +333,7 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
                     {gamification.stats.currentStreak >= 3 && ' 🔥'}
                   </span>
                   <span className="text-card-border">|</span>
-                  <span><span className="text-accent font-semibold">{gamification.earnedBadges.length}</span> badges</span>
+                  <span><span className="text-foreground font-semibold">{gamification.earnedBadges.length}</span> badges</span>
                 </div>
               )}
             </div>
