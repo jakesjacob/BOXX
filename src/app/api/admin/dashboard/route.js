@@ -177,6 +177,113 @@ export async function GET(request) {
         .order('starts_at', { ascending: true }),
     ])
 
+    // ── Member Engagement ──────────────────────────────────────
+    const thirtyDaysAgo = new Date(now)
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const [topMembersBookingsRes, allMembersRes, allRecentBookingsRes] = await Promise.all([
+      // Confirmed bookings in last 30 days (for top members)
+      supabaseAdmin
+        .from('bookings')
+        .select('user_id')
+        .eq('status', 'confirmed')
+        .gte('created_at', thirtyDaysAgo.toISOString()),
+
+      // All members with active credits
+      supabaseAdmin
+        .from('users')
+        .select('id, name, email, avatar_url, created_at')
+        .eq('role', 'member'),
+
+      // Most recent confirmed booking per user (for inactivity check)
+      supabaseAdmin
+        .from('bookings')
+        .select('user_id, created_at')
+        .eq('status', 'confirmed')
+        .order('created_at', { ascending: false }),
+    ])
+
+    // Top members: count bookings per user in last 30 days
+    const bookingCountByUser = {}
+    ;(topMembersBookingsRes.data || []).forEach((b) => {
+      bookingCountByUser[b.user_id] = (bookingCountByUser[b.user_id] || 0) + 1
+    })
+
+    const allMembers = allMembersRes.data || []
+    const memberMap = Object.fromEntries(allMembers.map((m) => [m.id, m]))
+
+    const topMembers = Object.entries(bookingCountByUser)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([userId, count]) => ({
+        ...memberMap[userId],
+        bookings_30d: count,
+      }))
+      .filter((m) => m.id) // exclude if user was deleted
+
+    // Last booking date per user
+    const lastBookingByUser = {}
+    ;(allRecentBookingsRes.data || []).forEach((b) => {
+      if (!lastBookingByUser[b.user_id]) {
+        lastBookingByUser[b.user_id] = b.created_at // first match = most recent (ordered desc)
+      }
+    })
+
+    // Get active credit packs for all members
+    const { data: allActiveCredits } = await supabaseAdmin
+      .from('user_credits')
+      .select('user_id, credits_remaining, expires_at, class_packs(name)')
+      .eq('status', 'active')
+      .gt('expires_at', now.toISOString())
+
+    // Build credits summary per user
+    const creditsByUser = {}
+    ;(allActiveCredits || []).forEach((uc) => {
+      if (!creditsByUser[uc.user_id]) creditsByUser[uc.user_id] = { total: 0, packs: [] }
+      if (uc.credits_remaining !== null) {
+        creditsByUser[uc.user_id].total += uc.credits_remaining
+      }
+      creditsByUser[uc.user_id].packs.push({
+        name: uc.class_packs?.name,
+        credits: uc.credits_remaining,
+        expires_at: uc.expires_at,
+      })
+    })
+
+    // At-risk members: have active credits but no booking in 14+ days
+    const fourteenDaysAgoMs = now.getTime() - 14 * 24 * 60 * 60 * 1000
+    const atRiskMembers = allMembers
+      .filter((m) => {
+        const hasCredits = creditsByUser[m.id]?.total > 0
+        if (!hasCredits) return false
+        const lastBooking = lastBookingByUser[m.id]
+        if (!lastBooking) return true // never booked but has credits
+        return new Date(lastBooking).getTime() < fourteenDaysAgoMs
+      })
+      .map((m) => {
+        const lastBooking = lastBookingByUser[m.id]
+        const daysSince = lastBooking
+          ? Math.floor((now.getTime() - new Date(lastBooking).getTime()) / (1000 * 60 * 60 * 24))
+          : null
+        return {
+          id: m.id,
+          name: m.name,
+          email: m.email,
+          avatar_url: m.avatar_url,
+          days_inactive: daysSince,
+          never_booked: !lastBooking,
+          credits_remaining: creditsByUser[m.id]?.total || 0,
+          last_booking: lastBooking || null,
+        }
+      })
+      .sort((a, b) => {
+        // Never booked first, then by longest inactivity
+        if (a.never_booked && !b.never_booked) return -1
+        if (!a.never_booked && b.never_booked) return 1
+        return (b.days_inactive || 999) - (a.days_inactive || 999)
+      })
+      .slice(0, 10)
+
     // Get booking counts + roster + waitlist for today's classes
     let todayClasses = todayClassesRes.data || []
     if (todayClasses.length > 0) {
@@ -296,6 +403,10 @@ export async function GET(request) {
       recentCancellations: recentCancelsRes.data || [],
       attentionClasses,
       lowCreditMembers: lowCreditRes.data || [],
+      engagement: {
+        topMembers,
+        atRiskMembers,
+      },
     })
   } catch (error) {
     console.error('[admin/dashboard] Error:', error)

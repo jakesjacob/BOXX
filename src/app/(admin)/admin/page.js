@@ -37,6 +37,8 @@ export default function AdminDashboard() {
   const [dayOffset, setDayOffset] = useState(0)
   const [dayClasses, setDayClasses] = useState(null)
   const [dayLoading, setDayLoading] = useState(false)
+  const [engagementTab, setEngagementTab] = useState('at-risk')
+  const [sendingEmail, setSendingEmail] = useState(null)
 
   const selectedDate = new Date()
   selectedDate.setDate(selectedDate.getDate() + dayOffset)
@@ -106,6 +108,27 @@ export default function AdminDashboard() {
   const recentCancellations = data?.recentCancellations || []
   const attentionClasses = data?.attentionClasses || []
   const lowCreditMembers = data?.lowCreditMembers || []
+  const topMembers = data?.engagement?.topMembers || []
+  const atRiskMembers = data?.engagement?.atRiskMembers || []
+
+  async function sendReminderEmail(member) {
+    setSendingEmail(member.id)
+    try {
+      const subject = `We miss you at BOXX!`
+      const body = `Hi ${member.name || 'there'},\n\nWe noticed it's been a while since your last session at BOXX${member.credits_remaining ? ` and you still have ${member.credits_remaining} credit${member.credits_remaining !== 1 ? 's' : ''} remaining` : ''}.\n\nWe'd love to see you back — come check out our upcoming classes and book your next session!\n\nSee you soon,\nThe BOXX Team`
+      const res = await fetch('/api/admin/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: member.email, subject, body }),
+      })
+      if (!res.ok) throw new Error('Failed to send')
+      alert(`Reminder sent to ${member.name || member.email}`)
+    } catch {
+      alert('Failed to send email. Please try again.')
+    } finally {
+      setSendingEmail(null)
+    }
+  }
 
   const statCards = [
     ...(isAdmin ? [{
@@ -521,8 +544,144 @@ export default function AdminDashboard() {
           </Card>
         )}
 
+        {/* Member Engagement */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                Member Engagement
+                {atRiskMembers.length > 0 && (
+                  <span className="text-[10px] font-medium text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">
+                    {atRiskMembers.length} at risk
+                  </span>
+                )}
+              </CardTitle>
+              <Link href="/admin/members" className="text-xs text-accent hover:text-accent-dim transition-colors">
+                All Members →
+              </Link>
+            </div>
+            <div className="flex gap-1 mt-2">
+              {[
+                { key: 'at-risk', label: 'At Risk' },
+                { key: 'top', label: 'Top Members' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setEngagementTab(tab.key)}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium rounded-md transition-colors min-h-[32px]',
+                    engagementTab === tab.key
+                      ? 'bg-accent/10 text-accent'
+                      : 'text-muted hover:text-foreground'
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {engagementTab === 'top' && (
+              topMembers.length === 0 ? (
+                <p className="text-sm text-muted py-4 text-center">No booking activity in the last 30 days.</p>
+              ) : (
+                <div className="space-y-2">
+                  {topMembers.map((member, i) => (
+                    <div key={member.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-card-border">
+                      <div className={cn(
+                        'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                        i === 0 ? 'bg-amber-400/20 text-amber-400' : i === 1 ? 'bg-gray-300/20 text-gray-300' : i === 2 ? 'bg-orange-400/20 text-orange-400' : 'bg-card-border text-muted'
+                      )}>
+                        {i + 1}
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
+                        {member.avatar_url ? (
+                          <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-accent text-xs font-medium">
+                            {(member.name || member.email)?.[0]?.toUpperCase() || '?'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{member.name || 'No name'}</p>
+                        <p className="text-xs text-muted truncate">{member.email}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-accent">{member.bookings_30d}</p>
+                        <p className="text-[10px] text-muted">classes</p>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-muted text-center pt-1">Last 30 days</p>
+                </div>
+              )
+            )}
+
+            {engagementTab === 'at-risk' && (
+              atRiskMembers.length === 0 ? (
+                <p className="text-sm text-muted py-4 text-center">All members with credits are active. Great!</p>
+              ) : (
+                <div className="space-y-2">
+                  {atRiskMembers.map((member) => (
+                    <div key={member.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-card-border">
+                      <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
+                        {member.avatar_url ? (
+                          <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-accent text-xs font-medium">
+                            {(member.name || member.email)?.[0]?.toUpperCase() || '?'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{member.name || 'No name'}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {member.never_booked ? (
+                            <span className="text-[10px] font-medium text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">Never booked</span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">
+                              {member.days_inactive}d inactive
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted">
+                            {member.credits_remaining} credit{member.credits_remaining !== 1 ? 's' : ''} left
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => sendReminderEmail(member)}
+                        disabled={sendingEmail === member.id}
+                        className={cn(
+                          'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-all min-h-[32px]',
+                          sendingEmail === member.id
+                            ? 'bg-muted/10 text-muted cursor-not-allowed'
+                            : 'bg-accent/10 text-accent hover:bg-accent/20'
+                        )}
+                      >
+                        {sendingEmail === member.id ? (
+                          <>
+                            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeLinecap="round" /></svg>
+                            Sending
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            Remind
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-muted text-center pt-1">Members with active credits but no bookings in 14+ days</p>
+                </div>
+              )
+            )}
+          </CardContent>
+        </Card>
+
         {/* Quick Actions */}
-        <Card className={cn(lowCreditMembers.length > 0 ? '' : 'lg:col-span-2')}>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>
