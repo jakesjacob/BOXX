@@ -5,8 +5,8 @@
 -- ─────────────────────────────────────
 
 -- ─── CLEAN UP (safe — only removes seed data) ────
-DELETE FROM waitlist WHERE class_schedule_id LIKE 'c0000%' OR class_schedule_id LIKE 'c9990%';
-DELETE FROM bookings WHERE class_schedule_id LIKE 'c0000%' OR class_schedule_id LIKE 'c9990%';
+DELETE FROM waitlist WHERE class_schedule_id::text LIKE 'c0000%' OR class_schedule_id::text LIKE 'c9990%';
+DELETE FROM bookings WHERE class_schedule_id::text LIKE 'c0000%' OR class_schedule_id::text LIKE 'c9990%';
 DELETE FROM bookings WHERE user_id IN (
   'd1111111-1111-1111-1111-111111111111',
   'd2222222-2222-2222-2222-222222222222',
@@ -14,7 +14,7 @@ DELETE FROM bookings WHERE user_id IN (
   'd4444444-4444-4444-4444-444444444444',
   'd5555555-5555-5555-5555-555555555555'
 );
-DELETE FROM class_schedule WHERE id LIKE 'c0000%' OR id LIKE 'c9990%';
+DELETE FROM class_schedule WHERE id::text LIKE 'c0000%' OR id::text LIKE 'c9990%';
 DELETE FROM user_credits WHERE stripe_payment_id LIKE 'seed_%' OR stripe_payment_id LIKE 'direct_%' OR stripe_payment_id LIKE 'bert_seed_%' OR stripe_payment_id LIKE 'test_seed_%' OR stripe_payment_id LIKE 'seed_j_%' OR stripe_payment_id LIKE 'seed_b_%' OR stripe_payment_id LIKE 'seed_t_%';
 DELETE FROM users WHERE email IN ('sarah@example.com','tom@example.com','mia@example.com','jake@example.com','luna@example.com','bertduff@gmail.com','test@boxxthailand.com');
 DELETE FROM instructors WHERE id IN (
