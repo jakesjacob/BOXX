@@ -237,6 +237,51 @@ Relies on `SameSite: lax` cookies and JSON content-type checks. Acceptable for c
 
 ---
 
+---
+
+## TODO — Owner Role & Platform Limits
+
+### Owner Role (NEW)
+- [ ] **Add `owner` role to users table** — highest privilege level, above `admin`
+- [ ] **Only assignable via direct DB update or env var** — no UI to promote to owner, only Jacob (platform operator) can assign. Hardcode owner user ID in env var `PLATFORM_OWNER_ID` as a safety check
+- [ ] **Owner can edit all admins/employees** — full CRUD on all staff accounts including role changes
+- [ ] **Admins cannot edit other admins** — admins can only manage employees and members. Cannot change another admin's email, role, or profile. Can still manage their own profile
+- [ ] **Employees cannot edit admins or other employees** — employees can only manage members (existing behavior, but enforce more strictly)
+- [ ] **Owner-only actions:**
+  - Assign/revoke admin role
+  - Connect/disconnect Stripe
+  - Change platform limits (see below)
+  - Access billing/usage dashboard
+  - Delete admin accounts
+- [ ] **Update middleware** — recognize `owner` role, grant access to all admin routes
+- [ ] **Update all admin API auth checks** — `owner` gets full access, `admin` gets current access minus editing other admins, `employee` stays the same
+- [ ] **Update admin layout sidebar** — show "Platform" section for owner only (limits, billing)
+
+### Platform Resource Limits
+> Protects scaling costs. Limits stored in `studio_settings` (or a dedicated `platform_limits` table). Enforced server-side on every relevant API route. Owner can adjust limits via a dedicated settings page or direct DB update.
+
+- [ ] **Max scheduled classes per month** — default 200. Checked on class creation (`/api/admin/schedule` POST). Prevents runaway schedule creation that increases DB/compute costs
+- [ ] **Max active members** — default 500. Checked on registration (`/api/auth/register`). Counts non-frozen, non-deleted users with role `member`
+- [ ] **Max instructors** — default 20. Checked on instructor creation (`/api/admin/instructors` POST)
+- [ ] **Max class types** — default 30. Checked on class type creation (`/api/admin/class-types` POST)
+- [ ] **Max storage per studio** — default 500MB. Checked on avatar upload and any future file uploads. Query Supabase Storage usage before allowing upload
+- [ ] **Max emails per month** — default 2000. Checked on all email sends (admin compose, automated emails). Counter stored in `studio_settings` with monthly reset
+- [ ] **Max active class packs** — default 20. Checked on pack creation (`/api/admin/packs` POST)
+- [ ] **Limit enforcement API** — all creation endpoints check against limits before proceeding, return `{ error: 'Limit reached. Contact support to increase.' , status: 403 }`
+- [ ] **Usage dashboard (owner-only page)** — shows current usage vs limits: classes this month, active members, storage used, emails sent, active packs. Visual bars showing usage percentage
+- [ ] **Limit override mechanism** — owner can increase limits via platform settings page or env vars. Future: tie to billing tier so increasing limits triggers a pricing change
+
+### Pricing Tier Model (Future)
+> If costs scale, these limits become the basis for tiered pricing:
+
+| Tier | Classes/mo | Members | Instructors | Emails/mo | Storage | Price |
+|------|-----------|---------|-------------|-----------|---------|-------|
+| Starter | 100 | 200 | 5 | 500 | 100MB | Base retainer |
+| Growth | 300 | 500 | 15 | 2000 | 500MB | Base + increment |
+| Pro | Unlimited | Unlimited | Unlimited | 5000 | 2GB | Base + higher increment |
+
+---
+
 ## Positive Findings
 
 The codebase has many strong security patterns already in place:

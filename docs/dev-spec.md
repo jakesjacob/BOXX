@@ -243,8 +243,24 @@ All email templates live in `src/lib/email.js` (Resend, branded dark HTML).
 - [ ] Member retention / churn metrics
 - [ ] Export reports to CSV
 
+### Owner Role & Platform Limits
+- [ ] **Owner role** — new top-level role above admin. Only assignable by platform operator (Jacob) via DB or `PLATFORM_OWNER_ID` env var
+- [ ] **Owner permissions** — can edit all admins/employees, connect Stripe, change platform limits, access billing
+- [ ] **Admin restrictions** — admins cannot edit other admins (only employees + members). Cannot assign admin/owner roles
+- [ ] **Platform resource limits** — server-side enforcement on all creation endpoints:
+  - Max classes/month (default 200)
+  - Max active members (default 500)
+  - Max instructors (default 20)
+  - Max class types (default 30)
+  - Max storage (default 500MB)
+  - Max emails/month (default 2000)
+  - Max active packs (default 20)
+- [ ] **Usage dashboard** — owner-only page showing current usage vs limits
+- [ ] **Limit override** — owner can adjust via platform settings, future: tie to billing tiers
+- [ ] **Security fixes** — see `docs/security-audit.md` for 19 findings (2 critical, 6 high, 6 medium, 5 low)
+
 ### Infrastructure
-- [ ] **Set up env vars** — `RESEND_API_KEY` (Resend email), `CRON_SECRET` (cron job auth)
+- [ ] **Set up env vars** — `RESEND_API_KEY` (Resend email), `CRON_SECRET` (cron job auth), `PLATFORM_OWNER_ID` (owner user ID)
 - [ ] Vercel deployment config
 - [ ] Custom domain setup
 - [ ] Supabase production environment
