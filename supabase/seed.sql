@@ -5,25 +5,8 @@
 -- ─────────────────────────────────────
 
 -- ─── CLEAN UP (safe — only removes seed data) ────
-DELETE FROM bookings WHERE class_schedule_id IN (
-  'c0000001-0000-0000-0000-000000000001',
-  'c0000001-0000-0000-0000-000000000002',
-  'c0000001-0000-0000-0000-000000000003',
-  'c0000002-0000-0000-0000-000000000001',
-  'c0000002-0000-0000-0000-000000000002',
-  'c0000002-0000-0000-0000-000000000003',
-  'c0000003-0000-0000-0000-000000000001',
-  'c0000003-0000-0000-0000-000000000002',
-  'c0000003-0000-0000-0000-000000000003',
-  'c0000004-0000-0000-0000-000000000001',
-  'c0000004-0000-0000-0000-000000000002',
-  'c0000005-0000-0000-0000-000000000001',
-  'c0000005-0000-0000-0000-000000000002',
-  'c0000005-0000-0000-0000-000000000003',
-  'c0000006-0000-0000-0000-000000000001',
-  'c0000006-0000-0000-0000-000000000002',
-  'c0000007-0000-0000-0000-000000000001'
-);
+DELETE FROM waitlist WHERE class_schedule_id LIKE 'c0000%' OR class_schedule_id LIKE 'c9990%';
+DELETE FROM bookings WHERE class_schedule_id LIKE 'c0000%' OR class_schedule_id LIKE 'c9990%';
 DELETE FROM bookings WHERE user_id IN (
   'd1111111-1111-1111-1111-111111111111',
   'd2222222-2222-2222-2222-222222222222',
@@ -31,26 +14,8 @@ DELETE FROM bookings WHERE user_id IN (
   'd4444444-4444-4444-4444-444444444444',
   'd5555555-5555-5555-5555-555555555555'
 );
-DELETE FROM class_schedule WHERE id IN (
-  'c0000001-0000-0000-0000-000000000001',
-  'c0000001-0000-0000-0000-000000000002',
-  'c0000001-0000-0000-0000-000000000003',
-  'c0000002-0000-0000-0000-000000000001',
-  'c0000002-0000-0000-0000-000000000002',
-  'c0000002-0000-0000-0000-000000000003',
-  'c0000003-0000-0000-0000-000000000001',
-  'c0000003-0000-0000-0000-000000000002',
-  'c0000003-0000-0000-0000-000000000003',
-  'c0000004-0000-0000-0000-000000000001',
-  'c0000004-0000-0000-0000-000000000002',
-  'c0000005-0000-0000-0000-000000000001',
-  'c0000005-0000-0000-0000-000000000002',
-  'c0000005-0000-0000-0000-000000000003',
-  'c0000006-0000-0000-0000-000000000001',
-  'c0000006-0000-0000-0000-000000000002',
-  'c0000007-0000-0000-0000-000000000001'
-);
-DELETE FROM user_credits WHERE stripe_payment_id LIKE 'seed_%' OR stripe_payment_id LIKE 'direct_%' OR stripe_payment_id LIKE 'bert_seed_%' OR stripe_payment_id LIKE 'test_seed_%';
+DELETE FROM class_schedule WHERE id LIKE 'c0000%' OR id LIKE 'c9990%';
+DELETE FROM user_credits WHERE stripe_payment_id LIKE 'seed_%' OR stripe_payment_id LIKE 'direct_%' OR stripe_payment_id LIKE 'bert_seed_%' OR stripe_payment_id LIKE 'test_seed_%' OR stripe_payment_id LIKE 'seed_j_%' OR stripe_payment_id LIKE 'seed_b_%' OR stripe_payment_id LIKE 'seed_t_%';
 DELETE FROM users WHERE email IN ('sarah@example.com','tom@example.com','mia@example.com','jake@example.com','luna@example.com','bertduff@gmail.com','test@boxxthailand.com');
 DELETE FROM instructors WHERE id IN (
   'b1111111-1111-1111-1111-111111111111',
@@ -119,12 +84,91 @@ ON CONFLICT (email) DO UPDATE SET
   bio = 'Demo account for testing BOXX.';
 
 -- ─── BERT'S ACCOUNT (admin + heavy user) ────
--- Creates if not exists, promotes to admin if already signed in via Google
 INSERT INTO users (id, email, name, bio, show_in_roster, role) VALUES
   ('d0000000-0000-0000-0000-000000000001', 'bertduff@gmail.com', 'Bert S.', 'Founder. Glasgow-raised, Chiang Mai-based. Building BOXX.', true, 'admin')
 ON CONFLICT (email) DO UPDATE SET role = 'admin', bio = 'Founder. Glasgow-raised, Chiang Mai-based. Building BOXX.';
 
--- ─── SCHEDULE (next 7 days) ──────────
+
+-- ═══════════════════════════════════════════════════════════════
+-- SCHEDULE: PAST CLASSES (6 weeks of history for streaks/badges)
+-- ═══════════════════════════════════════════════════════════════
+
+-- Week -1 (3-7 days ago) — 4 classes
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, status) VALUES
+  ('c9990001-0000-0000-0000-000000000001', 'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '3 days' + INTERVAL '7 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '3 days' + INTERVAL '7 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990001-0000-0000-0000-000000000002', 'a2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222',
+   (CURRENT_DATE - INTERVAL '4 days' + INTERVAL '17 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '4 days' + INTERVAL '17 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990001-0000-0000-0000-000000000003', 'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
+   (CURRENT_DATE - INTERVAL '5 days' + INTERVAL '9 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '5 days' + INTERVAL '9 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990001-0000-0000-0000-000000000004', 'a4444444-4444-4444-4444-444444444444', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '6 days' + INTERVAL '10 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '6 days' + INTERVAL '10 hours 55 minutes')::timestamptz, 10, 'active');
+
+-- Week -2 (8-14 days ago) — 4 classes
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, status) VALUES
+  ('c9990002-0000-0000-0000-000000000001', 'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '10 days' + INTERVAL '7 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '10 days' + INTERVAL '7 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990002-0000-0000-0000-000000000002', 'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
+   (CURRENT_DATE - INTERVAL '11 days' + INTERVAL '9 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '11 days' + INTERVAL '9 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990002-0000-0000-0000-000000000003', 'a2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222',
+   (CURRENT_DATE - INTERVAL '12 days' + INTERVAL '17 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '12 days' + INTERVAL '17 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990002-0000-0000-0000-000000000004', 'a4444444-4444-4444-4444-444444444444', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '13 days' + INTERVAL '10 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '13 days' + INTERVAL '10 hours 55 minutes')::timestamptz, 10, 'active');
+
+-- Week -3 (15-21 days ago) — 3 classes
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, status) VALUES
+  ('c9990003-0000-0000-0000-000000000001', 'a2222222-2222-2222-2222-222222222222', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '17 days' + INTERVAL '7 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '17 days' + INTERVAL '7 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990003-0000-0000-0000-000000000002', 'a1111111-1111-1111-1111-111111111111', 'b2222222-2222-2222-2222-222222222222',
+   (CURRENT_DATE - INTERVAL '19 days' + INTERVAL '7 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '19 days' + INTERVAL '7 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990003-0000-0000-0000-000000000003', 'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
+   (CURRENT_DATE - INTERVAL '20 days' + INTERVAL '9 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '20 days' + INTERVAL '9 hours 55 minutes')::timestamptz, 6, 'active');
+
+-- Week -4 (22-28 days ago) — 3 classes
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, status) VALUES
+  ('c9990004-0000-0000-0000-000000000001', 'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '24 days' + INTERVAL '7 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '24 days' + INTERVAL '7 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990004-0000-0000-0000-000000000002', 'a2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222',
+   (CURRENT_DATE - INTERVAL '25 days' + INTERVAL '17 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '25 days' + INTERVAL '17 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990004-0000-0000-0000-000000000003', 'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
+   (CURRENT_DATE - INTERVAL '27 days' + INTERVAL '9 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '27 days' + INTERVAL '9 hours 55 minutes')::timestamptz, 6, 'active');
+
+-- Week -5 (29-35 days ago) — 2 classes
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, status) VALUES
+  ('c9990005-0000-0000-0000-000000000001', 'a2222222-2222-2222-2222-222222222222', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '31 days' + INTERVAL '7 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '31 days' + INTERVAL '7 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990005-0000-0000-0000-000000000002', 'a1111111-1111-1111-1111-111111111111', 'b2222222-2222-2222-2222-222222222222',
+   (CURRENT_DATE - INTERVAL '33 days' + INTERVAL '17 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '33 days' + INTERVAL '17 hours 55 minutes')::timestamptz, 6, 'active');
+
+-- Week -6 (36-42 days ago) — 2 classes
+INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, status) VALUES
+  ('c9990006-0000-0000-0000-000000000001', 'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
+   (CURRENT_DATE - INTERVAL '38 days' + INTERVAL '9 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '38 days' + INTERVAL '9 hours 55 minutes')::timestamptz, 6, 'active'),
+  ('c9990006-0000-0000-0000-000000000002', 'a4444444-4444-4444-4444-444444444444', 'b1111111-1111-1111-1111-111111111111',
+   (CURRENT_DATE - INTERVAL '40 days' + INTERVAL '10 hours')::timestamptz,
+   (CURRENT_DATE - INTERVAL '40 days' + INTERVAL '10 hours 55 minutes')::timestamptz, 10, 'active');
+
+
+-- ═══════════════════════════════════════════════════════════════
+-- SCHEDULE: UPCOMING CLASSES (next 7 days)
+-- ═══════════════════════════════════════════════════════════════
 
 -- DAY 0 (today)
 INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
@@ -211,7 +255,7 @@ INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at
    (CURRENT_DATE + INTERVAL '4 days 10 hours 55 minutes')::timestamptz,
    10, 1, 'active');
 
--- DAY 5 (Saturday)
+-- DAY 5
 INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000006-0000-0000-0000-000000000001',
    'a1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111',
@@ -224,7 +268,7 @@ INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at
    (CURRENT_DATE + INTERVAL '5 days 10 hours 55 minutes')::timestamptz,
    6, 1, 'active');
 
--- DAY 6 (Sunday)
+-- DAY 6
 INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at, capacity, credits_cost, status) VALUES
   ('c0000007-0000-0000-0000-000000000001',
    'a3333333-3333-3333-3333-333333333333', 'b3333333-3333-3333-3333-333333333333',
@@ -232,24 +276,27 @@ INSERT INTO class_schedule (id, class_type_id, instructor_id, starts_at, ends_at
    (CURRENT_DATE + INTERVAL '6 days 9 hours 55 minutes')::timestamptz,
    6, 1, 'active');
 
--- ─── DUMMY BOOKINGS (roster population) ────
 
--- Sarah, Tom, Mia in today's BOXXBEGINNER
+-- ═══════════════════════════════════════════════════════════════
+-- DUMMY MEMBER BOOKINGS (roster population for upcoming classes)
+-- ═══════════════════════════════════════════════════════════════
+
+-- Today's BOXXBEGINNER: Sarah, Tom, Mia
 INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d1111111-1111-1111-1111-111111111111', 'c0000001-0000-0000-0000-000000000001', 'confirmed'),
   ('d2222222-2222-2222-2222-222222222222', 'c0000001-0000-0000-0000-000000000001', 'confirmed'),
   ('d3333333-3333-3333-3333-333333333333', 'c0000001-0000-0000-0000-000000000001', 'confirmed');
 
--- Jake, Luna in today's BOXXINTER
+-- Today's BOXXINTER: Jake, Luna
 INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d4444444-4444-4444-4444-444444444444', 'c0000001-0000-0000-0000-000000000003', 'confirmed'),
   ('d5555555-5555-5555-5555-555555555555', 'c0000001-0000-0000-0000-000000000003', 'confirmed');
 
--- Sarah in tomorrow's BOXXINTER
+-- Tomorrow BOXXINTER: Sarah
 INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d1111111-1111-1111-1111-111111111111', 'c0000002-0000-0000-0000-000000000001', 'confirmed');
 
--- ALL 6 SPOTS FILLED in Day 2 BOXXBEGINNER (full class — you are NOT in it)
+-- Day 2 BOXXBEGINNER: FULL (5 dummy members fill it)
 INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d1111111-1111-1111-1111-111111111111', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
   ('d2222222-2222-2222-2222-222222222222', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
@@ -257,185 +304,258 @@ INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d4444444-4444-4444-4444-444444444444', 'c0000003-0000-0000-0000-000000000001', 'confirmed'),
   ('d5555555-5555-5555-5555-555555555555', 'c0000003-0000-0000-0000-000000000001', 'confirmed');
 
--- Sarah, Tom were in Day 3 BOXX&TRAIN (now cancelled by admin — credits returned)
+-- Day 3 BOXX&TRAIN cancelled — Sarah & Tom had bookings
 INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned) VALUES
   ('d1111111-1111-1111-1111-111111111111', 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true),
   ('d2222222-2222-2222-2222-222222222222', 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
 
--- Sarah, Tom in Day 3 BOXXINTER
+-- Day 3 BOXXINTER: Sarah, Tom
 INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
   ('d1111111-1111-1111-1111-111111111111', 'c0000004-0000-0000-0000-000000000002', 'confirmed'),
   ('d2222222-2222-2222-2222-222222222222', 'c0000004-0000-0000-0000-000000000002', 'confirmed');
 
--- ─── BERT'S DUMMY DATA (admin account with heavy usage history) ────
+
+-- ═══════════════════════════════════════════════════════════════
+-- JACOB (your account) — POWER USER
+-- 5-week streak, 13 total classes, 3 class types tried
+-- 2 active packs (one expiring soon), waitlisted, 1 late cancel
+-- ═══════════════════════════════════════════════════════════════
 
 DO $$
 DECLARE
-  v_bert_id UUID;
-  v_pack_10 UUID;
-  v_pack_5 UUID;
-  v_pack_1 UUID;
-  v_pack_unlimited UUID;
+  v_id UUID;
+  v_pack_10 UUID; v_pack_5 UUID; v_pack_1 UUID; v_pack_unlimited UUID;
 BEGIN
-  -- Look up Bert by email (works whether he signed in via Google or was seeded above)
-  SELECT id INTO v_bert_id FROM users WHERE email = 'bertduff@gmail.com' LIMIT 1;
-  IF v_bert_id IS NULL THEN
-    RAISE NOTICE 'Bert not found — skipping';
-    RETURN;
-  END IF;
+  SELECT id INTO v_id FROM users
+    WHERE email NOT LIKE '%@example.com'
+      AND email != 'bertduff@gmail.com'
+      AND email != 'test@boxxthailand.com'
+    ORDER BY created_at ASC LIMIT 1;
+  IF v_id IS NULL THEN RAISE NOTICE 'No real user — skip'; RETURN; END IF;
 
   SELECT id INTO v_pack_10 FROM class_packs WHERE credits = 10 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_5 FROM class_packs WHERE credits = 5 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_1 FROM class_packs WHERE credits = 1 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_unlimited FROM class_packs WHERE credits IS NULL LIMIT 1;
 
-  -- ── CURRENT ACTIVE PACK: 10 credits, 7 remaining ──
+  -- ACTIVE: 10-pack, 3 remaining, 30 days left
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_bert_id, v_pack_10, 10, 7, NOW() + INTERVAL '45 days', 'bert_seed_001', 'active', NOW() - INTERVAL '15 days');
+  VALUES (v_id, v_pack_10, 10, 3, NOW() + INTERVAL '30 days', 'seed_j_001', 'active', NOW() - INTERVAL '30 days');
 
-  -- ── PAST PACK 1: 10 credits, fully used, expired 2 months ago ──
+  -- ACTIVE: 5-pack, 1 remaining, EXPIRING IN 4 DAYS
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_bert_id, v_pack_10, 10, 0, NOW() - INTERVAL '60 days', 'bert_seed_002', 'active', NOW() - INTERVAL '120 days');
+  VALUES (v_id, v_pack_5, 5, 1, NOW() + INTERVAL '4 days', 'seed_j_002', 'active', NOW() - INTERVAL '26 days');
 
-  -- ── PAST PACK 2: 5 credits, fully used, expired 4 months ago ──
+  -- PAST: 10-pack used up
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_bert_id, v_pack_5, 5, 0, NOW() - INTERVAL '120 days', 'bert_seed_003', 'active', NOW() - INTERVAL '150 days');
+  VALUES (v_id, v_pack_10, 10, 0, NOW() - INTERVAL '60 days', 'seed_j_003', 'active', NOW() - INTERVAL '120 days');
 
-  -- ── PAST PACK 3: unlimited month, expired 5 months ago ──
+  -- PAST: unlimited month
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_bert_id, v_pack_unlimited, NULL, NULL, NOW() - INTERVAL '150 days', 'bert_seed_004', 'active', NOW() - INTERVAL '180 days');
+  VALUES (v_id, v_pack_unlimited, NULL, NULL, NOW() - INTERVAL '120 days', 'seed_j_004', 'active', NOW() - INTERVAL '150 days');
 
-  -- ── PAST PACK 4: 1 credit single, fully used, 6 months ago ──
+  -- PAST: single class
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_bert_id, v_pack_1, 1, 0, NOW() - INTERVAL '180 days', 'bert_seed_005', 'active', NOW() - INTERVAL '210 days');
+  VALUES (v_id, v_pack_1, 1, 0, NOW() - INTERVAL '150 days', 'seed_j_005', 'active', NOW() - INTERVAL '180 days');
 
-  -- ── PAST PACK 5: 10 credits, fully used, 8 months ago ──
-  INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_bert_id, v_pack_10, 10, 0, NOW() - INTERVAL '240 days', 'bert_seed_006', 'active', NOW() - INTERVAL '300 days');
-
-  -- Bert's upcoming bookings
+  -- UPCOMING BOOKINGS: 4 future classes
   INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
-    (v_bert_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed'),
-    (v_bert_id, 'c0000003-0000-0000-0000-000000000001', 'confirmed'),  -- fills Day 2 BOXXBEGINNER to 6/6
-    (v_bert_id, 'c0000003-0000-0000-0000-000000000002', 'confirmed'),
-    (v_bert_id, 'c0000005-0000-0000-0000-000000000001', 'confirmed');
+    (v_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed'),  -- Tomorrow BOXXINTER
+    (v_id, 'c0000003-0000-0000-0000-000000000002', 'confirmed'),  -- Day 2 BOXX&TRAIN
+    (v_id, 'c0000005-0000-0000-0000-000000000001', 'confirmed'),  -- Day 4 BOXXBEGINNER
+    (v_id, 'c0000006-0000-0000-0000-000000000002', 'confirmed');  -- Day 5 BOXXINTER
 
-  -- Bert attended today's class
-  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
-    (v_bert_id, 'c0000001-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '2 hours');
+  -- WAITLIST: Day 2 BOXXBEGINNER is full, Jacob is #1
+  INSERT INTO waitlist (user_id, class_schedule_id, position) VALUES
+    (v_id, 'c0000003-0000-0000-0000-000000000001', 1);
 
-  -- Bert cancelled a class (Day 3 BOXX&TRAIN was admin-cancelled)
+  -- CANCELLED: admin-cancelled Day 3 BOXX&TRAIN
   INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned) VALUES
-    (v_bert_id, 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
+    (v_id, 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
 
-  -- Bert past attended classes
+  -- LATE CANCEL: Day 3 BOXXINTER
+  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, late_cancel, credit_returned) VALUES
+    (v_id, 'c0000004-0000-0000-0000-000000000002', 'cancelled', NOW() - INTERVAL '2 hours', true, false);
+
+  -- PAST ATTENDED: 13 classes across 5 weeks = strong streak + badges
+  -- This week (today)
   INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
-    (v_bert_id, 'c0000001-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '1 day');
+    (v_id, 'c0000001-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '3 hours');
+  -- Week -1: 3 classes (BEGINNER, INTER, BOXX&TRAIN = 3 class types)
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990001-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '3 days'),
+    (v_id, 'c9990001-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '4 days'),
+    (v_id, 'c9990001-0000-0000-0000-000000000003', 'attended', NOW() - INTERVAL '5 days');
+  -- Week -2: 2 classes
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990002-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '10 days'),
+    (v_id, 'c9990002-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '11 days');
+  -- Week -3: 2 classes
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990003-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '17 days'),
+    (v_id, 'c9990003-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '19 days');
+  -- Week -4: 2 classes
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990004-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '24 days'),
+    (v_id, 'c9990004-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '25 days');
+  -- Week -5: 2 classes
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990005-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '31 days'),
+    (v_id, 'c9990005-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '33 days');
 
-  RAISE NOTICE 'Seeded Bert account: %', v_bert_id;
+  RAISE NOTICE 'Jacob: % — 4 credits, 5wk streak, 13 classes, waitlisted, late cancel', v_id;
 END $$;
 
--- ─── YOUR ACCOUNT: CREDITS + BOOKINGS ────
+
+-- ═══════════════════════════════════════════════════════════════
+-- BERT — ADMIN + ACTIVE MEMBER
+-- 4-week streak, 9 total classes, mix of all 4 class types
+-- 1 active pack (healthy), 3 past packs, upcoming bookings,
+-- on waitlist, 1 normal cancel
+-- ═══════════════════════════════════════════════════════════════
 
 DO $$
 DECLARE
-  v_user_id UUID;
-  v_pack_10 UUID;
-  v_pack_5 UUID;
-  v_pack_1 UUID;
+  v_id UUID;
+  v_pack_10 UUID; v_pack_5 UUID; v_pack_unlimited UUID;
 BEGIN
-  SELECT id INTO v_user_id FROM users
-    WHERE email NOT LIKE '%@example.com'
-      AND email != 'bertduff@gmail.com'
-      AND email != 'test@boxxthailand.com'
-    ORDER BY created_at ASC LIMIT 1;
-
-  IF v_user_id IS NULL THEN
-    RAISE NOTICE 'No real user found — skipping';
-    RETURN;
-  END IF;
+  SELECT id INTO v_id FROM users WHERE email = 'bertduff@gmail.com' LIMIT 1;
+  IF v_id IS NULL THEN RAISE NOTICE 'Bert not found — skip'; RETURN; END IF;
 
   SELECT id INTO v_pack_10 FROM class_packs WHERE credits = 10 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_5 FROM class_packs WHERE credits = 5 AND NOT is_intro LIMIT 1;
-  SELECT id INTO v_pack_1 FROM class_packs WHERE credits = 1 AND NOT is_intro LIMIT 1;
+  SELECT id INTO v_pack_unlimited FROM class_packs WHERE credits IS NULL LIMIT 1;
 
-  -- Current active: 10 credits, 9 remaining
+  -- ACTIVE: 10-pack, 6 remaining, 40 days left
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_user_id, v_pack_10, 10, 9, NOW() + INTERVAL '60 days', 'seed_payment_001', 'active', NOW() - INTERVAL '5 days');
+  VALUES (v_id, v_pack_10, 10, 6, NOW() + INTERVAL '40 days', 'seed_b_001', 'active', NOW() - INTERVAL '20 days');
 
-  -- Old expired pack: 5 credits, fully used, 2 months ago
+  -- PAST: 5-pack fully used
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_user_id, v_pack_5, 5, 0, NOW() - INTERVAL '30 days', 'seed_payment_002', 'active', NOW() - INTERVAL '60 days');
+  VALUES (v_id, v_pack_5, 5, 0, NOW() - INTERVAL '30 days', 'seed_b_002', 'active', NOW() - INTERVAL '60 days');
 
-  -- Old expired pack: 1 credit single, used, 3 months ago
+  -- PAST: unlimited month
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_user_id, v_pack_1, 1, 0, NOW() - INTERVAL '60 days', 'seed_payment_003', 'active', NOW() - INTERVAL '90 days');
+  VALUES (v_id, v_pack_unlimited, NULL, NULL, NOW() - INTERVAL '90 days', 'seed_b_003', 'active', NOW() - INTERVAL '120 days');
 
-  -- Upcoming: tomorrow's BOXXINTER
+  -- PAST: 10-pack fully used
+  INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
+  VALUES (v_id, v_pack_10, 10, 0, NOW() - INTERVAL '150 days', 'seed_b_004', 'active', NOW() - INTERVAL '210 days');
+
+  -- UPCOMING: 3 future classes
   INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
-    (v_user_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed');
+    (v_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed'),  -- Tomorrow BOXXINTER
+    (v_id, 'c0000003-0000-0000-0000-000000000002', 'confirmed'),  -- Day 2 BOXX&TRAIN
+    (v_id, 'c0000005-0000-0000-0000-000000000001', 'confirmed');  -- Day 4 BOXXBEGINNER
 
-  -- Admin-cancelled: Day 3 BOXX&TRAIN was cancelled, credit returned
-  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned)
-  VALUES (v_user_id, 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
+  -- WAITLIST: Day 2 BOXXBEGINNER full, Bert is #2
+  INSERT INTO waitlist (user_id, class_schedule_id, position) VALUES
+    (v_id, 'c0000003-0000-0000-0000-000000000001', 2);
 
-  -- Past: attended today's morning class
-  INSERT INTO bookings (user_id, class_schedule_id, status, created_at)
-  VALUES (v_user_id, 'c0000001-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '2 hours');
+  -- CANCELLED: admin-cancelled Day 3 BOXX&TRAIN (credit returned)
+  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned) VALUES
+    (v_id, 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
 
-  -- Past: cancelled yesterday
-  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned, created_at)
-  VALUES (v_user_id, 'c0000001-0000-0000-0000-000000000003', 'cancelled', NOW() - INTERVAL '1 day', true, NOW() - INTERVAL '2 days');
+  -- NORMAL CANCEL: cancelled Day 5 BOXXBEGINNER with plenty of notice
+  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned, created_at) VALUES
+    (v_id, 'c0000006-0000-0000-0000-000000000001', 'cancelled', NOW() - INTERVAL '2 days', true, NOW() - INTERVAL '5 days');
 
-  RAISE NOTICE 'Seeded for user: %', v_user_id;
+  -- PAST ATTENDED: 9 classes, 4 class types tried, 4-week streak
+  -- This week
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c0000001-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '3 hours'),
+    (v_id, 'c0000001-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '1 hour');
+  -- Week -1: BEGINNER + JUNIORS (variety!)
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990001-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '3 days'),
+    (v_id, 'c9990001-0000-0000-0000-000000000004', 'attended', NOW() - INTERVAL '6 days');
+  -- Week -2: BOXX&TRAIN + INTER
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990002-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '11 days'),
+    (v_id, 'c9990002-0000-0000-0000-000000000003', 'attended', NOW() - INTERVAL '12 days');
+  -- Week -3: BOXXINTER
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990003-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '17 days');
+  -- Week -5 (gap at week -4 = streak broken before that)
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990005-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '31 days'),
+    (v_id, 'c9990006-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '38 days');
+
+  RAISE NOTICE 'Bert: % — 6 credits, 4wk streak (broken before), 9 classes, waitlisted, 1 cancel', v_id;
 END $$;
 
--- ─── TEST ACCOUNT: CREDITS + BOOKINGS (same data as your account) ────
+
+-- ═══════════════════════════════════════════════════════════════
+-- TEST USER — RETURNING MEMBER WITH MIXED HISTORY
+-- 3-week streak (current), 7 total classes, 2 class types
+-- 1 active pack (2 credits, expiring in 8 days), past intro pack
+-- Upcoming bookings, on waitlist, 1 late cancel in past
+-- ═══════════════════════════════════════════════════════════════
 
 DO $$
 DECLARE
-  v_test_id UUID;
-  v_pack_10 UUID;
-  v_pack_5 UUID;
-  v_pack_1 UUID;
+  v_id UUID;
+  v_pack_5 UUID; v_pack_intro UUID; v_pack_1 UUID;
 BEGIN
-  SELECT id INTO v_test_id FROM users WHERE email = 'test@boxxthailand.com' LIMIT 1;
-  IF v_test_id IS NULL THEN
-    RAISE NOTICE 'Test user not found — skipping';
-    RETURN;
-  END IF;
+  SELECT id INTO v_id FROM users WHERE email = 'test@boxxthailand.com' LIMIT 1;
+  IF v_id IS NULL THEN RAISE NOTICE 'Test user not found — skip'; RETURN; END IF;
 
-  SELECT id INTO v_pack_10 FROM class_packs WHERE credits = 10 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_5 FROM class_packs WHERE credits = 5 AND NOT is_intro LIMIT 1;
   SELECT id INTO v_pack_1 FROM class_packs WHERE credits = 1 AND NOT is_intro LIMIT 1;
+  SELECT id INTO v_pack_intro FROM class_packs WHERE is_intro = true LIMIT 1;
 
-  -- Current active: 10 credits, 9 remaining
+  -- ACTIVE: 5-pack, 2 remaining, expiring in 8 days
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_test_id, v_pack_10, 10, 9, NOW() + INTERVAL '60 days', 'test_seed_001', 'active', NOW() - INTERVAL '5 days');
+  VALUES (v_id, v_pack_5, 5, 2, NOW() + INTERVAL '8 days', 'seed_t_001', 'active', NOW() - INTERVAL '22 days');
 
-  -- Old expired pack: 5 credits, fully used, 2 months ago
+  -- PAST: intro 1-class pack, used 3 months ago
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_test_id, v_pack_5, 5, 0, NOW() - INTERVAL '30 days', 'test_seed_002', 'active', NOW() - INTERVAL '60 days');
+  VALUES (v_id, v_pack_intro, 1, 0, NOW() - INTERVAL '60 days', 'seed_t_002', 'active', NOW() - INTERVAL '90 days');
 
-  -- Old expired pack: 1 credit single, used, 3 months ago
+  -- PAST: single class, used 2 months ago
   INSERT INTO user_credits (user_id, class_pack_id, credits_total, credits_remaining, expires_at, stripe_payment_id, status, purchased_at)
-  VALUES (v_test_id, v_pack_1, 1, 0, NOW() - INTERVAL '60 days', 'test_seed_003', 'active', NOW() - INTERVAL '90 days');
+  VALUES (v_id, v_pack_1, 1, 0, NOW() - INTERVAL '45 days', 'seed_t_003', 'active', NOW() - INTERVAL '75 days');
 
-  -- Upcoming: tomorrow's BOXXINTER
+  -- UPCOMING: 2 future classes
   INSERT INTO bookings (user_id, class_schedule_id, status) VALUES
-    (v_test_id, 'c0000002-0000-0000-0000-000000000001', 'confirmed');
+    (v_id, 'c0000002-0000-0000-0000-000000000002', 'confirmed'),  -- Tomorrow BOXXBEGINNER evening
+    (v_id, 'c0000005-0000-0000-0000-000000000002', 'confirmed');  -- Day 4 BOXX&TRAIN
 
-  -- Admin-cancelled: Day 3 BOXX&TRAIN was cancelled, credit returned
-  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned)
-  VALUES (v_test_id, 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
+  -- WAITLIST: Day 5 BOXXBEGINNER, position #1
+  INSERT INTO waitlist (user_id, class_schedule_id, position) VALUES
+    (v_id, 'c0000006-0000-0000-0000-000000000001', 1);
 
-  -- Past: attended today's morning class
-  INSERT INTO bookings (user_id, class_schedule_id, status, created_at)
-  VALUES (v_test_id, 'c0000001-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '2 hours');
+  -- CANCELLED: admin-cancelled Day 3 BOXX&TRAIN
+  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned) VALUES
+    (v_id, 'c0000004-0000-0000-0000-000000000001', 'cancelled', NOW(), true);
 
-  -- Past: cancelled yesterday
-  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned, created_at)
-  VALUES (v_test_id, 'c0000001-0000-0000-0000-000000000003', 'cancelled', NOW() - INTERVAL '1 day', true, NOW() - INTERVAL '2 days');
+  -- LATE CANCEL: cancelled Day 2 BOXX&TRAIN too late
+  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, late_cancel, credit_returned, created_at) VALUES
+    (v_id, 'c0000003-0000-0000-0000-000000000003', 'cancelled', NOW() - INTERVAL '1 day', true, false, NOW() - INTERVAL '3 days');
 
-  RAISE NOTICE 'Seeded test account: %', v_test_id;
+  -- NORMAL CANCEL: cancelled Day 6 BOXX&TRAIN with time
+  INSERT INTO bookings (user_id, class_schedule_id, status, cancelled_at, credit_returned, created_at) VALUES
+    (v_id, 'c0000007-0000-0000-0000-000000000001', 'cancelled', NOW() - INTERVAL '3 days', true, NOW() - INTERVAL '5 days');
+
+  -- PAST ATTENDED: 7 classes, 3-week current streak
+  -- This week
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c0000001-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '1 hour');
+  -- Week -1: 2 classes
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990001-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '4 days'),
+    (v_id, 'c9990001-0000-0000-0000-000000000003', 'attended', NOW() - INTERVAL '5 days');
+  -- Week -2: 1 class
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990002-0000-0000-0000-000000000001', 'attended', NOW() - INTERVAL '10 days');
+  -- (gap at week -3 = 3-week current streak)
+  -- Week -4: 1 class (before the gap)
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990004-0000-0000-0000-000000000003', 'attended', NOW() - INTERVAL '27 days');
+  -- Week -5-6: 2 classes (early days, intro pack era)
+  INSERT INTO bookings (user_id, class_schedule_id, status, created_at) VALUES
+    (v_id, 'c9990005-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '33 days'),
+    (v_id, 'c9990006-0000-0000-0000-000000000002', 'attended', NOW() - INTERVAL '40 days');
+
+  RAISE NOTICE 'Test User: % — 2 credits (8d), 3wk streak, 7 classes, waitlisted, late cancel', v_id;
 END $$;
