@@ -741,8 +741,10 @@ function getClassImage(cls) {
   try {
     if (cls?.is_private || cls?.class_types?.is_private) return '/images/studio/pt-session.webp'
     const icon = cls?.class_types?.icon?.toLowerCase() || ''
-    if (classImageMap[icon]) return classImageMap[icon]
     const name = (cls?.class_types?.name || '').toLowerCase()
+    // Check name for private/1:1/pt before icon map
+    if (name.includes('private') || name.includes('1:1') || name.includes('pt ') || name.includes('personal')) return '/images/studio/pt-session.webp'
+    if (classImageMap[icon]) return classImageMap[icon]
     if (name.includes('beginner')) return classImageMap.beginner
     if (name.includes('inter')) return classImageMap.intermediate
     if (name.includes('train')) return classImageMap.train
@@ -758,7 +760,7 @@ function getClassColor(cls) {
     // Fallbacks based on icon/name
     const icon = cls?.class_types?.icon?.toLowerCase() || ''
     const name = (cls?.class_types?.name || '').toLowerCase()
-    if (cls?.is_private || cls?.class_types?.is_private) return '#f59e0b'
+    if (cls?.is_private || cls?.class_types?.is_private || name.includes('private') || name.includes('1:1') || name.includes('personal')) return '#f59e0b'
     if (icon === 'beginner' || name.includes('beginner')) return '#8b5cf6'
     if (icon === 'intermediate' || name.includes('inter')) return '#e74c3c'
     if (icon === 'train' || name.includes('train')) return '#3498db'
