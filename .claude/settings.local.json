@@ -18,7 +18,8 @@
       "WebFetch(domain:www.1rebel.com)",
       "WebFetch(domain:codepen.io)",
       "WebFetch(domain:21st.dev)",
-      "WebFetch(domain:cdpn.io)"
+      "WebFetch(domain:cdpn.io)",
+      "WebFetch(domain:boxx-three.vercel.app)"
     ]
   }
 }

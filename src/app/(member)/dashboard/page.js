@@ -643,7 +643,7 @@ function GamificationWidget() {
       .catch(() => {})
   }, [])
 
-  if (!data || data.stats?.totalClasses === 0) return null
+  if (!data) return null
 
   const { stats, earnedBadges, allBadges } = data
 
