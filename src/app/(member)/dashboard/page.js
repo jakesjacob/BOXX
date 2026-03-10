@@ -735,6 +735,7 @@ const classImageMap = {
 }
 
 function getClassImage(cls) {
+  if (cls.is_private) return '/images/studio/pt-session.webp'
   const icon = cls.class_types?.icon?.toLowerCase() || ''
   if (classImageMap[icon]) return classImageMap[icon]
   const name = (cls.class_types?.name || '').toLowerCase()
@@ -746,12 +747,12 @@ function getClassImage(cls) {
 }
 
 function getClassColor(cls) {
-  // Category hue system: amber=private, purple=recurring, otherwise class type color
-  if (cls.is_private) return '#f59e0b'
-  if (cls.recurring_id) return '#8b5cf6'
+  // Always use admin-set class type color first
   if (cls.class_types?.color) return cls.class_types.color
+  // Fallbacks based on icon/name
   const icon = cls.class_types?.icon?.toLowerCase() || ''
   const name = (cls.class_types?.name || '').toLowerCase()
+  if (cls.is_private) return '#f59e0b'
   if (icon === 'beginner' || name.includes('beginner')) return '#8b5cf6'
   if (icon === 'intermediate' || name.includes('inter')) return '#e74c3c'
   if (icon === 'train' || name.includes('train')) return '#3498db'
@@ -1331,15 +1332,26 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange 
               <span className="text-[10px] text-muted">
                 {(new Date(cls.starts_at) - Date.now()) / 36e5 <= 24 ? 'Credit will not be returned' : 'Free cancellation'}
               </span>
-              <button
-                onClick={async (e) => { e.stopPropagation(); try { const r = await fetch(`/api/bookings/ical?id=${cls.booking_id}`); if (!r.ok) return; const blob = await r.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'boxx-class.ics'; a.click(); URL.revokeObjectURL(url); } catch {} }}
-                className="p-1.5 text-muted hover:text-accent transition-colors"
-                title="Add to calendar"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </button>
+              {isGoogleUser && (
+                <a
+                  href={(() => {
+                    const start = new Date(cls.starts_at)
+                    const end = new Date(cls.ends_at || new Date(start.getTime() + 60 * 60 * 1000))
+                    const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+                    const title = `${cls.class_types?.name || 'BOXX Class'}${cls.instructors?.name ? ` with ${cls.instructors.name}` : ''}`
+                    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent('BOXX Boxing Studio — Chiang Mai')}&location=${encodeURIComponent('89/2 Bumruang Road, Wat Ket, Chiang Mai 50000')}`
+                  })()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1.5 text-muted hover:text-accent transition-colors"
+                  title="Add to Google Calendar"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </a>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -1776,7 +1788,7 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
       timeZone: 'Asia/Bangkok',
     })
     const classImage = getClassImage(cls)
-    const classColor = isWaitlist ? '#f59e0b' : getClassColor(cls)
+    const classColor = getClassColor(cls)
     const hoursUntil = isUpcoming ? (new Date(cls.starts_at) - Date.now()) / (1000 * 60 * 60) : 0
     const isLate = hoursUntil <= 24
 
@@ -1902,15 +1914,26 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
                         <span className="text-[10px] text-muted">
                           {isLate ? 'Credit will not be returned' : 'Free cancellation'}
                         </span>
-                        <button
-                          onClick={async (e) => { e.stopPropagation(); try { const r = await fetch(`/api/bookings/ical?id=${b.id}`); if (!r.ok) return; const blob = await r.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'boxx-class.ics'; a.click(); URL.revokeObjectURL(url); } catch {} }}
-                          className="p-1.5 text-muted hover:text-accent transition-colors"
-                          title="Add to calendar"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        </button>
+                        {isGoogleUser && (
+                          <a
+                            href={(() => {
+                              const start = new Date(cls.starts_at)
+                              const end = new Date(cls.ends_at || new Date(start.getTime() + 60 * 60 * 1000))
+                              const fmt = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+                              const title = `${cls.class_types?.name || 'BOXX Class'}${cls.instructors?.name ? ` with ${cls.instructors.name}` : ''}`
+                              return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent('BOXX Boxing Studio — Chiang Mai')}&location=${encodeURIComponent('89/2 Bumruang Road, Wat Ket, Chiang Mai 50000')}`
+                            })()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 text-muted hover:text-accent transition-colors"
+                            title="Add to Google Calendar"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </a>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
