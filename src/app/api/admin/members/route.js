@@ -118,8 +118,8 @@ export async function GET(request) {
 }
 
 const grantCreditsSchema = z.object({
-  userId: z.string().uuid(),
-  packId: z.string().uuid(),
+  userId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
+  packId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
   notes: z.string().optional(),
 })
 

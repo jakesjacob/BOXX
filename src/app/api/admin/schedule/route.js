@@ -107,8 +107,8 @@ export async function GET(request) {
 }
 
 const createClassSchema = z.object({
-  classTypeId: z.string().uuid(),
-  instructorId: z.string().uuid(),
+  classTypeId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
+  instructorId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
   startsAt: z.string().min(1),
   endsAt: z.string().min(1),
   capacity: z.number().int().min(1).max(50).optional(),
@@ -200,9 +200,9 @@ export async function POST(request) {
 }
 
 const updateClassSchema = z.object({
-  id: z.string().uuid(),
-  classTypeId: z.string().uuid().optional(),
-  instructorId: z.string().uuid().optional(),
+  id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
+  classTypeId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID').optional(),
+  instructorId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID').optional(),
   startsAt: z.string().min(1).optional(),
   endsAt: z.string().min(1).optional(),
   capacity: z.number().int().min(1).max(50).optional(),

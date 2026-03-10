@@ -7,7 +7,7 @@ import { z } from 'zod'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 const checkoutSchema = z.object({
-  packId: z.string().uuid(),
+  packId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
 })
 
 /**

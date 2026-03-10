@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const recurringSchema = z.object({
-  classTypeId: z.string().uuid(),
-  instructorId: z.string().uuid(),
+  classTypeId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
+  instructorId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
   startTime: z.string().regex(/^\d{2}:\d{2}$/), // HH:MM
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
   capacity: z.number().int().min(1).max(50).optional(),

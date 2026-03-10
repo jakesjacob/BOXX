@@ -102,7 +102,7 @@ export async function GET(request) {
 }
 
 const updateBookingSchema = z.object({
-  bookingId: z.string().uuid(),
+  bookingId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
   action: z.enum(['cancel']),
   refundCredit: z.boolean().optional(),
 })

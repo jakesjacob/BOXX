@@ -95,7 +95,7 @@ export async function POST(request) {
 }
 
 const updatePackSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   credits: z.number().int().min(1).nullable().optional(),

@@ -103,7 +103,7 @@ export async function POST(request) {
 }
 
 const updateSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
   duration_mins: z.number().int().min(1).max(300).optional(),

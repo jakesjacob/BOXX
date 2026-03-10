@@ -6,13 +6,13 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const addMemberSchema = z.object({
-  classId: z.string().uuid(),
-  userId: z.string().uuid(),
+  classId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
+  userId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
 })
 
 const removeMemberSchema = z.object({
-  classId: z.string().uuid(),
-  userId: z.string().uuid(),
+  classId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
+  userId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Invalid ID'),
   refundCredit: z.boolean().optional(),
   fromWaitlist: z.boolean().optional(),
 })
