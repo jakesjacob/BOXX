@@ -163,19 +163,20 @@ function BuyClassesContent() {
 
       {/* Pack cards */}
       {loading ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-80 bg-card border border-card-border rounded-xl animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 items-start">
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
           {packs.map((pack, idx) => {
             const isIntro = pack.is_intro
             const isMembership = pack.is_membership
+            const isSingleClass = pack.credits === 1
             const canBuyIntro = isIntro && !hasActiveCredits
-            const isMostPopular = pack.badge_text?.toLowerCase().includes('popular') || (!isIntro && !isMembership && idx === 1)
-            const isBestValue = pack.badge_text?.toLowerCase().includes('value') || (!isIntro && !isMembership && packs.length > 2 && idx === packs.length - 1)
+            const isMostPopular = !isSingleClass && (pack.badge_text?.toLowerCase().includes('popular') || (!isIntro && !isMembership && idx === 1))
+            const isBestValue = pack.badge_text?.toLowerCase().includes('value') || (!isIntro && !isMembership && !isSingleClass && packs.length > 2 && idx === packs.length - 1)
 
             // Hide intro pack if user already has credits
             if (isIntro && hasActiveCredits) return null
@@ -193,10 +194,11 @@ function BuyClassesContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
+                className="h-full"
               >
                 <Card
                   className={cn(
-                    'relative flex flex-col overflow-hidden transition-all hover:translate-y-[-2px]',
+                    'relative flex flex-col overflow-hidden transition-all hover:translate-y-[-2px] h-full',
                     isMostPopular
                       ? 'ring-2 ring-accent shadow-lg shadow-accent/10'
                       : 'hover:border-accent/30'
