@@ -1,43 +1,37 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 const TABS = [
-  { id: 'overview', label: 'Email Overview', icon: '📧' },
+  { id: 'overview', label: 'Email Events', icon: '📧' },
   { id: 'compose', label: 'Compose', icon: '✉️' },
 ]
 
-// ─── Email events reference table ──────────────────────────────────────────
+// ─── Email events ───────────────────────────────────────────────────────────
 
 const EMAIL_EVENTS = [
-  { id: 1, name: 'Booking confirmation', trigger: 'Member books a class', status: 'live', template: 'sendBookingConfirmation', calledFrom: '/api/bookings/create' },
-  { id: 2, name: 'Class reminder (1hr)', trigger: 'Cron every 15min', status: 'live', template: 'sendClassReminder', calledFrom: '/api/cron/reminders' },
-  { id: 3, name: 'Waitlist promotion', trigger: 'Spot opens (cancel/remove)', status: 'live', template: 'sendWaitlistPromotion', calledFrom: 'src/lib/waitlist.js' },
-  { id: 4, name: 'Credit expiry warning', trigger: 'Cron daily midnight', status: 'live', template: 'sendCreditExpiryWarning', calledFrom: '/api/cron/expire-credits' },
-  { id: 5, name: 'Welcome email', trigger: 'User registers', status: 'live', template: 'sendWelcomeEmail', calledFrom: '/api/auth/register' },
-  { id: 6, name: 'Cancellation confirmation', trigger: 'Member cancels booking', status: 'live', template: 'sendCancellationConfirmation', calledFrom: '/api/bookings/cancel' },
-  { id: 7, name: 'Class cancelled by admin', trigger: 'Admin cancels a class', status: 'live', template: 'sendClassCancelledByAdmin', calledFrom: '/api/admin/schedule/cancel' },
-  { id: 8, name: 'Pack purchase confirmation', trigger: 'Stripe webhook success', status: 'live', template: 'sendPackPurchaseConfirmation', calledFrom: '/api/stripe/webhook' },
-  { id: 9, name: 'Credits low warning', trigger: 'Credit drops to 1 remaining', status: 'live', template: 'sendCreditsLowWarning', calledFrom: '/api/bookings/create' },
-  { id: 10, name: 'Class change notification', trigger: 'Admin edits class with bookings', status: 'live', template: 'sendClassChanged', calledFrom: '/api/admin/schedule/notify' },
-  { id: 11, name: 'Removed from class', trigger: 'Admin removes member via roster', status: 'live', template: 'sendRemovedFromClass', calledFrom: '/api/admin/schedule/roster' },
-  { id: 12, name: 'Admin cancels booking', trigger: 'Admin cancels on behalf', status: 'live', template: 'sendAdminCancelledBooking', calledFrom: '/api/admin/schedule/roster' },
-  { id: 13, name: 'Admin direct email', trigger: 'Admin composes message', status: 'live', template: 'sendAdminDirectEmail', calledFrom: '/api/admin/emails' },
-  { id: 14, name: 'Private class invitation', trigger: 'Admin adds member to private class', status: 'live', template: 'sendPrivateClassInvitation', calledFrom: '/api/admin/schedule/roster' },
-  { id: 15, name: 'Password reset', trigger: 'User requests reset', status: 'not_built', template: '—', calledFrom: '—' },
-  { id: 16, name: 'Payment failed', trigger: 'Stripe invoice.payment_failed', status: 'not_built', template: '—', calledFrom: '/api/stripe/webhook' },
+  { slug: 'booking_confirmation', name: 'Booking Confirmation', description: 'Sent when a member books a class', trigger: 'Member books a class', defaultSubject: 'Booking Confirmed — {{class}}' },
+  { slug: 'class_reminder', name: 'Class Reminder (1hr)', description: 'Sent 1 hour before a class starts', trigger: 'Cron every 15min', defaultSubject: 'Reminder: {{class}} in 1 hour' },
+  { slug: 'waitlist_promotion', name: 'Waitlist Promotion', description: 'Sent when a member is promoted from the waitlist', trigger: 'Spot opens up', defaultSubject: 'Spot Available — {{class}}' },
+  { slug: 'credit_expiry_warning', name: 'Credit Expiry Warning', description: 'Sent when credits are about to expire', trigger: 'Cron daily', defaultSubject: 'Credits Expiring Soon — {{pack}}' },
+  { slug: 'welcome', name: 'Welcome Email', description: 'Sent when a new member registers', trigger: 'User registers', defaultSubject: 'Welcome to BOXX' },
+  { slug: 'cancellation_confirmation', name: 'Cancellation Confirmation', description: 'Sent when a member cancels a booking', trigger: 'Member cancels', defaultSubject: 'Booking Cancelled — {{class}}' },
+  { slug: 'class_cancelled_admin', name: 'Class Cancelled by Admin', description: 'Sent to all booked members when admin cancels a class', trigger: 'Admin cancels class', defaultSubject: 'Class Cancelled — {{class}}' },
+  { slug: 'pack_purchase_confirmation', name: 'Pack Purchase Confirmation', description: 'Sent after successful pack purchase', trigger: 'Stripe webhook', defaultSubject: 'Pack Purchased — {{pack}}' },
+  { slug: 'credits_low_warning', name: 'Credits Low Warning', description: 'Sent when member has 1 credit remaining', trigger: 'Credit drops to 1', defaultSubject: 'Low Credits — 1 remaining' },
+  { slug: 'class_changed', name: 'Class Change Notification', description: 'Sent when admin edits a class with existing bookings', trigger: 'Admin edits class', defaultSubject: 'Class Updated — {{class}}' },
+  { slug: 'removed_from_class', name: 'Removed from Class', description: 'Sent when admin removes a member from a class', trigger: 'Admin removes member', defaultSubject: 'Removed from {{class}}' },
+  { slug: 'admin_cancelled_booking', name: 'Admin Cancels Booking', description: 'Sent when admin cancels a booking on behalf of a member', trigger: 'Admin cancels booking', defaultSubject: 'Booking Cancelled — {{class}}' },
+  { slug: 'private_class_invitation', name: 'Private Class Invitation', description: 'Sent when admin adds a member to a private class', trigger: 'Admin adds to private class', defaultSubject: 'Private Class Invitation — {{class}}' },
 ]
-
-const statusConfig = {
-  live: { label: 'Live', className: 'bg-green-400/10 text-green-400 border-green-400/20' },
-  not_built: { label: 'Not Built', className: 'bg-zinc-400/10 text-zinc-400 border-zinc-400/20' },
-}
 
 export default function EmailsPage() {
   const [activeTab, setActiveTab] = useState('overview')
@@ -74,112 +68,313 @@ export default function EmailsPage() {
 // ─── Email Overview Tab ──────────────────────────────────────────────────────
 
 function EmailOverviewTab() {
-  const liveCount = EMAIL_EVENTS.filter((e) => e.status === 'live').length
-  const notBuiltCount = EMAIL_EVENTS.filter((e) => e.status === 'not_built').length
+  const [settings, setSettings] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(null)
+  const [editSlug, setEditSlug] = useState(null)
+  const [previewSlug, setPreviewSlug] = useState(null)
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+
+  // Load all email settings
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/admin/settings')
+        if (res.ok) {
+          const { settings: s } = await res.json()
+          setSettings(s || {})
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const isEnabled = useCallback((slug) => {
+    const key = `email_${slug}_enabled`
+    return settings[key] !== 'false'
+  }, [settings])
+
+  const getCustomSubject = useCallback((slug) => {
+    return settings[`email_${slug}_subject`] || ''
+  }, [settings])
+
+  const getCustomBody = useCallback((slug) => {
+    return settings[`email_${slug}_body`] || ''
+  }, [settings])
+
+  async function toggleEnabled(slug) {
+    const key = `email_${slug}_enabled`
+    const newValue = isEnabled(slug) ? 'false' : 'true'
+    setSaving(slug)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: newValue }),
+      })
+      if (res.ok) {
+        setSettings((prev) => ({ ...prev, [key]: newValue }))
+      }
+    } catch (err) {
+      console.error('Failed to toggle:', err)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function saveCustomMessage(slug, subject, body) {
+    setSaving(slug)
+    try {
+      const updates = {}
+      updates[`email_${slug}_subject`] = subject
+      updates[`email_${slug}_body`] = body
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      if (res.ok) {
+        setSettings((prev) => ({
+          ...prev,
+          [`email_${slug}_subject`]: subject,
+          [`email_${slug}_body`]: body,
+        }))
+        setEditSlug(null)
+      }
+    } catch (err) {
+      console.error('Failed to save:', err)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function openPreview(slug) {
+    setPreviewSlug(slug)
+    setPreviewLoading(true)
+    setPreviewHtml('')
+    try {
+      const res = await fetch(`/api/admin/emails/preview?slug=${slug}`)
+      if (res.ok) {
+        const html = await res.text()
+        setPreviewHtml(html)
+      } else {
+        setPreviewHtml('<p style="color:#888;padding:40px;text-align:center;">Failed to load preview</p>')
+      }
+    } catch {
+      setPreviewHtml('<p style="color:#888;padding:40px;text-align:center;">Failed to load preview</p>')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const enabledCount = EMAIL_EVENTS.filter((e) => isEnabled(e.slug)).length
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Card key={i}>
+            <CardContent className="py-4 px-4">
+              <div className="animate-pulse flex items-center gap-4">
+                <div className="h-5 bg-card-border rounded w-48" />
+                <div className="flex-1" />
+                <div className="h-5 bg-card-border rounded w-12" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-5">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="py-4 px-4 text-center">
-            <p className="text-2xl font-bold text-foreground">{EMAIL_EVENTS.length}</p>
-            <p className="text-xs text-muted mt-1">Total Events</p>
+            <p className="text-2xl font-bold text-green-400">{enabledCount}</p>
+            <p className="text-xs text-muted mt-1">Enabled</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4 px-4 text-center">
-            <p className="text-2xl font-bold text-green-400">{liveCount}</p>
-            <p className="text-xs text-muted mt-1">Live</p>
-          </CardContent>
-        </Card>
-        <Card className="col-span-2 sm:col-span-1">
-          <CardContent className="py-4 px-4 text-center">
-            <p className="text-2xl font-bold text-zinc-400">{notBuiltCount}</p>
-            <p className="text-xs text-muted mt-1">Not Built</p>
+            <p className="text-2xl font-bold text-zinc-400">{EMAIL_EVENTS.length - enabledCount}</p>
+            <p className="text-xs text-muted mt-1">Disabled</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Info banner */}
-      <div className="p-3 sm:p-4 bg-amber-600/10 border border-amber-600/20 rounded-lg">
-        <p className="text-amber-400 text-sm font-medium">RESEND_API_KEY required</p>
-        <p className="text-amber-400/70 text-xs mt-1">All email templates are coded and wired into their trigger points. Set the RESEND_API_KEY environment variable to activate email delivery.</p>
-      </div>
+      {/* Email event cards */}
+      <div className="space-y-2">
+        {EMAIL_EVENTS.map((event) => {
+          const enabled = isEnabled(event.slug)
+          const hasCustom = getCustomSubject(event.slug) || getCustomBody(event.slug)
 
-      {/* Email events reference table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Email Events Reference</CardTitle>
-          <CardDescription>All automated email notifications and their triggers</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto -mx-6 px-6">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-card-border text-left">
-                  <th className="pb-2 pr-3 text-xs text-muted font-medium">#</th>
-                  <th className="pb-2 pr-3 text-xs text-muted font-medium">Email Event</th>
-                  <th className="pb-2 pr-3 text-xs text-muted font-medium hidden sm:table-cell">Trigger</th>
-                  <th className="pb-2 pr-3 text-xs text-muted font-medium">Status</th>
-                  <th className="pb-2 text-xs text-muted font-medium hidden md:table-cell">Template</th>
-                </tr>
-              </thead>
-              <tbody>
-                {EMAIL_EVENTS.map((event) => {
-                  const config = statusConfig[event.status]
-                  return (
-                    <tr key={event.id} className="border-b border-card-border/50 last:border-0">
-                      <td className="py-2.5 pr-3 text-muted text-xs">{event.id}</td>
-                      <td className="py-2.5 pr-3">
-                        <p className="text-foreground font-medium">{event.name}</p>
-                        <p className="text-xs text-muted sm:hidden mt-0.5">{event.trigger}</p>
-                      </td>
-                      <td className="py-2.5 pr-3 text-muted hidden sm:table-cell">{event.trigger}</td>
-                      <td className="py-2.5 pr-3">
-                        <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded border', config.className)}>
-                          {config.label}
+          return (
+            <Card key={event.slug} className={cn(!enabled && 'opacity-60')}>
+              <CardContent className="py-3 px-4">
+                <div className="flex items-start gap-3">
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-foreground">{event.name}</p>
+                      {hasCustom && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
+                          Customised
                         </span>
-                      </td>
-                      <td className="py-2.5 text-xs text-muted font-mono hidden md:table-cell">{event.template}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted mt-0.5">{event.description}</p>
+                  </div>
 
-      {/* Template info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Email Template</CardTitle>
-          <CardDescription>All emails use a shared branded template</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="p-3 rounded-lg bg-background/50 border border-card-border/50">
-              <p className="text-xs text-muted mb-1">Theme</p>
-              <p className="text-foreground">Dark luxury (matches website)</p>
-            </div>
-            <div className="p-3 rounded-lg bg-background/50 border border-card-border/50">
-              <p className="text-xs text-muted mb-1">Sender</p>
-              <p className="text-foreground">BOXX Thailand &lt;noreply@boxxthailand.com&gt;</p>
-            </div>
-            <div className="p-3 rounded-lg bg-background/50 border border-card-border/50">
-              <p className="text-xs text-muted mb-1">Design</p>
-              <p className="text-foreground">Gold accent bar, logo header, card layout, social footer</p>
-            </div>
-            <div className="p-3 rounded-lg bg-background/50 border border-card-border/50">
-              <p className="text-xs text-muted mb-1">CTA Buttons</p>
-              <p className="text-foreground">Gold (#c8a750) with dark text, rounded</p>
-            </div>
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => openPreview(event.slug)}
+                      className="text-xs text-muted hover:text-foreground transition-colors px-2 py-1"
+                      title="Preview"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => setEditSlug(event.slug)}
+                      className="text-xs text-muted hover:text-foreground transition-colors px-2 py-1"
+                      title="Edit message"
+                    >
+                      Edit
+                    </button>
+                    <Switch
+                      checked={enabled}
+                      onCheckedChange={() => toggleEnabled(event.slug)}
+                      disabled={saving === event.slug}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Edit Dialog */}
+      <EditEmailDialog
+        slug={editSlug}
+        event={EMAIL_EVENTS.find((e) => e.slug === editSlug)}
+        customSubject={editSlug ? getCustomSubject(editSlug) : ''}
+        customBody={editSlug ? getCustomBody(editSlug) : ''}
+        saving={saving}
+        onSave={saveCustomMessage}
+        onClose={() => setEditSlug(null)}
+      />
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewSlug} onOpenChange={() => setPreviewSlug(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-0">
+            <DialogTitle className="text-base">
+              {EMAIL_EVENTS.find((e) => e.slug === previewSlug)?.name} — Preview
+            </DialogTitle>
+            <DialogDescription>
+              Preview with sample data. Actual emails use real member and class information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-6 overflow-auto" style={{ maxHeight: 'calc(85vh - 100px)' }}>
+            {previewLoading ? (
+              <div className="h-64 flex items-center justify-center text-muted text-sm">Loading preview...</div>
+            ) : (
+              <iframe
+                srcDoc={previewHtml}
+                className="w-full border border-card-border rounded-lg"
+                style={{ height: '600px', background: '#0a0a0a' }}
+                title="Email preview"
+                sandbox=""
+              />
+            )}
           </div>
-          <p className="text-xs text-muted">Template source: <code className="text-accent/80">src/lib/email.js</code></p>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
     </div>
+  )
+}
+
+// ─── Edit Email Dialog ──────────────────────────────────────────────────────
+
+function EditEmailDialog({ slug, event, customSubject, customBody, saving, onSave, onClose }) {
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+
+  useEffect(() => {
+    if (slug) {
+      setSubject(customSubject)
+      setBody(customBody)
+    }
+  }, [slug, customSubject, customBody])
+
+  if (!event) return null
+
+  return (
+    <Dialog open={!!slug} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base">Edit — {event.name}</DialogTitle>
+          <DialogDescription>
+            Customise the subject line and message body. Leave blank to use the default.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 mt-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-subject">Subject Line</Label>
+            <Input
+              id="edit-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder={event.defaultSubject}
+            />
+            <p className="text-xs text-muted">Leave blank to use default: {event.defaultSubject}</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-body">Message Body</Label>
+            <textarea
+              id="edit-body"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={6}
+              className="w-full rounded-lg bg-background/50 border border-card-border/60 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted/50 transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 resize-y"
+              placeholder="Leave blank to use the default message..."
+            />
+            <p className="text-xs text-muted">
+              This replaces the greeting and main message. Detail tables (class info, dates) are preserved automatically.
+            </p>
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            {(subject || body) && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { setSubject(''); setBody('') }}
+              >
+                Reset to Default
+              </Button>
+            )}
+            <Button
+              onClick={() => onSave(slug, subject, body)}
+              disabled={saving === slug}
+            >
+              {saving === slug ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
