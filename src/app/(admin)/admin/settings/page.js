@@ -22,6 +22,7 @@ const TABS = [
   { id: 'payments', label: 'Payments', icon: '💳' },
   { id: 'studio', label: 'Studio', icon: '🏢' },
   { id: 'social', label: 'Social Links', icon: '🔗' },
+  { id: 'seo', label: 'SEO', icon: '🔍' },
   { id: 'booking', label: 'Booking', icon: '📋' },
   { id: 'reminders', label: 'Reminders', icon: '🔔' },
 ]
@@ -60,6 +61,7 @@ function SettingsContent() {
       {activeTab === 'payments' && <PaymentsTab connected={connected} error={error} />}
       {activeTab === 'studio' && <StudioInfoTab />}
       {activeTab === 'social' && <SocialLinksTab />}
+      {activeTab === 'seo' && <SeoTab />}
       {activeTab === 'booking' && <BookingRulesTab />}
       {activeTab === 'reminders' && <RemindersTab />}
     </div>
@@ -298,6 +300,220 @@ function SocialLinksTab() {
         </form>
       </CardContent>
     </Card>
+  )
+}
+
+// ─── SEO Tab ────────────────────────────────────────────────────────────────
+
+function SeoTab() {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState(null)
+  const [form, setForm] = useState({
+    seo_title: '',
+    seo_description: '',
+    seo_keywords: '',
+    seo_og_title: '',
+    seo_og_description: '',
+    seo_og_image: '',
+    seo_url: '',
+  })
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/admin/settings')
+        if (res.ok) {
+          const { settings } = await res.json()
+          setForm({
+            seo_title: settings.seo_title || 'BOXX | Luxury Boutique Boxing & Personal Training Studio in Chiang Mai',
+            seo_description: settings.seo_description || "Chiang Mai's first luxury boutique boxing and personal training studio. UK-qualified coaches delivering authentic British boxing and strength training. Small-group classes, max 6 per session.",
+            seo_keywords: settings.seo_keywords || 'boxing, chiang mai, personal training, boutique gym, luxury fitness, boxing classes, strength training, thailand',
+            seo_og_title: settings.seo_og_title || 'BOXX | Luxury Boutique Boxing Studio in Chiang Mai',
+            seo_og_description: settings.seo_og_description || 'Boxing and strength training, done properly. Small-group classes led by UK-qualified coaches.',
+            seo_og_image: settings.seo_og_image || '',
+            seo_url: settings.seo_url || 'https://www.boxxthailand.com',
+          })
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'SEO settings saved. Changes take effect on next page load.' })
+      } else {
+        setMessage({ type: 'error', text: 'Failed to save.' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to save.' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-6 bg-card-border rounded w-48" />
+            <div className="h-10 bg-card-border rounded w-full" />
+            <div className="h-10 bg-card-border rounded w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Page Title & Meta</CardTitle>
+          <CardDescription>Controls how your site appears in Google search results</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSave} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="seo_title">Page Title</Label>
+              <Input
+                id="seo_title"
+                value={form.seo_title}
+                onChange={(e) => setForm({ ...form, seo_title: e.target.value })}
+                placeholder="BOXX | Luxury Boxing Studio in Chiang Mai"
+              />
+              <p className="text-xs text-muted">{form.seo_title.length}/60 characters — keep under 60 for best results</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="seo_description">Meta Description</Label>
+              <textarea
+                id="seo_description"
+                value={form.seo_description}
+                onChange={(e) => setForm({ ...form, seo_description: e.target.value })}
+                rows={3}
+                className="flex w-full rounded-md border border-card-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                placeholder="A short description of your business for search engines"
+              />
+              <p className="text-xs text-muted">{form.seo_description.length}/160 characters — keep under 160 for best results</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="seo_keywords">Keywords</Label>
+              <Input
+                id="seo_keywords"
+                value={form.seo_keywords}
+                onChange={(e) => setForm({ ...form, seo_keywords: e.target.value })}
+                placeholder="boxing, chiang mai, personal training, fitness"
+              />
+              <p className="text-xs text-muted">Comma-separated keywords</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="seo_url">Site URL</Label>
+              <Input
+                id="seo_url"
+                value={form.seo_url}
+                onChange={(e) => setForm({ ...form, seo_url: e.target.value })}
+                placeholder="https://www.boxxthailand.com"
+              />
+            </div>
+
+            {message && (
+              <p className={cn('text-sm', message.type === 'success' ? 'text-green-400' : 'text-red-400')}>
+                {message.text}
+              </p>
+            )}
+
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : 'Save SEO Settings'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Social Sharing (Open Graph)</CardTitle>
+          <CardDescription>Controls how your site appears when shared on social media</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSave} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="seo_og_title">Share Title</Label>
+              <Input
+                id="seo_og_title"
+                value={form.seo_og_title}
+                onChange={(e) => setForm({ ...form, seo_og_title: e.target.value })}
+                placeholder="BOXX | Luxury Boxing Studio"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="seo_og_description">Share Description</Label>
+              <textarea
+                id="seo_og_description"
+                value={form.seo_og_description}
+                onChange={(e) => setForm({ ...form, seo_og_description: e.target.value })}
+                rows={2}
+                className="flex w-full rounded-md border border-card-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                placeholder="Short description for social media shares"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="seo_og_image">Share Image URL</Label>
+              <Input
+                id="seo_og_image"
+                value={form.seo_og_image}
+                onChange={(e) => setForm({ ...form, seo_og_image: e.target.value })}
+                placeholder="https://www.boxxthailand.com/images/brand/og-image.jpg"
+              />
+              <p className="text-xs text-muted">Recommended: 1200x630px. Leave blank to use auto-generated image.</p>
+              {form.seo_og_image && (
+                <div className="mt-2 rounded border border-card-border overflow-hidden max-w-xs">
+                  <img src={form.seo_og_image} alt="OG preview" className="w-full" onError={(e) => { e.target.style.display = 'none' }} />
+                </div>
+              )}
+            </div>
+
+            {/* Preview */}
+            <div className="mt-4 p-4 rounded-lg bg-background/50 border border-card-border/50">
+              <p className="text-[10px] uppercase tracking-wider text-muted mb-2">Social Share Preview</p>
+              <div className="rounded border border-card-border overflow-hidden max-w-sm">
+                <div className="h-32 bg-card-border flex items-center justify-center text-muted text-xs">
+                  {form.seo_og_image ? 'Image loaded above' : 'Auto-generated image'}
+                </div>
+                <div className="p-3 bg-card">
+                  <p className="text-xs text-muted truncate">{form.seo_url || 'boxxthailand.com'}</p>
+                  <p className="text-sm font-semibold text-foreground mt-0.5 truncate">{form.seo_og_title || 'Page title'}</p>
+                  <p className="text-xs text-muted mt-0.5 line-clamp-2">{form.seo_og_description || 'Page description'}</p>
+                </div>
+              </div>
+            </div>
+
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Social Sharing'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

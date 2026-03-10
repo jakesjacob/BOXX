@@ -5,6 +5,8 @@ import { NextResponse } from 'next/server'
 const PUBLIC_KEYS = [
   'studio_name', 'studio_address', 'studio_phone', 'studio_email', 'studio_website',
   'social_instagram', 'social_tiktok', 'social_facebook', 'social_line', 'social_youtube',
+  'seo_title', 'seo_description', 'seo_keywords', 'seo_url',
+  'seo_og_title', 'seo_og_description', 'seo_og_image',
 ]
 
 /**
