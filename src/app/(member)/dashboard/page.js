@@ -80,6 +80,7 @@ function DashboardContent() {
   return (
     <div className="space-y-6">
       <ProfileSection user={data.user} credits={data.credits} onUpdate={fetchDashboard} creditAnimation={creditAnimation} />
+      <GamificationWidget />
 
       {/* Tab switcher */}
       <div className="flex bg-card border border-card-border rounded p-0.5">
@@ -620,6 +621,104 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
             )}
           </AnimatePresence>
         </div>}
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   GAMIFICATION WIDGET — streaks, total classes, badges
+   ───────────────────────────────────────────────────────── */
+function GamificationWidget() {
+  const [data, setData] = useState(null)
+  const [showBadges, setShowBadges] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/gamification')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d && setData(d))
+      .catch(() => {})
+  }, [])
+
+  if (!data || data.stats?.totalClasses === 0) return null
+
+  const { stats, earnedBadges, allBadges } = data
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        {/* Stats row */}
+        <div className="flex items-center gap-4 sm:gap-6">
+          <div className="text-center flex-1">
+            <p className="text-2xl font-bold text-foreground">{stats.totalClasses}</p>
+            <p className="text-[10px] text-muted mt-0.5">Total Classes</p>
+          </div>
+          <div className="w-px h-8 bg-card-border" />
+          <div className="text-center flex-1">
+            <p className="text-2xl font-bold text-foreground flex items-center justify-center gap-1">
+              {stats.currentStreak}
+              {stats.currentStreak >= 3 && <span className="text-sm">🔥</span>}
+            </p>
+            <p className="text-[10px] text-muted mt-0.5">Week Streak</p>
+          </div>
+          <div className="w-px h-8 bg-card-border" />
+          <div className="text-center flex-1">
+            <p className="text-2xl font-bold text-accent">{earnedBadges.length}</p>
+            <p className="text-[10px] text-muted mt-0.5">Badges</p>
+          </div>
+        </div>
+
+        {/* Badges toggle */}
+        {allBadges.length > 0 && (
+          <>
+            <button
+              onClick={() => setShowBadges(!showBadges)}
+              className="mt-3 w-full flex items-center justify-between text-xs text-muted hover:text-foreground transition-colors pt-3 border-t border-card-border"
+            >
+              <span>
+                {earnedBadges.length > 0
+                  ? `${earnedBadges.map(b => b.icon).join(' ')} ${earnedBadges.length} of ${allBadges.length} badges earned`
+                  : 'No badges earned yet — keep going!'
+                }
+              </span>
+              <svg className={cn('w-3.5 h-3.5 transition-transform', showBadges && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <AnimatePresence>
+              {showBadges && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+                    {allBadges.map((badge) => {
+                      const isEarned = earnedBadges.some((b) => b.id === badge.id)
+                      return (
+                        <div
+                          key={badge.id}
+                          className={cn(
+                            'rounded-lg p-3 text-center border transition-colors',
+                            isEarned
+                              ? 'bg-accent/5 border-accent/20'
+                              : 'bg-background/50 border-card-border/50 opacity-40'
+                          )}
+                        >
+                          <span className="text-2xl">{badge.icon}</span>
+                          <p className="text-xs font-medium text-foreground mt-1">{badge.name}</p>
+                          <p className="text-[10px] text-muted mt-0.5">{badge.description}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
       </CardContent>
     </Card>
   )
