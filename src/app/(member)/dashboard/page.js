@@ -1757,11 +1757,12 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
     }
   }
 
-  function renderBookingCard(b, { isUpcoming = false } = {}) {
-    const cls = b.class_schedule
+  function renderBookingCard(b, { isUpcoming = false, isWaitlist = false } = {}) {
+    const cls = isWaitlist ? b.class_schedule : b.class_schedule
     if (!cls) return null
 
-    const isExpanded = expandedId === b.id
+    const cardId = isWaitlist ? `w-${b.id}` : b.id
+    const isExpanded = expandedId === cardId
     const startTime = new Date(cls.starts_at).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -1774,33 +1775,37 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
       hour12: false,
       timeZone: 'Asia/Bangkok',
     })
-    const dateStr = new Date(cls.starts_at).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'Asia/Bangkok',
-    })
     const classImage = getClassImage(cls)
-    const classColor = getClassColor(cls)
+    const classColor = isWaitlist ? '#f59e0b' : getClassColor(cls)
     const hoursUntil = isUpcoming ? (new Date(cls.starts_at) - Date.now()) / (1000 * 60 * 60) : 0
     const isLate = hoursUntil <= 24
 
     const isClassCancelled = cls.status === 'cancelled'
-    const statusColors = {
-      cancelled: 'destructive',
-      confirmed: 'secondary',
-    }
+    const isCancelled = !isWaitlist && (b.status === 'cancelled' || isClassCancelled)
+    const isConfirmed = !isWaitlist && b.status === 'confirmed' && !isClassCancelled
+
+    // Status pill config
+    const statusPill = isWaitlist
+      ? { label: `Waitlist #${b.position}`, className: 'bg-amber-400/10 text-amber-400 border-amber-400/20' }
+      : isClassCancelled
+        ? { label: 'Class Cancelled', className: 'bg-red-400/10 text-red-400 border-red-400/20' }
+        : b.status === 'cancelled'
+          ? { label: b.late_cancel ? 'Cancelled (late)' : 'Cancelled', className: 'bg-red-400/10 text-red-400 border-red-400/20' }
+          : isUpcoming
+            ? { label: 'Confirmed', className: 'bg-green-400/10 text-green-400 border-green-400/20' }
+            : { label: 'Attended', className: 'bg-zinc-400/10 text-zinc-400 border-zinc-400/20' }
 
     return (
       <Card
-        key={b.id}
+        key={cardId}
         className={cn(
           'cursor-pointer transition-colors overflow-hidden relative',
           !isUpcoming && 'opacity-60',
+          isCancelled && isUpcoming && 'opacity-50',
           isExpanded ? 'ring-1 ring-accent/30' : 'hover:border-accent/20'
         )}
-        style={{ borderLeftWidth: '4px', borderLeftColor: classColor }}
-        onClick={() => setExpandedId(isExpanded ? null : b.id)}
+        style={{ borderLeftWidth: '4px', borderLeftColor: isCancelled ? '#ef4444' : classColor }}
+        onClick={() => setExpandedId(isExpanded ? null : cardId)}
       >
         {/* Blended image from right */}
         <div className="absolute top-0 right-0 bottom-0 w-1/3 sm:w-2/5">
@@ -1816,30 +1821,22 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
               <div className="text-[10px] text-muted">{new Date(cls.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok' })}</div>
             </div>
             <div className="shrink-0 w-14 text-center">
-              <div className="text-sm font-bold text-foreground">{startTime}</div>
+              <div className={cn('text-sm font-bold', isCancelled ? 'text-muted line-through' : 'text-foreground')}>{startTime}</div>
               <div className="text-[10px] text-muted">{cls.class_types?.duration_mins || 55}min</div>
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-foreground tracking-tight">
-                {cls.class_types?.name || 'Class'}
-              </h3>
-              <p className="text-xs text-muted mt-0.5">{cls.instructors?.name || 'TBA'}</p>
-              <div className="flex items-center gap-1.5 mt-1">
-                {cls.is_private && (
-                  <Badge className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20">Private</Badge>
-                )}
-                {!isUpcoming && (
-                  <>
-                    {isClassCancelled ? (
-                      <Badge variant="destructive" className="text-[10px]">Class Cancelled</Badge>
-                    ) : (
-                      <Badge variant={statusColors[b.status] || 'secondary'} className="text-[10px] capitalize">
-                        {b.status}{b.late_cancel ? ' (late)' : ''}
-                      </Badge>
-                    )}
-                  </>
-                )}
+              <div className="flex items-center gap-2">
+                <h3 className={cn('font-bold tracking-tight', isCancelled ? 'text-muted' : 'text-foreground')}>
+                  {cls.class_types?.name || 'Class'}
+                </h3>
+                <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0', statusPill.className)}>
+                  {statusPill.label}
+                </span>
               </div>
+              <p className="text-xs text-muted mt-0.5">{cls.instructors?.name || 'TBA'}</p>
+              {cls.is_private && (
+                <Badge className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20 mt-1">Private</Badge>
+              )}
             </div>
             <svg className={cn('w-5 h-5 text-foreground/40 transition-transform shrink-0 z-10', isExpanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -1862,6 +1859,12 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
                     <div className="flex items-center gap-2 px-3 py-2 rounded bg-red-500/10 border border-red-500/20">
                       <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                       <span className="text-xs text-red-400">This class was cancelled by the studio{b.credit_returned ? ' — your credit has been returned' : ''}</span>
+                    </div>
+                  )}
+                  {!isWaitlist && b.status === 'cancelled' && !isClassCancelled && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded bg-red-500/10 border border-red-500/20">
+                      <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      <span className="text-xs text-red-400">You cancelled this booking{b.late_cancel ? ' (late — credit not returned)' : b.credit_returned ? ' — credit returned' : ''}</span>
                     </div>
                   )}
                   <div className="flex items-start gap-4">
@@ -1894,7 +1897,7 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
                         <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.63 8.37m5.96 6a14.926 14.926 0 01-5.84 2.58m0 0a6 6 0 01-7.38-5.84h4.8" /></svg>Share</>
                       )}
                     </button>
-                    {isUpcoming && (
+                    {isUpcoming && isConfirmed && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted">
                           {isLate ? 'Credit will not be returned' : 'Free cancellation'}
@@ -1918,6 +1921,23 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
                           {cancelling === b.id ? 'Cancelling...' : 'Cancel'}
                         </Button>
                       </div>
+                    )}
+                    {isWaitlist && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/waitlist/leave', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ classScheduleId: cls.id }),
+                            })
+                            if (res.ok) onUpdate()
+                          } catch {}
+                        }}
+                        className="text-xs text-muted hover:text-red-400 transition-colors"
+                      >
+                        Leave Waitlist
+                      </button>
                     )}
                   </div>
                 </div>
@@ -1964,66 +1984,24 @@ function BookingsSection({ upcoming, past, waitlist = [], onUpdate }) {
 
       <h2 className="text-lg font-bold text-foreground mb-4">My Bookings</h2>
 
-      {/* Waitlist positions (F1) */}
-      {waitlist.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-muted mb-2">Waitlisted ({waitlist.length})</h3>
-          <div className="space-y-2">
-            {waitlist.map((w) => {
-              const cls = w.class_schedule
-              if (!cls) return null
-              const startTime = new Date(cls.starts_at).toLocaleTimeString('en-US', {
-                hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok',
-              })
-              const dateStr = new Date(cls.starts_at).toLocaleDateString('en-US', {
-                weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Bangkok',
-              })
-              return (
-                <Card key={w.id} className="border-l-4" style={{ borderLeftColor: '#f59e0b' }}>
-                  <CardContent className="p-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Badge className="bg-amber-400/10 text-amber-400 border border-amber-400/20 text-[10px] shrink-0">
-                        #{w.position}
-                      </Badge>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{cls.class_types?.name || 'Class'}</p>
-                        <p className="text-xs text-muted">{dateStr} at {startTime} &middot; {cls.instructors?.name || 'TBA'}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const res = await fetch('/api/waitlist/leave', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ classScheduleId: cls.id }),
-                          })
-                          if (res.ok) onUpdate()
-                        } catch {}
-                      }}
-                      className="text-xs text-muted hover:text-red-400 transition-colors shrink-0"
-                    >
-                      Leave
-                    </button>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {upcoming.length === 0 && past.length === 0 ? (
-        waitlist.length === 0 && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted">No bookings yet. Book a class above to get started!</p>
-            </CardContent>
-          </Card>
-        )
+      {upcoming.length === 0 && past.length === 0 && waitlist.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted">No bookings yet. Book a class above to get started!</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-2">
+          {/* Confirmed and cancelled (future) bookings */}
           {upcoming.map((b) => renderBookingCard(b, { isUpcoming: true }))}
+
+          {/* Waitlisted under confirmed, same card style */}
+          {waitlist.length > 0 && (
+            <>
+              <p className="text-xs font-medium text-muted pt-2">Waitlisted ({waitlist.length})</p>
+              {waitlist.map((w) => renderBookingCard(w, { isUpcoming: true, isWaitlist: true }))}
+            </>
+          )}
 
           {past.length > 0 && (
             <>

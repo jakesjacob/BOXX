@@ -182,13 +182,14 @@ export async function GET() {
       (w) => w.class_schedule?.status === 'active' && new Date(w.class_schedule.starts_at) > new Date()
     )
 
-    // Separate bookings into upcoming and past
+    // Separate bookings: active = class date in future, past = class date has passed
     const allBookings = bookingsRes.data || []
+    const currentTime = new Date()
     const upcomingBookings = allBookings.filter(
-      (b) => b.status === 'confirmed' && new Date(b.class_schedule?.starts_at) > new Date()
+      (b) => new Date(b.class_schedule?.starts_at) > currentTime
     )
     const pastBookings = allBookings.filter(
-      (b) => b.status !== 'confirmed' || new Date(b.class_schedule?.starts_at) <= new Date()
+      (b) => new Date(b.class_schedule?.starts_at) <= currentTime
     )
 
     return NextResponse.json({
