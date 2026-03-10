@@ -40,6 +40,10 @@ Use Tailwind classes mapped to these CSS variables — do not use raw hex values
 
 Full brand doc at `docs/brand-reference.md` — includes founder bio, class descriptions, testimonials, contact info, and image inventory.
 
+## Task Tracking
+
+All task tracking lives in **`docs/dev-spec.md`** — this is the single source of truth. Read it at the start of each session and update it after completing features.
+
 ## Key Conventions
 
 - JavaScript only (no TypeScript)

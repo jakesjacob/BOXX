@@ -1,6 +1,6 @@
 # BOXX Development Spec & Progress Tracker
 
-> Last updated: 2026-03-09 (post technical PM review)
+> Last updated: 2026-03-10
 
 ---
 
@@ -225,13 +225,15 @@ All email templates live in `src/lib/email.js` (Resend, branded dark HTML).
 | 10 | Class cancelled by admin | Admin cancels a class | Notify all booked members |
 | 11 | Pack purchase confirmation | Stripe webhook payment success | Send from `/api/stripe/webhook` |
 | 12 | Credits low warning | Credit drops to 1 remaining | Could be in booking create or cron |
-| 13 | Admin direct email | Admin sends message to member | Needs compose UI + API on Emails page |
+| 13 | Admin direct email | Admin sends message to member | Done — compose UI on Emails page + engagement widget reminder |
 | 14 | Password reset | User requests reset | Needs forgot-password flow + token |
 | 15 | Admin removes from class | Admin removes member via roster | Notify the removed member |
 | 16 | Admin cancels booking | Admin cancels on behalf of member | Notify the member |
 
 ### Dashboard Enhancements
 - [x] **Today's classes** — schedule-style cards on admin dashboard (colored border, time range, capacity bar, clickable to schedule page)
+- [x] **Member engagement widget** — two tabs: "At Risk" (inactive 14+ days with credits, one-click email reminder) + "Top Members" (leaderboard, last 30 days)
+- [x] **Revenue widget admin-only** — hidden from employee role
 - [ ] Password reset / forgot password flow (token-based, email link)
 - [ ] Google account linking (merge email + Google accounts)
 
@@ -259,8 +261,8 @@ All email templates live in `src/lib/email.js` (Resend, branded dark HTML).
 - [ ] **404 page**
 
 ### Member Dashboard Gaps
-- [ ] **Waitlist UI in dashboard** — backend exists but member can't see their waitlist positions
-- [ ] **Calendar view** — referenced in member dashboard tabs but not rendered
+- [x] **Waitlist UI in dashboard** — backend exists but member can't see their waitlist positions
+- [x] **Calendar view** — referenced in member dashboard tabs but not rendered
 
 ### Quality
 - [ ] Mobile QA pass on all member pages
@@ -457,3 +459,34 @@ All email templates live in `src/lib/email.js` (Resend, branded dark HTML).
 - ~~open new tab when logging in~~ → K6
 - ~~change location of toast message on the public app~~ (done — member dashboard + buy-classes toasts moved to fixed bottom-right floating)
 - ~~Freeze member instead of deactivate is better~~ → K5
+
+---
+
+## POST-BATCH POLISH (2026-03-10)
+
+> UI/UX improvements, engagement features, and fixes applied after BUILD BATCH 1.
+
+### Activity Page
+- [x] **Enriched admin events** — human-readable details (e.g., "Removed Sarah from BOXXBEGINNER" instead of "Removed member from class")
+- [x] **Batch-resolved audit log** — old entries missing enriched JSONB get backfilled via batch lookups at read time
+
+### My Bookings & Schedule
+- [x] **Private class colors** — use admin-set class type color from DB, fallback to name-based detection (`private`, `1:1`, `personal`)
+- [x] **Private class card image** — uses `pt-session.webp` instead of generic class images
+- [x] **Google Calendar button** — teal pill with calendar+plus icon, "Add" label, only shown for Google OAuth users
+- [x] **Calendar button layout** — next to Share button, cancellation info on separate row below
+- [x] **Default to list view** — schedule defaults to card list instead of calendar, toggle icons swapped
+
+### Buy Packs Page
+- [x] **Equal height cards** — CSS grid with `h-full` + `flex-1` for consistent card heights
+- [x] **Mobile 2x2 grid** — `min-[400px]:grid-cols-2`, stacked vertically on very small screens
+- [x] **Removed "Most Popular" from single class** — only multi-credit packs get the badge
+
+### Gamification
+- [x] **Widget always visible** — shows even with 0 classes attended (was hidden for new members)
+
+### Admin Dashboard
+- [x] **Revenue widget admin-only** — hidden from employee role, employees see 3 stat cards
+- [x] **Member engagement widget** — full-width, two tabs:
+  - **At Risk:** members with active credits but no bookings in 14+ days, "Never booked" badge, one-click "Remind" email button
+  - **Top Members:** leaderboard of most active members by bookings in last 30 days (gold/silver/bronze styling)
