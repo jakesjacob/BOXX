@@ -82,39 +82,34 @@ export async function POST(request) {
       .eq('id', classId)
       .single()
 
-    if (rosterClass?.is_private) {
-      const { data: addedUser } = await supabaseAdmin
-        .from('users')
-        .select('email, name')
-        .eq('id', userId)
-        .single()
+    const { data: addedUser } = await supabaseAdmin
+      .from('users')
+      .select('email, name')
+      .eq('id', userId)
+      .single()
 
-      if (addedUser?.email) {
-        const startDate = new Date(rosterClass.starts_at)
-        sendPrivateClassInvitation({
-          to: addedUser.email,
-          name: addedUser.name,
-          className: rosterClass.class_types?.name || 'Private Session',
-          instructor: rosterClass.instructors?.name,
-          date: startDate.toLocaleDateString('en-US', {
-            weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
-          }),
-          time: startDate.toLocaleTimeString('en-US', {
-            hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Bangkok',
-          }),
-        }).catch((err) => console.error('[admin/roster] Invitation email failed:', err))
-      }
+    if (addedUser?.email) {
+      const startDate = new Date(rosterClass.starts_at)
+      sendPrivateClassInvitation({
+        to: addedUser.email,
+        name: addedUser.name,
+        className: rosterClass.class_types?.name || 'BOXX Class',
+        instructor: rosterClass.instructors?.name,
+        date: startDate.toLocaleDateString('en-US', {
+          weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
+        }),
+        time: startDate.toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Bangkok',
+        }),
+      }).catch((err) => console.error('[admin/roster] Invitation email failed:', err))
     }
 
     // Look up member + class info for audit details (reuse rosterClass if available)
     let auditClassName = rosterClass?.class_types?.name || 'Unknown class'
     let auditClassDate = rosterClass?.starts_at || null
-    let auditMemberName = null
-    let auditMemberEmail = null
-    if (rosterClass?.is_private && addedUser) {
-      auditMemberName = addedUser.name
-      auditMemberEmail = addedUser.email
-    } else {
+    let auditMemberName = addedUser?.name || null
+    let auditMemberEmail = addedUser?.email || null
+    if (!auditMemberName) {
       const { data: auditUser } = await supabaseAdmin
         .from('users')
         .select('name, email')
