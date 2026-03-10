@@ -159,8 +159,92 @@ export async function GET(request) {
       }
 
       const { data } = await q
-      ;(data || []).forEach((log) => {
+      const logs = data || []
+
+      // Batch-resolve missing names from old audit entries that lack enriched details
+      // Collect IDs we need to look up
+      const bookingIdsToResolve = new Set()
+      const userIdsToResolve = new Set()
+      const classIdsToResolve = new Set()
+      const classTypeIdsToResolve = new Set()
+
+      for (const log of logs) {
         const d = log.details || {}
+        const needsMember = !d.memberName && ['admin_add_to_class', 'admin_remove_from_class', 'admin_remove_from_waitlist', 'booking_cancel', 'edit_member', 'freeze_member', 'grant_credits'].includes(log.action)
+        const needsClass = !d.className && ['admin_add_to_class', 'admin_remove_from_class', 'admin_remove_from_waitlist', 'booking_cancel', 'create_class', 'update_class', 'update_recurring_classes', 'cancel_class', 'cancel_recurring_classes', 'create_recurring_classes', 'notify_class_change'].includes(log.action)
+
+        if (needsMember && log.target_id) {
+          if (log.target_type === 'booking') bookingIdsToResolve.add(log.target_id)
+          if (log.target_type === 'user' || log.target_type === 'user_credits') userIdsToResolve.add(log.target_id)
+          // For user_credits, target_id is the credit ID — also check details.userId
+          if (d.userId) userIdsToResolve.add(d.userId)
+        }
+        if (needsClass && log.target_id) {
+          if (log.target_type === 'class_schedule') classIdsToResolve.add(log.target_id)
+          if (log.target_type === 'booking') bookingIdsToResolve.add(log.target_id)
+          // For roster actions, classId might be in details
+          if (d.classId) classIdsToResolve.add(d.classId)
+        }
+        if (!d.name && !d.classTypeName && log.target_type === 'class_types' && log.target_id) {
+          classTypeIdsToResolve.add(log.target_id)
+        }
+      }
+
+      // Batch lookups (only if needed)
+      const [resolvedBookings, resolvedUsers, resolvedClasses, resolvedClassTypes] = await Promise.all([
+        bookingIdsToResolve.size > 0
+          ? supabaseAdmin.from('bookings').select('id, user_id, class_schedule_id, users(name, email), class_schedule(starts_at, class_types(name))').in('id', [...bookingIdsToResolve]).then(r => r.data || [])
+          : [],
+        userIdsToResolve.size > 0
+          ? supabaseAdmin.from('users').select('id, name, email').in('id', [...userIdsToResolve]).then(r => r.data || [])
+          : [],
+        classIdsToResolve.size > 0
+          ? supabaseAdmin.from('class_schedule').select('id, starts_at, class_types(name), instructors(name)').in('id', [...classIdsToResolve]).then(r => r.data || [])
+          : [],
+        classTypeIdsToResolve.size > 0
+          ? supabaseAdmin.from('class_types').select('id, name').in('id', [...classTypeIdsToResolve]).then(r => r.data || [])
+          : [],
+      ])
+
+      // Build lookup maps
+      const bookingMap = Object.fromEntries(resolvedBookings.map(b => [b.id, b]))
+      const userMap = Object.fromEntries(resolvedUsers.map(u => [u.id, u]))
+      const classMap = Object.fromEntries(resolvedClasses.map(c => [c.id, c]))
+      const classTypeMap = Object.fromEntries(resolvedClassTypes.map(ct => [ct.id, ct]))
+
+      logs.forEach((log) => {
+        const d = { ...(log.details || {}) }
+
+        // Backfill missing names from resolved data
+        if (!d.memberName) {
+          if (log.target_type === 'booking' && bookingMap[log.target_id]) {
+            const b = bookingMap[log.target_id]
+            d.memberName = b.users?.name
+            d.memberEmail = d.memberEmail || b.users?.email
+          } else if ((log.target_type === 'user' || log.target_type === 'user_credits') && log.target_id) {
+            const lookupId = d.userId || log.target_id
+            const u = userMap[lookupId]
+            if (u) {
+              d.memberName = u.name
+              d.memberEmail = d.memberEmail || u.email
+            }
+          }
+        }
+        if (!d.className) {
+          if (log.target_type === 'booking' && bookingMap[log.target_id]) {
+            d.className = bookingMap[log.target_id].class_schedule?.class_types?.name
+          } else if (log.target_type === 'class_schedule' && classMap[log.target_id]) {
+            d.className = classMap[log.target_id].class_types?.name
+            d.instructorName = d.instructorName || classMap[log.target_id].instructors?.name
+          } else if (d.classId && classMap[d.classId]) {
+            d.className = classMap[d.classId].class_types?.name
+          }
+        }
+        if (!d.name && !d.classTypeName && log.target_type === 'class_types' && classTypeMap[log.target_id]) {
+          d.name = classTypeMap[log.target_id].name
+          d.classTypeName = classTypeMap[log.target_id].name
+        }
+
         const actionLabels = {
           'booking_cancel': 'Cancelled booking',
           'create_class': 'Created class',
@@ -181,7 +265,7 @@ export async function GET(request) {
           'send_direct_email': 'Sent email',
         }
 
-        // Build a human-readable detail string from the details JSONB
+        // Build a human-readable detail string from the (backfilled) details
         let detail = ''
         switch (log.action) {
           case 'admin_add_to_class':
@@ -242,7 +326,7 @@ export async function GET(request) {
           detail,
           user: log.users ? { id: log.admin_id, name: log.users.name, email: log.users.email, avatar_url: log.users.avatar_url } : null,
           timestamp: log.created_at,
-          meta: log.details,
+          meta: d,
         })
       })
     }
