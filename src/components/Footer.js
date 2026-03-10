@@ -172,9 +172,17 @@ export default function Footer() {
             <p className="text-[11px] text-white/15 tracking-wider">
               &copy; {new Date().getFullYear()} BOXX Boxing Studio. All rights reserved.
             </p>
-            <p className="text-[11px] text-white/15 tracking-[0.3em]">
-              #BOXXCNX
-            </p>
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" target="_blank" className="text-[11px] text-white/15 hover:text-accent transition-colors duration-300 tracking-wider">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" target="_blank" className="text-[11px] text-white/15 hover:text-accent transition-colors duration-300 tracking-wider">
+                Terms &amp; Conditions
+              </Link>
+              <p className="text-[11px] text-white/15 tracking-[0.3em]">
+                #BOXXCNX
+              </p>
+            </div>
           </div>
         </div>
       </div>
