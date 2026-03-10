@@ -5,6 +5,7 @@
 -- ─────────────────────────────────────
 
 -- ─── CLEAN UP (safe — only removes seed data) ────
+-- 1. Waitlist + bookings referencing seed schedule
 DELETE FROM waitlist WHERE class_schedule_id::text LIKE 'c0000%' OR class_schedule_id::text LIKE 'c9990%';
 DELETE FROM bookings WHERE class_schedule_id::text LIKE 'c0000%' OR class_schedule_id::text LIKE 'c9990%';
 DELETE FROM bookings WHERE user_id IN (
@@ -14,7 +15,14 @@ DELETE FROM bookings WHERE user_id IN (
   'd4444444-4444-4444-4444-444444444444',
   'd5555555-5555-5555-5555-555555555555'
 );
+-- 2. Seed schedule entries
 DELETE FROM class_schedule WHERE id::text LIKE 'c0000%' OR id::text LIKE 'c9990%';
+-- 3. ALL schedule entries referencing seed instructors/class_types (admin-created ones too)
+DELETE FROM waitlist WHERE class_schedule_id IN (SELECT id FROM class_schedule WHERE instructor_id IN ('b1111111-1111-1111-1111-111111111111','b2222222-2222-2222-2222-222222222222','b3333333-3333-3333-3333-333333333333'));
+DELETE FROM bookings WHERE class_schedule_id IN (SELECT id FROM class_schedule WHERE instructor_id IN ('b1111111-1111-1111-1111-111111111111','b2222222-2222-2222-2222-222222222222','b3333333-3333-3333-3333-333333333333'));
+DELETE FROM class_schedule WHERE instructor_id IN ('b1111111-1111-1111-1111-111111111111','b2222222-2222-2222-2222-222222222222','b3333333-3333-3333-3333-333333333333');
+DELETE FROM class_schedule WHERE class_type_id IN ('a1111111-1111-1111-1111-111111111111','a2222222-2222-2222-2222-222222222222','a3333333-3333-3333-3333-333333333333','a4444444-4444-4444-4444-444444444444','a5555555-5555-5555-5555-555555555555');
+-- 4. Credits, users, instructors, class types
 DELETE FROM user_credits WHERE stripe_payment_id LIKE 'seed_%' OR stripe_payment_id LIKE 'direct_%' OR stripe_payment_id LIKE 'bert_seed_%' OR stripe_payment_id LIKE 'test_seed_%' OR stripe_payment_id LIKE 'seed_j_%' OR stripe_payment_id LIKE 'seed_b_%' OR stripe_payment_id LIKE 'seed_t_%';
 DELETE FROM users WHERE email IN ('sarah@example.com','tom@example.com','mia@example.com','jake@example.com','luna@example.com','bertduff@gmail.com','test@boxxthailand.com');
 DELETE FROM instructors WHERE id IN (
