@@ -126,6 +126,7 @@ export default function Hero() {
         >
           <Link
             href="/book"
+            target="_blank"
             className="px-14 py-6 bg-cta text-[#0a0a0a] text-sm tracking-[0.2em] uppercase font-semibold hover:bg-cta-hover transition-all duration-500 text-center"
           >
             Book a Class

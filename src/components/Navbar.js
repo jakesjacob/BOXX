@@ -156,6 +156,7 @@ export default function Navbar() {
 
             <Link
               href="/book"
+              target="_blank"
               className="ml-2 px-8 py-3.5 text-xs tracking-[0.2em] uppercase bg-cta text-[#0a0a0a] font-semibold hover:bg-cta-hover transition-colors duration-300"
             >
               Book a Class
@@ -163,6 +164,7 @@ export default function Navbar() {
 
             <Link
               href={session ? '/dashboard' : '/login'}
+              target="_blank"
               className="ml-2 px-6 py-3.5 text-xs tracking-[0.2em] uppercase border border-white/20 hover:border-white/40 text-white/70 hover:text-white transition-all duration-300"
             >
               {session ? 'My Account' : 'Log In'}
@@ -244,6 +246,7 @@ export default function Navbar() {
               >
                 <Link
                   href="/book"
+                  target="_blank"
                   onClick={() => setMobileOpen(false)}
                   className="px-10 py-4 text-sm tracking-[0.2em] uppercase bg-cta text-[#0a0a0a] font-semibold"
                 >
@@ -251,6 +254,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href={session ? '/dashboard' : '/login'}
+                  target="_blank"
                   onClick={() => setMobileOpen(false)}
                   className="px-10 py-4 text-sm tracking-[0.2em] uppercase border border-white/20 text-white/70"
                 >

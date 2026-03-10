@@ -136,6 +136,7 @@ function ClassCard({ cls, index, isExpanded, onToggle }) {
               <div className="pt-3">
                 <Link
                   href="/book"
+                  target="_blank"
                   onClick={(e) => e.stopPropagation()}
                   className="text-xs tracking-[0.2em] uppercase text-accent hover:text-accent-dim transition-colors"
                 >

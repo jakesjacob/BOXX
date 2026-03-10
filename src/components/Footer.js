@@ -108,6 +108,7 @@ export default function Footer() {
                       ) : link.route ? (
                         <Link
                           href={link.href}
+                          target="_blank"
                           className="text-sm text-white/40 hover:text-accent transition-colors duration-300"
                         >
                           {link.name}
