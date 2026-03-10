@@ -163,13 +163,13 @@ function BuyClassesContent() {
 
       {/* Pack cards */}
       {loading ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-80 bg-card border border-card-border rounded-xl animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
           {packs.map((pack, idx) => {
             const isIntro = pack.is_intro
             const isMembership = pack.is_membership
