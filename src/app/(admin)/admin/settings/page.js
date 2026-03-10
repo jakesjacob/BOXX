@@ -496,9 +496,13 @@ function SeoTab() {
             <div className="mt-4 p-4 rounded-lg bg-background/50 border border-card-border/50">
               <p className="text-[10px] uppercase tracking-wider text-muted mb-2">Social Share Preview</p>
               <div className="rounded border border-card-border overflow-hidden max-w-sm">
-                <div className="h-32 bg-card-border flex items-center justify-center text-muted text-xs">
-                  {form.seo_og_image ? 'Image loaded above' : 'Auto-generated image'}
-                </div>
+                {form.seo_og_image ? (
+                  <img src={form.seo_og_image} alt="Share preview" className="w-full aspect-[1200/630] object-cover" onError={(e) => { e.target.style.display = 'none' }} />
+                ) : (
+                  <div className="h-32 bg-card-border flex items-center justify-center text-muted text-xs">
+                    Auto-generated image
+                  </div>
+                )}
                 <div className="p-3 bg-card">
                   <p className="text-xs text-muted truncate">{form.seo_url || 'boxxthailand.com'}</p>
                   <p className="text-sm font-semibold text-foreground mt-0.5 truncate">{form.seo_og_title || 'Page title'}</p>
