@@ -396,3 +396,20 @@ BEGIN
     updated_at = now();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─────────────────────────────────────
+-- PAGE VIEW ANALYTICS
+-- ─────────────────────────────────────
+CREATE TABLE page_views (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  path         TEXT NOT NULL,
+  referrer     TEXT,
+  utm_source   TEXT,
+  utm_medium   TEXT,
+  utm_campaign TEXT,
+  device_type  TEXT DEFAULT 'desktop',
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_page_views_created_at ON page_views(created_at DESC);
+CREATE INDEX idx_page_views_path ON page_views(path);

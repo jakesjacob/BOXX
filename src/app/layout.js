@@ -1,6 +1,7 @@
 import { Geist } from "next/font/google";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import Providers from "./providers";
+import Analytics from "@/components/Analytics";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -80,6 +81,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${geistSans.variable} font-sans antialiased`}>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );

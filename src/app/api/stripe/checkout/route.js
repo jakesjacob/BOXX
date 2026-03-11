@@ -108,10 +108,12 @@ export async function POST(request) {
     }
 
     // Create Checkout Session
+    // allow_promotion_codes lets customers enter Stripe promo codes at checkout
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: pack.is_membership ? 'subscription' : 'payment',
       customer: customerId,
       line_items: [{ price: pack.stripe_price_id, quantity: 1 }],
+      allow_promotion_codes: true,
       metadata: {
         userId: session.user.id,
         packId: pack.id,

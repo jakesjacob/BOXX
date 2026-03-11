@@ -266,6 +266,44 @@ export default function AdminPacksPage() {
         </div>
       )}
 
+      {/* Promo Codes Guide */}
+      <div className="mt-8 border border-card-border rounded-lg bg-card p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-base">🏷️</span>
+          <h2 className="text-sm font-semibold text-foreground">Promo Codes</h2>
+        </div>
+        <p className="text-sm text-muted mb-3">
+          Promo codes are managed through your Stripe Dashboard. When a customer checks out, they can enter a promo code to get a discount.
+        </p>
+        <div className="space-y-2 text-sm text-muted">
+          <div className="flex items-start gap-2">
+            <span className="text-accent font-bold mt-0.5 shrink-0">1.</span>
+            <span>Go to your <a href="https://dashboard.stripe.com/coupons" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Stripe Dashboard &rarr; Coupons</a></span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-accent font-bold mt-0.5 shrink-0">2.</span>
+            <span>Click <strong className="text-foreground">&quot;+ New&quot;</strong> to create a coupon (e.g. 20% off, or ฿500 off)</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-accent font-bold mt-0.5 shrink-0">3.</span>
+            <span>Under the coupon, click <strong className="text-foreground">&quot;Add promotion code&quot;</strong> to create a customer-facing code (e.g. <code className="text-accent bg-accent/10 px-1.5 py-0.5 rounded text-xs">WELCOME20</code>)</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-accent font-bold mt-0.5 shrink-0">4.</span>
+            <span>Set limits: max redemptions, first-time customers only, specific products, expiry date</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-accent font-bold mt-0.5 shrink-0">5.</span>
+            <span>Share the code with your members — they&apos;ll see a <strong className="text-foreground">&quot;Add promotion code&quot;</strong> field on the checkout page</span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-card-border">
+          <p className="text-xs text-muted">
+            All promo code usage, redemptions, and revenue impact are tracked automatically in your Stripe Dashboard under Coupons &rarr; Promotion Codes.
+          </p>
+        </div>
+      </div>
+
       {/* Delete Confirmation */}
       <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
         <DialogContent className="sm:max-w-sm" onOpenAutoFocus={(e) => e.preventDefault()}>
