@@ -358,3 +358,41 @@ BEGIN
     AND credits_remaining IS NOT NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─────────────────────────────────────
+-- AGENT USAGE TRACKING
+-- ─────────────────────────────────────
+CREATE TABLE agent_usage (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  month           TEXT NOT NULL,
+  input_tokens    BIGINT DEFAULT 0,
+  output_tokens   BIGINT DEFAULT 0,
+  cost_usd        NUMERIC(10,6) DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, month)
+);
+
+CREATE INDEX idx_agent_usage_user_month ON agent_usage(user_id, month);
+
+-- Atomically increment agent usage counters (avoids race conditions)
+CREATE OR REPLACE FUNCTION increment_agent_usage(
+  p_user_id UUID,
+  p_month TEXT,
+  p_input_tokens BIGINT,
+  p_output_tokens BIGINT,
+  p_cost NUMERIC
+)
+RETURNS VOID AS $$
+BEGIN
+  INSERT INTO agent_usage (user_id, month, input_tokens, output_tokens, cost_usd)
+  VALUES (p_user_id, p_month, p_input_tokens, p_output_tokens, p_cost)
+  ON CONFLICT (user_id, month)
+  DO UPDATE SET
+    input_tokens = agent_usage.input_tokens + EXCLUDED.input_tokens,
+    output_tokens = agent_usage.output_tokens + EXCLUDED.output_tokens,
+    cost_usd = agent_usage.cost_usd + EXCLUDED.cost_usd,
+    updated_at = now();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -3,8 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { getSuggestions } from '@/lib/agent/memory'
 import { getUsage } from '@/lib/agent/usage'
-
-const MAX_CONVERSATIONS = 50
+import { enforceConversationCap } from '@/lib/agent/conversations'
 
 /**
  * GET /api/admin/agent/conversations — List conversations + dynamic suggestions
@@ -21,7 +20,7 @@ export async function GET() {
       .select('id, title, created_at, updated_at')
       .eq('user_id', session.user.id)
       .order('updated_at', { ascending: false })
-      .limit(MAX_CONVERSATIONS)
+      .limit(50)
 
     const [suggestions, usage] = await Promise.all([
       getSuggestions(session.user.id),
@@ -49,27 +48,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Enforce conversation cap — delete oldest if at limit
-    const { count } = await supabaseAdmin
-      .from('agent_conversations')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', session.user.id)
-
-    if (count >= MAX_CONVERSATIONS) {
-      const { data: oldest } = await supabaseAdmin
-        .from('agent_conversations')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .order('updated_at', { ascending: true })
-        .limit(count - MAX_CONVERSATIONS + 1)
-
-      if (oldest?.length) {
-        await supabaseAdmin
-          .from('agent_conversations')
-          .delete()
-          .in('id', oldest.map((c) => c.id))
-      }
-    }
+    await enforceConversationCap(session.user.id)
 
     const body = await request.json().catch(() => ({}))
 

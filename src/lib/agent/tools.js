@@ -54,7 +54,6 @@ export const AGENT_TOOLS = [
         class_type: { type: 'string', description: 'Name of the class type to find' },
         date: { type: 'string', description: 'Date of the class (YYYY-MM-DD)' },
         start_time: { type: 'string', description: 'Start time (HH:MM) to disambiguate if multiple classes that day' },
-        cancel_all_recurring: { type: 'boolean', description: 'If true, cancels all future recurring instances too' },
       },
       required: ['class_type', 'date'],
     },

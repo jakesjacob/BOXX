@@ -7,11 +7,11 @@ import { executeTool } from '@/lib/agent/executor'
 import { rateLimit } from '@/lib/rate-limit'
 import { updateMemory } from '@/lib/agent/memory'
 import { checkUsageLimit, trackUsage, getUsage } from '@/lib/agent/usage'
+import { enforceConversationCap } from '@/lib/agent/conversations'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const DAILY_MESSAGE_LIMIT = 200
-const MAX_CONVERSATIONS = 50
 
 /**
  * Build system prompt with live studio context (class types, instructors, packs)
@@ -73,8 +73,9 @@ ${packs || '(none configured)'}
  * Check daily message usage for a user
  */
 async function checkDailyLimit(userId) {
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  // Use Bangkok timezone for daily reset
+  const bangkokDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+  const todayStart = new Date(`${bangkokDate}T00:00:00+07:00`)
 
   // Get user's conversation IDs
   const { data: convos } = await supabaseAdmin
@@ -154,24 +155,7 @@ export async function POST(request) {
 
     try {
       if (newConversation || !convoId) {
-        // Enforce conversation cap
-        const { count } = await supabaseAdmin
-          .from('agent_conversations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', session.user.id)
-
-        if (count >= MAX_CONVERSATIONS) {
-          const { data: oldest } = await supabaseAdmin
-            .from('agent_conversations')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .order('updated_at', { ascending: true })
-            .limit(count - MAX_CONVERSATIONS + 1)
-
-          if (oldest?.length) {
-            await supabaseAdmin.from('agent_conversations').delete().in('id', oldest.map((c) => c.id))
-          }
-        }
+        await enforceConversationCap(session.user.id)
 
         const { data: convo } = await supabaseAdmin
           .from('agent_conversations')
@@ -211,6 +195,12 @@ export async function POST(request) {
     const systemPrompt = await buildSystemPrompt(session.user.name)
     const context = { adminId: session.user.id, adminName: session.user.name }
 
+    // Truncate message history to last 40 messages to prevent unbounded token growth
+    const MAX_HISTORY = 40
+    const truncatedMessages = messages.length > MAX_HISTORY
+      ? messages.slice(-MAX_HISTORY)
+      : messages
+
     // Track total tokens across all API calls
     let totalInputTokens = 0
     let totalOutputTokens = 0
@@ -221,7 +211,7 @@ export async function POST(request) {
       max_tokens: 1024,
       system: systemPrompt,
       tools: AGENT_TOOLS,
-      messages,
+      messages: truncatedMessages,
     })
 
     totalInputTokens += response.usage?.input_tokens || 0
@@ -255,7 +245,7 @@ export async function POST(request) {
         system: systemPrompt,
         tools: AGENT_TOOLS,
         messages: [
-          ...messages,
+          ...truncatedMessages,
           { role: 'assistant', content: response.content },
           { role: 'user', content: toolResultMessages },
         ],

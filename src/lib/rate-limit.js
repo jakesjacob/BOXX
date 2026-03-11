@@ -1,7 +1,9 @@
 /**
- * Simple in-memory rate limiter for API routes
- * Suitable for single-instance deployments (Vercel serverless has per-invocation memory,
- * so this protects against rapid-fire requests within the same instance)
+ * In-memory burst rate limiter for API routes.
+ * NOTE: On Vercel serverless, each cold start gets fresh memory, so this only
+ * protects against rapid-fire requests within the same warm instance. It is NOT
+ * a reliable rate limiter for sustained attacks. The real protection comes from
+ * database-backed limits (daily message limit, monthly cost limit in agent_usage).
  */
 const buckets = new Map()
 

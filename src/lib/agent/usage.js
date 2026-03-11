@@ -11,7 +11,8 @@ const OUTPUT_COST = 5.00 / 1_000_000  // $5.00 per 1M output tokens
 const MONTHLY_LIMIT_USD = 2.00
 
 function currentMonth() {
-  return new Date().toISOString().slice(0, 7) // '2026-03'
+  // Use Bangkok timezone so the month resets at midnight Bangkok time
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).slice(0, 7)
 }
 
 /**
@@ -65,41 +66,23 @@ export async function checkUsageLimit(userId) {
 
 /**
  * Record token usage after an API call.
- * Uses upsert to atomically increment counters.
+ * Uses atomic RPC to avoid race conditions with concurrent requests.
  */
 export async function trackUsage(userId, inputTokens, outputTokens) {
   const month = currentMonth()
   const cost = calculateCost(inputTokens, outputTokens)
 
   try {
-    // Try to increment existing row
-    const { data: existing } = await supabaseAdmin
-      .from('agent_usage')
-      .select('id, input_tokens, output_tokens, cost_usd')
-      .eq('user_id', userId)
-      .eq('month', month)
-      .single()
+    const { error } = await supabaseAdmin.rpc('increment_agent_usage', {
+      p_user_id: userId,
+      p_month: month,
+      p_input_tokens: inputTokens,
+      p_output_tokens: outputTokens,
+      p_cost: cost,
+    })
 
-    if (existing) {
-      await supabaseAdmin
-        .from('agent_usage')
-        .update({
-          input_tokens: existing.input_tokens + inputTokens,
-          output_tokens: existing.output_tokens + outputTokens,
-          cost_usd: parseFloat(existing.cost_usd) + cost,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id)
-    } else {
-      await supabaseAdmin
-        .from('agent_usage')
-        .insert({
-          user_id: userId,
-          month,
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          cost_usd: cost,
-        })
+    if (error) {
+      console.error('[agent/usage] RPC error:', error.message)
     }
   } catch (err) {
     console.error('[agent/usage] Track error:', err.message)

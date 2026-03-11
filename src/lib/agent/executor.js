@@ -586,12 +586,17 @@ async function addMemberToClass(input, context) {
 }
 
 async function searchMembers(input) {
-  const { data: members } = await supabaseAdmin
+  const q = input.query.toLowerCase()
+
+  // Fetch all members and filter in JS to avoid PostgREST .or() injection issues
+  const { data: allMembers } = await supabaseAdmin
     .from('users')
     .select('id, name, email, role, created_at')
-    .or(`name.ilike.%${input.query}%,email.ilike.%${input.query}%`)
     .order('name')
-    .limit(10)
+
+  const members = (allMembers || []).filter(
+    (m) => m.name?.toLowerCase().includes(q) || m.email?.toLowerCase().includes(q)
+  ).slice(0, 10)
 
   if (!members?.length) {
     return { success: true, data: { message: `No members found matching "${input.query}".`, members: [] } }
@@ -606,22 +611,29 @@ async function searchMembers(input) {
     .eq('status', 'active')
     .gt('expires_at', new Date().toISOString())
 
-  const creditMap = {}
+  const creditMap = {}     // total finite credits
+  const unlimitedSet = new Set() // users with unlimited packs
   ;(credits || []).forEach((c) => {
-    creditMap[c.user_id] = (creditMap[c.user_id] || 0) + (c.credits_remaining || 0)
+    if (c.credits_remaining === null) {
+      unlimitedSet.add(c.user_id)
+    } else {
+      creditMap[c.user_id] = (creditMap[c.user_id] || 0) + c.credits_remaining
+    }
   })
+
+  const hasCredits = (id) => unlimitedSet.has(id) || (creditMap[id] || 0) > 0
 
   const results = members
     .filter((m) => {
-      if (input.has_credits === 'yes') return (creditMap[m.id] || 0) > 0
-      if (input.has_credits === 'no') return !creditMap[m.id]
+      if (input.has_credits === 'yes') return hasCredits(m.id)
+      if (input.has_credits === 'no') return !hasCredits(m.id)
       return true
     })
     .map((m) => ({
       name: m.name,
       email: m.email,
       role: m.role,
-      credits: creditMap[m.id] || 0,
+      credits: unlimitedSet.has(m.id) ? 'unlimited' : (creditMap[m.id] || 0),
       joined: new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     }))
 
@@ -798,9 +810,9 @@ async function updateInstructor(input, context) {
 
 async function sendEmail(input, context) {
   const member = await resolveMember(input.to)
-  const { sendDirectEmail } = await import('@/lib/email')
+  const { sendAdminDirectEmail } = await import('@/lib/email')
 
-  await sendDirectEmail({
+  await sendAdminDirectEmail({
     to: member.email,
     subject: input.subject,
     body: input.body,
@@ -824,12 +836,13 @@ async function getDashboard() {
   const now = new Date()
   const sevenDaysAgo = new Date(now)
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  const todayStart = new Date(now)
-  todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date(now)
-  todayEnd.setHours(23, 59, 59, 999)
+  // Use Bangkok timezone for "today" and "this month"
+  const bangkokDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+  const bangkokMonth = bangkokDate.slice(0, 7)
+  const monthStart = new Date(`${bangkokMonth}-01T00:00:00+07:00`)
+  const todayStart = new Date(`${bangkokDate}T00:00:00+07:00`)
+  const todayEnd = new Date(`${bangkokDate}T23:59:59+07:00`)
 
   const [membersRes, todayClassesRes, weekBookingsRes, monthRevenueRes] = await Promise.all([
     supabaseAdmin.from('users').select('id', { count: 'exact', head: true }).eq('role', 'member'),

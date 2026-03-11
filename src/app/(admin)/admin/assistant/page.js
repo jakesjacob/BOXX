@@ -140,8 +140,9 @@ export default function AssistantPage() {
     inputRef.current?.focus()
   }, [activeConvoId])
 
-  // Check for ?test-limit param to simulate usage limit
+  // Check for ?test-limit param to simulate usage limit (dev only)
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return
     const params = new URLSearchParams(window.location.search)
     if (params.get('test-limit') === 'true') {
       setUsageLimited(true)
