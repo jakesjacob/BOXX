@@ -116,11 +116,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return true
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id
         token.role = user.role || 'member'
         token.tenantId = user.tenantId
+      }
+      // Refresh token data when session.update() is called (e.g. after onboarding)
+      if (trigger === 'update' && token.id) {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('tenant_id, role')
+          .eq('id', token.id)
+          .single()
+        if (data) {
+          token.tenantId = data.tenant_id
+          token.role = data.role
+        }
       }
       return token
     },

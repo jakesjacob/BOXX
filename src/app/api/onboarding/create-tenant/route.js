@@ -7,11 +7,11 @@ import { getVerticalDefaults } from '@/lib/vertical-defaults'
 
 const limiter = rateLimit({ interval: 60_000, uniqueTokenPerInterval: 100 })
 
-const schema = z.object({
+// Base schema (shared fields)
+const baseSchema = z.object({
   // Account
   ownerName: z.string().min(2).max(100),
   ownerEmail: z.string().email().max(255),
-  password: z.string().min(8).max(128),
 
   // Studio
   studioName: z.string().min(2).max(100),
@@ -30,6 +30,13 @@ const schema = z.object({
   // Brand
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#3b82f6'),
   logoUrl: z.string().url().optional().nullable(),
+
+  // Google auth (optional — present when user signed up via Google OAuth)
+  googleUserId: z.string().uuid().optional(),
+  password: z.string().min(8).max(128).optional(),
+}).refine(data => data.password || data.googleUserId, {
+  message: 'Either password or Google authentication is required',
+  path: ['password'],
 })
 
 export async function POST(request) {
@@ -43,7 +50,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
-    const parsed = schema.safeParse(body)
+    const parsed = baseSchema.safeParse(body)
 
     if (!parsed.success) {
       const firstError = parsed.error.errors[0]
@@ -51,6 +58,7 @@ export async function POST(request) {
     }
 
     const data = parsed.data
+    const isGoogleAuth = !!data.googleUserId
 
     // Check slug availability
     const { data: existingTenant } = await supabaseAdmin
@@ -63,19 +71,34 @@ export async function POST(request) {
       return NextResponse.json({ error: 'This studio URL is already taken', field: 'slug' }, { status: 409 })
     }
 
-    // Check email not already in use (globally — owner emails should be unique)
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', data.ownerEmail.toLowerCase())
-      .single()
+    // For Google auth: verify the user exists and get their info
+    let googleUser = null
+    if (isGoogleAuth) {
+      const { data: gUser } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', data.googleUserId)
+        .single()
 
-    if (existingUser) {
-      return NextResponse.json({ error: 'An account with this email already exists', field: 'ownerEmail' }, { status: 409 })
+      if (!gUser) {
+        return NextResponse.json({ error: 'Google account not found. Please try again.' }, { status: 400 })
+      }
+      googleUser = gUser
+    } else {
+      // For email/password: check email not already in use
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('email', data.ownerEmail.toLowerCase())
+        .single()
+
+      if (existingUser) {
+        return NextResponse.json({ error: 'An account with this email already exists', field: 'ownerEmail' }, { status: 409 })
+      }
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(data.password, 12)
+    // Hash password (only for email/password signups)
+    const passwordHash = data.password ? await bcrypt.hash(data.password, 12) : null
 
     // Calculate trial end (14 days)
     const trialEndsAt = new Date()
@@ -120,24 +143,47 @@ export async function POST(request) {
       .select()
       .single()
 
-    // 3. Create owner user
-    const { data: owner, error: ownerError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        tenant_id: tenant.id,
-        email: data.ownerEmail.toLowerCase(),
-        name: data.ownerName,
-        password_hash: passwordHash,
-        role: 'owner',
-      })
-      .select()
-      .single()
+    // 3. Create or update owner user
+    let owner
+    if (isGoogleAuth) {
+      // Update existing Google user: move to new tenant, promote to owner
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('users')
+        .update({
+          tenant_id: tenant.id,
+          name: data.ownerName,
+          role: 'owner',
+        })
+        .eq('id', googleUser.id)
+        .select()
+        .single()
 
-    if (ownerError) {
-      // Rollback tenant if user creation fails
-      await supabaseAdmin.from('tenants').delete().eq('id', tenant.id)
-      console.error('[onboarding] Owner creation failed:', ownerError)
-      return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+      if (updateError) {
+        await supabaseAdmin.from('tenants').delete().eq('id', tenant.id)
+        console.error('[onboarding] Google user update failed:', updateError)
+        return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+      }
+      owner = updated
+    } else {
+      // Create new user with email/password
+      const { data: newOwner, error: ownerError } = await supabaseAdmin
+        .from('users')
+        .insert({
+          tenant_id: tenant.id,
+          email: data.ownerEmail.toLowerCase(),
+          name: data.ownerName,
+          password_hash: passwordHash,
+          role: 'owner',
+        })
+        .select()
+        .single()
+
+      if (ownerError) {
+        await supabaseAdmin.from('tenants').delete().eq('id', tenant.id)
+        console.error('[onboarding] Owner creation failed:', ownerError)
+        return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+      }
+      owner = newOwner
     }
 
     // 4. Create staff_tenants entry
