@@ -115,7 +115,7 @@ export async function POST(request) {
 
     return NextResponse.json({ url: checkoutSession.url })
   } catch (error) {
-    console.error('[stripe/checkout] Error:', error)
-    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
+    console.error('[stripe/checkout] Error:', error.message, error.stack)
+    return NextResponse.json({ error: error.message || 'Something went wrong. Please try again.' }, { status: 500 })
   }
 }
