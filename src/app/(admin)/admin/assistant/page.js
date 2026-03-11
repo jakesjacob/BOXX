@@ -36,8 +36,8 @@ export default function AssistantPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState(null)
   const [convoLoading, setConvoLoading] = useState(true)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [vpOffset, setVpOffset] = useState(0)
+  const [vpHeight, setVpHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800)
   const [usage, setUsage] = useState(null) // { cost_usd, limit_usd, limited }
   const [usageLimited, setUsageLimited] = useState(false)
 
@@ -70,16 +70,17 @@ export default function AssistantPage() {
     const vv = window.visualViewport
     if (vv) {
       const update = () => {
-        // Keyboard height
-        const kb = window.innerHeight - vv.height - vv.offsetTop
-        setKeyboardHeight(Math.max(0, kb))
-
-        // iOS scrolls the visual viewport when keyboard opens,
-        // pushing fixed elements out of view. Track the offset
-        // so we can compensate on our fixed container + the header.
+        // Use visualViewport dimensions directly — much more reliable
+        // than trying to calculate keyboard height from innerHeight
+        setVpHeight(vv.height)
         setVpOffset(vv.offsetTop)
 
-        // Also shift the admin header to compensate
+        // Try to prevent iOS from accumulating scroll offset
+        if (vv.offsetTop > 0) {
+          window.scrollTo(0, 0)
+        }
+
+        // Shift the admin header to compensate for iOS viewport scroll
         const header = document.querySelector('header[class*="fixed"]')
         if (header) {
           header.style.transform = `translateY(${vv.offsetTop}px)`
@@ -119,10 +120,10 @@ export default function AssistantPage() {
     }
   }, [])
 
-  // Scroll to bottom when messages change or keyboard opens
+  // Scroll to bottom when messages change or viewport resizes (keyboard)
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, keyboardHeight])
+  }, [messages, vpHeight])
 
   // Focus input on load
   useEffect(() => {
@@ -297,7 +298,7 @@ export default function AssistantPage() {
           'fixed left-0 right-0 flex flex-col bg-background z-20',
           'lg:static lg:z-auto lg:flex-row lg:h-[calc(100vh-4rem)] lg:-m-6 lg:overflow-hidden'
         )}
-        style={{ top: `${64 + vpOffset}px`, bottom: `${keyboardHeight}px` }}
+        style={{ top: `${64 + vpOffset}px`, height: `${vpHeight - 64}px` }}
       >
         {/* Mobile sidebar overlay */}
         {sidebarOpen && (
