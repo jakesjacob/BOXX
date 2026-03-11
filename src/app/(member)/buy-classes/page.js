@@ -64,7 +64,7 @@ function BuyClassesContent() {
     setConfirmPack(null)
     setPurchasing(packId)
     try {
-      const res = await fetch('/api/packs/purchase', {
+      const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packId }),
@@ -74,7 +74,10 @@ function BuyClassesContent() {
         setToast({ message: data.error || 'Something went wrong', type: 'error' })
         return
       }
-      router.push('/dashboard?purchased=true')
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url
+      }
     } catch (err) {
       setToast({ message: 'Something went wrong. Please try again.', type: 'error' })
     } finally {
