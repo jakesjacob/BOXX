@@ -1956,9 +1956,16 @@ function BookingsSection({ upcoming, past, waitlist = [], credits = [], onUpdate
                                   body: JSON.stringify({ bookingId: b.id }),
                                 })
                                 const result = await res.json()
-                                if (res.ok) onUpdate()
-                                else alert(result.error + (result.debug ? '\n\nDebug: ' + JSON.stringify(result.debug) : '') || 'Failed to accept')
-                              } catch { alert('Something went wrong') }
+                                if (res.ok) {
+                                  setToast({ message: 'Invitation accepted — your spot is confirmed!', type: 'success' })
+                                  setExpandedId(null)
+                                  onUpdate()
+                                } else {
+                                  setToast({ message: result.error || 'Failed to accept invitation', type: 'error' })
+                                }
+                              } catch {
+                                setToast({ message: 'Something went wrong. Please try again.', type: 'error' })
+                              }
                             }}
                             className="shrink-0"
                           >
