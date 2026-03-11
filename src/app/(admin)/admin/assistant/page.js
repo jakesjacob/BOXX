@@ -36,25 +36,20 @@ export default function AssistantPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState(null)
   const [convoLoading, setConvoLoading] = useState(true)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Track visual viewport for mobile keyboard/browser chrome
+  // Track mobile keyboard via visualViewport
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
 
-    let prevHeight = vv.height
     const update = () => {
-      document.documentElement.style.setProperty('--app-height', `${vv.height}px`)
-      // Scroll messages to bottom when keyboard opens (viewport shrinks)
-      if (vv.height < prevHeight) {
-        requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-        })
-      }
-      prevHeight = vv.height
+      // Keyboard height = layout viewport minus visual viewport minus its offset
+      const kb = window.innerHeight - vv.height - vv.offsetTop
+      setKeyboardHeight(Math.max(0, kb))
     }
 
     vv.addEventListener('resize', update)
@@ -67,10 +62,10 @@ export default function AssistantPage() {
     }
   }, [])
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change or keyboard opens
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, keyboardHeight])
 
   // Focus input on load
   useEffect(() => {
@@ -212,219 +207,229 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex -m-4 lg:-m-6 overflow-hidden" style={{ height: 'calc(var(--app-height, 100dvh) - 4rem)' }}>
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+    <>
+      {/*
+        Mobile: fixed positioning — chat fills from admin header (h-16) to bottom.
+        Completely bypasses the admin layout's scroll behavior.
+        Desktop: normal flex layout inside the admin main area.
+      */}
+      <div
+        className={cn(
+          'fixed top-16 left-0 right-0 flex flex-col bg-background z-20',
+          'lg:static lg:z-auto lg:flex-row lg:h-[calc(100vh-4rem)] lg:-m-6 lg:overflow-hidden'
+        )}
+        style={{ bottom: `${keyboardHeight}px` }}
+      >
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-      {/* Sidebar */}
-      <aside className={cn(
-        'fixed top-0 left-0 bottom-0 z-50 w-72 bg-card border-r border-card-border flex flex-col transition-transform duration-200',
-        'lg:static lg:translate-x-0 lg:z-auto',
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
-        {/* Sidebar header */}
-        <div className="p-3 border-b border-card-border">
-          <Button onClick={startNewChat} className="w-full justify-start gap-2 text-sm">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            New Chat
-          </Button>
-        </div>
-
-        {/* Conversation list */}
-        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
-          {convoLoading ? (
-            <div className="space-y-2 px-2 pt-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-9 bg-white/5 rounded animate-pulse" />
-              ))}
-            </div>
-          ) : conversations.length === 0 ? (
-            <p className="text-xs text-muted text-center pt-6 px-4">No conversations yet</p>
-          ) : (
-            conversations.map((convo) => (
-              <div key={convo.id} className="group relative">
-                <button
-                  onClick={() => loadConversation(convo.id)}
-                  className={cn(
-                    'w-full text-left px-3 py-2 rounded-md text-sm transition-colors truncate pr-8',
-                    activeConvoId === convo.id
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-foreground hover:bg-white/5'
-                  )}
-                  title={convo.title}
-                >
-                  <span className="block truncate text-[13px]">{convo.title}</span>
-                  <span className="block text-[10px] text-muted/60 mt-0.5">{timeAgo(convo.updated_at)}</span>
-                </button>
-                {/* Delete button */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setDeleteDialog(convo.id) }}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded text-muted/40 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Delete conversation"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            ))
-          )}
-        </nav>
-
-        {/* Sidebar footer */}
-        <div className="p-3 border-t border-card-border">
-          <p className="text-[10px] text-muted text-center">
-            Conversations auto-delete after 7 days
-          </p>
-        </div>
-      </aside>
-
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Chat header */}
-        <div className="h-12 border-b border-card-border flex items-center px-4 gap-3 shrink-0 bg-background z-10">
-          {/* Mobile sidebar toggle */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden w-8 h-8 flex items-center justify-center rounded hover:bg-white/5"
-          >
-            <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground">Studio Assistant</span>
-            <span className="text-[10px] text-muted bg-white/5 px-1.5 py-0.5 rounded">AI</span>
+        {/* Sidebar */}
+        <aside className={cn(
+          'fixed top-0 left-0 bottom-0 z-50 w-72 bg-card border-r border-card-border flex flex-col transition-transform duration-200',
+          'lg:static lg:translate-x-0 lg:z-auto lg:shrink-0',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        )}>
+          {/* Sidebar header */}
+          <div className="p-3 border-b border-card-border">
+            <Button onClick={startNewChat} className="w-full justify-start gap-2 text-sm">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              New Chat
+            </Button>
           </div>
-        </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
-          {messages.length === 0 && !loading && (
-            <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <div className="text-4xl mb-4">🥊</div>
-              <h2 className="text-lg font-semibold text-foreground mb-2">How can I help?</h2>
-              <p className="text-sm text-muted max-w-md mb-6">
-                I can manage your schedule, look up members, check stats, send emails, and more. Just ask.
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2 w-full max-w-lg">
-                {suggestions.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleSend(s)}
-                    className="text-left text-sm px-4 py-3 rounded-lg border border-card-border bg-card hover:bg-white/[0.04] hover:border-accent/30 transition-colors text-muted"
-                  >
-                    {s}
-                  </button>
+          {/* Conversation list */}
+          <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+            {convoLoading ? (
+              <div className="space-y-2 px-2 pt-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-9 bg-white/5 rounded animate-pulse" />
                 ))}
               </div>
-            </div>
-          )}
-
-          {messages.map((msg, i) => (
-            <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-              <div className={cn(
-                'max-w-[85%] sm:max-w-[75%] rounded-xl px-4 py-3',
-                msg.role === 'user'
-                  ? 'bg-accent/15 text-foreground'
-                  : 'bg-card border border-card-border text-foreground'
-              )}>
-                {/* Tool results badges */}
-                {msg.tool_results?.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {msg.tool_results.map((tr, j) => (
-                      <span
-                        key={j}
-                        className={cn(
-                          'text-[10px] font-medium px-2 py-0.5 rounded-full',
-                          tr.result?.success
-                            ? 'bg-green-500/10 text-green-400'
-                            : 'bg-red-500/10 text-red-400'
-                        )}
-                      >
-                        {tr.tool.replace(/_/g, ' ')}
-                        {tr.result?.success ? ' ✓' : ' ✗'}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Message content with markdown */}
-                <div className="text-sm leading-relaxed">
-                  {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
+            ) : conversations.length === 0 ? (
+              <p className="text-xs text-muted text-center pt-6 px-4">No conversations yet</p>
+            ) : (
+              conversations.map((convo) => (
+                <div key={convo.id} className="group relative">
+                  <button
+                    onClick={() => loadConversation(convo.id)}
+                    className={cn(
+                      'w-full text-left px-3 py-2 rounded-md text-sm transition-colors truncate pr-8',
+                      activeConvoId === convo.id
+                        ? 'bg-accent/10 text-accent'
+                        : 'text-muted hover:text-foreground hover:bg-white/5'
+                    )}
+                    title={convo.title}
+                  >
+                    <span className="block truncate text-[13px]">{convo.title}</span>
+                    <span className="block text-[10px] text-muted/60 mt-0.5">{timeAgo(convo.updated_at)}</span>
+                  </button>
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteDialog(convo.id) }}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded text-muted/40 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete conversation"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
-              </div>
-            </div>
-          ))}
+              ))
+            )}
+          </nav>
 
-          {/* Loading indicator */}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-card border border-card-border rounded-xl px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span className="text-xs text-muted">Thinking...</span>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Sidebar footer */}
+          <div className="p-3 border-t border-card-border">
+            <p className="text-[10px] text-muted text-center">
+              Conversations auto-delete after 7 days
+            </p>
+          </div>
+        </aside>
 
-          {/* Error */}
-          {error && (
-            <div className="flex justify-start">
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 max-w-[85%]">
-                <p className="text-sm text-red-400">{error}</p>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input */}
-        <div className="border-t border-card-border p-3 shrink-0">
-          <form onSubmit={(e) => { e.preventDefault(); handleSend() }} className="flex gap-2">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              enterKeyHint="send"
-              placeholder="Type a command..."
-              rows={1}
-              disabled={loading}
-              className="flex-1 resize-none rounded-lg bg-card border border-card-border px-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 disabled:opacity-50"
-            />
-            <Button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="px-4 shrink-0"
+        {/* Main chat area */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* Chat header */}
+          <div className="h-12 border-b border-card-border flex items-center px-4 gap-3 shrink-0 bg-background">
+            {/* Mobile sidebar toggle */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden w-8 h-8 flex items-center justify-center rounded hover:bg-white/5"
             >
-              {loading ? (
-                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
-                </svg>
-              )}
-            </Button>
-          </form>
-          <p className="text-[10px] text-muted mt-1.5 text-center">
-            AI assistant — actions are logged.
-          </p>
+              <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground">Studio Assistant</span>
+              <span className="text-[10px] text-muted bg-white/5 px-1.5 py-0.5 rounded">AI</span>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+            {messages.length === 0 && !loading && (
+              <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                <div className="text-4xl mb-4">🥊</div>
+                <h2 className="text-lg font-semibold text-foreground mb-2">How can I help?</h2>
+                <p className="text-sm text-muted max-w-md mb-6">
+                  I can manage your schedule, look up members, check stats, send emails, and more. Just ask.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 w-full max-w-lg">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => handleSend(s)}
+                      className="text-left text-sm px-4 py-3 rounded-lg border border-card-border bg-card hover:bg-white/[0.04] hover:border-accent/30 transition-colors text-muted"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg, i) => (
+              <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                <div className={cn(
+                  'max-w-[85%] sm:max-w-[75%] rounded-xl px-4 py-3',
+                  msg.role === 'user'
+                    ? 'bg-accent/15 text-foreground'
+                    : 'bg-card border border-card-border text-foreground'
+                )}>
+                  {/* Tool results badges */}
+                  {msg.tool_results?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {msg.tool_results.map((tr, j) => (
+                        <span
+                          key={j}
+                          className={cn(
+                            'text-[10px] font-medium px-2 py-0.5 rounded-full',
+                            tr.result?.success
+                              ? 'bg-green-500/10 text-green-400'
+                              : 'bg-red-500/10 text-red-400'
+                          )}
+                        >
+                          {tr.tool.replace(/_/g, ' ')}
+                          {tr.result?.success ? ' ✓' : ' ✗'}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Message content with markdown */}
+                  <div className="text-sm leading-relaxed">
+                    {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Loading indicator */}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-card border border-card-border rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-xs text-muted">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div className="flex justify-start">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 max-w-[85%]">
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-card-border p-3 shrink-0 bg-background">
+            <form onSubmit={(e) => { e.preventDefault(); handleSend() }} className="flex gap-2">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                enterKeyHint="send"
+                placeholder="Type a command..."
+                rows={1}
+                disabled={loading}
+                className="flex-1 resize-none rounded-lg bg-card border border-card-border px-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 disabled:opacity-50"
+              />
+              <Button
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="px-4 shrink-0"
+              >
+                {loading ? (
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                  </svg>
+                )}
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -443,6 +448,6 @@ export default function AssistantPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
