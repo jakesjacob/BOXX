@@ -40,6 +40,33 @@ export default function AssistantPage() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
+  // Track visual viewport for mobile keyboard/browser chrome
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    let prevHeight = vv.height
+    const update = () => {
+      document.documentElement.style.setProperty('--app-height', `${vv.height}px`)
+      // Scroll messages to bottom when keyboard opens (viewport shrinks)
+      if (vv.height < prevHeight) {
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        })
+      }
+      prevHeight = vv.height
+    }
+
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
+
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -185,7 +212,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] -m-4 lg:-m-6 overflow-hidden">
+    <div className="flex -m-4 lg:-m-6 overflow-hidden" style={{ height: 'calc(var(--app-height, 100dvh) - 4rem)' }}>
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
