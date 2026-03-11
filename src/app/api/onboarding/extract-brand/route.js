@@ -319,7 +319,18 @@ ${cleaned}
 CSS variables & key rules:
 ${cssSnippet}
 
-Return a JSON object with your best assessment. Fix any incorrect regex results. Fill in missing values by analyzing the actual HTML structure and CSS. For colors, look at buttons, headers, links, nav backgrounds. For the font, look at font-family declarations on body/html/main content.
+Return a JSON object with your best assessment. Fix any incorrect regex results. Fill in missing values by analyzing the actual HTML structure and CSS.
+
+For colors:
+- primary: the main brand/button/CTA color
+- secondary: a complementary brand color (links, hover states, secondary buttons)
+- accent: highlight/badge color
+- background: the main page background color
+
+For fonts:
+- titleFont: the font used for headings/titles (h1, h2, hero text)
+- bodyFont: the font used for body/paragraph text
+- titleFontType/bodyFontType: "sans-serif", "serif", or "monospace"
 
 Return ONLY valid JSON, no markdown:
 {
@@ -328,8 +339,10 @@ Return ONLY valid JSON, no markdown:
   "secondary": "#hex",
   "accent": "#hex",
   "background": "#hex",
-  "font": "Font Family Name",
-  "fontType": "sans-serif|serif|monospace",
+  "titleFont": "Font Family Name",
+  "titleFontType": "sans-serif|serif|monospace",
+  "bodyFont": "Font Family Name",
+  "bodyFontType": "sans-serif|serif|monospace",
   "mood": "dark|light|warm|cool|luxury|minimal|bold|playful"
 }`
       }],
@@ -406,8 +419,12 @@ export async function POST(request) {
         accent: aiResult?.accent || regexBrand.colors?.accent,
         background: aiResult?.background || regexBrand.colors?.background,
       },
-      font: aiResult?.font || regexBrand.font,
-      fontType: aiResult?.fontType || null,
+      // Separate title/body fonts — fallback to single font for backwards compat
+      titleFont: aiResult?.titleFont || aiResult?.font || regexBrand.font,
+      titleFontType: aiResult?.titleFontType || aiResult?.fontType || null,
+      bodyFont: aiResult?.bodyFont || aiResult?.font || regexBrand.font,
+      bodyFontType: aiResult?.bodyFontType || aiResult?.fontType || null,
+      font: aiResult?.titleFont || aiResult?.font || regexBrand.font, // legacy compat
       mood: aiResult?.mood || null,
     }
 

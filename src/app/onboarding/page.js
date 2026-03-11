@@ -17,15 +17,26 @@ const THEMES = [
     name: 'Midnight',
     description: 'Dark & modern',
     icon: Moon,
-    background: '#0f0f0f',
-    foreground: '#f5f5f5',
+    // Backgrounds
+    background: '#0a0a0b',
+    surface: '#141416',
+    surfaceHover: '#1c1c1f',
+    // Brand
     primary: '#6366f1',
+    primaryHover: '#5558e8',
     secondary: '#818cf8',
-    card: '#1a1a1a',
-    border: '#262626',
-    muted: '#a1a1aa',
-    font: 'Inter',
-    fontType: 'sans-serif',
+    accent: '#a78bfa',
+    // Text
+    foreground: '#f0f0f5',
+    muted: '#71717a',
+    // Borders
+    border: '#27272a',
+    borderHover: '#3f3f46',
+    // Fonts
+    titleFont: 'Inter',
+    titleFontType: 'sans-serif',
+    bodyFont: 'Inter',
+    bodyFontType: 'sans-serif',
   },
   {
     id: 'ember',
@@ -33,14 +44,20 @@ const THEMES = [
     description: 'Warm & energetic',
     icon: Flame,
     background: '#0c0a09',
-    foreground: '#fafaf9',
+    surface: '#1c1917',
+    surfaceHover: '#262220',
     primary: '#f97316',
+    primaryHover: '#ea6c0e',
     secondary: '#fb923c',
-    card: '#1c1917',
-    border: '#292524',
+    accent: '#fbbf24',
+    foreground: '#fafaf9',
     muted: '#a8a29e',
-    font: 'DM Sans',
-    fontType: 'sans-serif',
+    border: '#292524',
+    borderHover: '#3d3835',
+    titleFont: 'DM Sans',
+    titleFontType: 'sans-serif',
+    bodyFont: 'DM Sans',
+    bodyFontType: 'sans-serif',
   },
   {
     id: 'ivory',
@@ -48,14 +65,20 @@ const THEMES = [
     description: 'Light & clean',
     icon: Sun,
     background: '#fafafa',
-    foreground: '#18181b',
+    surface: '#ffffff',
+    surfaceHover: '#f4f4f5',
     primary: '#0d9488',
+    primaryHover: '#0b7f74',
     secondary: '#2dd4bf',
-    card: '#ffffff',
-    border: '#e4e4e7',
+    accent: '#5eead4',
+    foreground: '#18181b',
     muted: '#71717a',
-    font: 'Plus Jakarta Sans',
-    fontType: 'sans-serif',
+    border: '#e4e4e7',
+    borderHover: '#d4d4d8',
+    titleFont: 'Plus Jakarta Sans',
+    titleFontType: 'sans-serif',
+    bodyFont: 'Plus Jakarta Sans',
+    bodyFontType: 'sans-serif',
   },
   {
     id: 'royal',
@@ -63,14 +86,20 @@ const THEMES = [
     description: 'Bold & luxurious',
     icon: Crown,
     background: '#09090b',
-    foreground: '#fafafa',
+    surface: '#141417',
+    surfaceHover: '#1c1c20',
     primary: '#c8a750',
+    primaryHover: '#b89640',
     secondary: '#d4af37',
-    card: '#18181b',
-    border: '#27272a',
+    accent: '#e8c547',
+    foreground: '#fafaf5',
     muted: '#a1a1aa',
-    font: 'Playfair Display',
-    fontType: 'serif',
+    border: '#27272a',
+    borderHover: '#3a3a3f',
+    titleFont: 'Playfair Display',
+    titleFontType: 'serif',
+    bodyFont: 'Inter',
+    bodyFontType: 'sans-serif',
   },
   {
     id: 'forest',
@@ -78,14 +107,20 @@ const THEMES = [
     description: 'Natural & calm',
     icon: Trees,
     background: '#f8faf5',
-    foreground: '#1a2e1a',
+    surface: '#f0f7ec',
+    surfaceHover: '#e5f0df',
     primary: '#16a34a',
+    primaryHover: '#138a3e',
     secondary: '#4ade80',
-    card: '#f0fdf0',
-    border: '#d1e7d1',
+    accent: '#86efac',
+    foreground: '#1a2e1a',
     muted: '#6b8f6b',
-    font: 'Nunito',
-    fontType: 'sans-serif',
+    border: '#d1e7d1',
+    borderHover: '#b8d9b8',
+    titleFont: 'Nunito',
+    titleFontType: 'sans-serif',
+    bodyFont: 'Nunito',
+    bodyFontType: 'sans-serif',
   },
   {
     id: 'ocean',
@@ -93,14 +128,20 @@ const THEMES = [
     description: 'Fresh & professional',
     icon: Waves,
     background: '#f8fafc',
-    foreground: '#0f172a',
+    surface: '#ffffff',
+    surfaceHover: '#f1f5f9',
     primary: '#0ea5e9',
+    primaryHover: '#0c93cf',
     secondary: '#38bdf8',
-    card: '#ffffff',
-    border: '#e2e8f0',
+    accent: '#7dd3fc',
+    foreground: '#0f172a',
     muted: '#64748b',
-    font: 'Poppins',
-    fontType: 'sans-serif',
+    border: '#e2e8f0',
+    borderHover: '#cbd5e1',
+    titleFont: 'Poppins',
+    titleFontType: 'sans-serif',
+    bodyFont: 'Inter',
+    bodyFontType: 'sans-serif',
   },
 ]
 
@@ -220,13 +261,16 @@ function SelectField({ label, id, options, error, ...props }) {
 
 function ThemePreview({ theme, businessName, logoUrl }) {
   const isDark = theme.background.replace('#', '').split('').reduce((sum, c) => sum + parseInt(c, 16), 0) < 24
+  const titleFontCSS = `"${theme.titleFont}", ${theme.titleFontType}`
+  const bodyFontCSS = `"${theme.bodyFont}", ${theme.bodyFontType}`
+
   return (
     <div
       className="rounded-xl overflow-hidden border shadow-lg"
-      style={{ borderColor: theme.border, backgroundColor: theme.background, fontFamily: `"${theme.font}", ${theme.fontType}` }}
+      style={{ borderColor: theme.border, backgroundColor: theme.background, fontFamily: bodyFontCSS }}
     >
       {/* Browser chrome */}
-      <div className="flex items-center gap-1.5 px-3 py-2" style={{ backgroundColor: theme.card, borderBottom: `1px solid ${theme.border}` }}>
+      <div className="flex items-center gap-1.5 px-3 py-2" style={{ backgroundColor: theme.surface, borderBottom: `1px solid ${theme.border}` }}>
         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#ef4444' }} />
         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#22c55e' }} />
@@ -236,53 +280,114 @@ function ThemePreview({ theme, businessName, logoUrl }) {
       </div>
 
       {/* Navbar */}
-      <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: `1px solid ${theme.border}` }}>
+      <div className="flex items-center justify-between px-4 py-2.5" style={{ backgroundColor: theme.surface, borderBottom: `1px solid ${theme.border}` }}>
         <div className="flex items-center gap-2">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="w-5 h-5 rounded object-contain" />
           ) : (
-            <div className="w-5 h-5 rounded flex items-center justify-center text-[8px] font-bold" style={{ backgroundColor: theme.primary, color: theme.background }}>
+            <div className="w-5 h-5 rounded flex items-center justify-center text-[8px] font-bold" style={{ backgroundColor: theme.primary, color: isDark ? '#ffffff' : theme.background }}>
               {(businessName || 'Z')[0].toUpperCase()}
             </div>
           )}
-          <span className="text-xs font-semibold truncate max-w-[100px]" style={{ color: theme.foreground }}>
+          <span className="text-xs font-semibold truncate max-w-[100px]" style={{ color: theme.foreground, fontFamily: titleFontCSS }}>
             {businessName || 'Your Business'}
           </span>
         </div>
-        <div className="flex gap-3">
-          <div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: theme.muted, opacity: 0.3 }} />
-          <div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: theme.muted, opacity: 0.3 }} />
-          <div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: theme.muted, opacity: 0.3 }} />
+        <div className="flex gap-2">
+          <div className="px-2 py-0.5 rounded text-[8px]" style={{ color: theme.muted }}>Classes</div>
+          <div className="px-2 py-0.5 rounded text-[8px]" style={{ color: theme.muted }}>Pricing</div>
+          <div className="px-2 py-0.5 rounded text-[8px]" style={{ color: theme.secondary }}>Login</div>
         </div>
       </div>
 
       {/* Hero */}
-      <div className="px-4 py-6 text-center">
-        <div className="w-24 h-2 rounded-full mx-auto mb-2" style={{ backgroundColor: theme.muted, opacity: 0.2 }} />
-        <div className="text-sm font-bold mb-1" style={{ color: theme.foreground }}>
+      <div className="px-5 py-6 text-center">
+        <div className="text-base font-bold mb-1" style={{ color: theme.foreground, fontFamily: titleFontCSS }}>
           Welcome
         </div>
-        <div className="w-32 h-1.5 rounded-full mx-auto mb-4" style={{ backgroundColor: theme.muted, opacity: 0.15 }} />
-        <div
-          className="inline-block px-5 py-1.5 rounded-lg text-[10px] font-semibold"
-          style={{ backgroundColor: theme.primary, color: isDark ? '#ffffff' : theme.background }}
-        >
-          Book Now
+        <div className="text-[10px] mb-4" style={{ color: theme.muted, fontFamily: bodyFontCSS }}>
+          Book your next session today
+        </div>
+        <div className="flex items-center justify-center gap-2">
+          <div
+            className="px-5 py-1.5 rounded-lg text-[10px] font-semibold"
+            style={{ backgroundColor: theme.primary, color: isDark ? '#ffffff' : theme.background }}
+          >
+            Book Now
+          </div>
+          <div
+            className="px-5 py-1.5 rounded-lg text-[10px] font-semibold"
+            style={{ border: `1px solid ${theme.secondary}`, color: theme.secondary }}
+          >
+            View Schedule
+          </div>
         </div>
       </div>
 
       {/* Cards */}
-      <div className="px-4 pb-4 grid grid-cols-2 gap-2">
-        {[0, 1].map(i => (
-          <div key={i} className="rounded-lg p-3" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-            <div className="w-full h-8 rounded mb-2" style={{ backgroundColor: theme.primary, opacity: 0.1 }} />
-            <div className="w-3/4 h-1.5 rounded-full mb-1.5" style={{ backgroundColor: theme.muted, opacity: 0.3 }} />
-            <div className="w-1/2 h-1.5 rounded-full" style={{ backgroundColor: theme.muted, opacity: 0.2 }} />
+      <div className="px-4 pb-3 grid grid-cols-2 gap-2">
+        {[
+          { label: 'Morning Flow', badge: 'Popular' },
+          { label: 'HIIT Session', badge: '3 spots' },
+        ].map((item, i) => (
+          <div key={i} className="rounded-lg p-2.5" style={{ backgroundColor: theme.surface, border: `1px solid ${theme.border}` }}>
+            <div className="w-full h-6 rounded mb-2" style={{ backgroundColor: theme.accent, opacity: 0.12 }} />
+            <div className="text-[9px] font-semibold mb-0.5" style={{ color: theme.foreground, fontFamily: titleFontCSS }}>{item.label}</div>
+            <div className="text-[8px] mb-1.5" style={{ color: theme.muted }}>9:00 AM — 60 min</div>
+            <div className="flex items-center justify-between">
+              <span className="text-[7px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: theme.accent, opacity: 0.15, color: theme.accent === theme.primary ? theme.foreground : theme.accent }}>{item.badge}</span>
+              <span className="text-[8px] font-semibold" style={{ color: theme.primary }}>Book</span>
+            </div>
           </div>
         ))}
       </div>
+
+      {/* Footer accent bar */}
+      <div className="h-1" style={{ background: `linear-gradient(to right, ${theme.primary}, ${theme.secondary}, ${theme.accent})` }} />
     </div>
   )
+}
+
+// ─── Color utility functions ──────────────────────────────
+
+function hexToHsl(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  let h = 0, s = 0, l = (max + min) / 2
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+    else if (max === g) h = ((b - r) / d + 2) / 6
+    else h = ((r - g) / d + 4) / 6
+  }
+  return [h * 360, s * 100, l * 100]
+}
+
+function hslToHex(h, s, l) {
+  h /= 360; s /= 100; l /= 100
+  const hue2rgb = (p, q, t) => { if (t < 0) t += 1; if (t > 1) t -= 1; if (t < 1/6) return p + (q - p) * 6 * t; if (t < 1/2) return q; if (t < 2/3) return p + (q - p) * (2/3 - t) * 6; return p }
+  let r, g, b
+  if (s === 0) { r = g = b = l } else { const q = l < 0.5 ? l * (1 + s) : l + s - l * s; const p = 2 * l - q; r = hue2rgb(p, q, h + 1/3); g = hue2rgb(p, q, h); b = hue2rgb(p, q, h - 1/3) }
+  return '#' + [r, g, b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('')
+}
+
+function lightenColor(hex, amount) {
+  try { const [h, s, l] = hexToHsl(hex); return hslToHex(h, s, Math.min(100, l + amount)) } catch { return hex }
+}
+
+function darkenColor(hex, amount) {
+  try { const [h, s, l] = hexToHsl(hex); return hslToHex(h, s, Math.max(0, l - amount)) } catch { return hex }
+}
+
+function shiftColor(hex, hueShift) {
+  try { const [h, s, l] = hexToHsl(hex); return hslToHex((h + hueShift) % 360, s, l) } catch { return hex }
+}
+
+function isColorDark(hex) {
+  try { const [,, l] = hexToHsl(hex); return l < 50 } catch { return true }
 }
 
 // ─── Analyzing steps animation ────────────────────────────
@@ -327,14 +432,16 @@ export default function OnboardingPage() {
   // Brand/theme state
   const [selectedThemeId, setSelectedThemeId] = useState('midnight')
   const [customColors, setCustomColors] = useState(null)
+  const [customTitleFont, setCustomTitleFont] = useState(null)
+  const [customBodyFont, setCustomBodyFont] = useState(null)
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeStep, setAnalyzeStep] = useState(0)
   const [extractedBrand, setExtractedBrand] = useState(null)
-  const [customFont, setCustomFont] = useState(null)
   const [hasLocation, setHasLocation] = useState(true)
   const [logoFile, setLogoFile] = useState(null)
   const [showCustomize, setShowCustomize] = useState(false)
+  const [showThemes, setShowThemes] = useState(true)
 
   // Slug state
   const [slugAvailable, setSlugAvailable] = useState(null)
@@ -353,14 +460,22 @@ export default function OnboardingPage() {
     return {
       ...base,
       ...(customColors ? {
-        primary: customColors.primary || base.primary,
-        secondary: customColors.secondary || base.secondary,
         background: customColors.background || base.background,
+        surface: customColors.surface || base.surface,
+        surfaceHover: customColors.surfaceHover || base.surfaceHover,
+        primary: customColors.primary || base.primary,
+        primaryHover: customColors.primaryHover || base.primaryHover,
+        secondary: customColors.secondary || base.secondary,
+        accent: customColors.accent || base.accent,
         foreground: customColors.foreground || base.foreground,
+        muted: customColors.muted || base.muted,
+        border: customColors.border || base.border,
+        borderHover: customColors.borderHover || base.borderHover,
       } : {}),
-      ...(customFont ? { font: customFont } : {}),
+      ...(customTitleFont ? { titleFont: customTitleFont } : {}),
+      ...(customBodyFont ? { bodyFont: customBodyFont } : {}),
     }
-  }, [selectedThemeId, customColors, customFont])
+  }, [selectedThemeId, customColors, customTitleFont, customBodyFont])
 
   // Sync primary color to form
   useEffect(() => {
@@ -503,15 +618,35 @@ export default function OnboardingPage() {
 
       setExtractedBrand(data.brand)
 
-      // Apply extracted brand
-      if (data.brand.colors?.primary) {
+      // Apply extracted brand — build full custom color set with derived shades
+      const c = data.brand.colors || {}
+      if (c.primary || c.background) {
+        const primary = c.primary || '#6366f1'
+        const secondary = c.secondary || c.accent || shiftColor(primary, 30)
+        const accent = c.accent || shiftColor(primary, 60)
+        const bg = c.background || '#0f0f0f'
+        const isDarkBg = isColorDark(bg)
+
         setCustomColors({
-          primary: data.brand.colors.primary,
-          secondary: data.brand.colors.secondary || null,
-          background: data.brand.colors.background || null,
-          foreground: null,
+          background: bg,
+          surface: isDarkBg ? lightenColor(bg, 8) : darkenColor(bg, 3),
+          surfaceHover: isDarkBg ? lightenColor(bg, 14) : darkenColor(bg, 6),
+          primary,
+          primaryHover: darkenColor(primary, 10),
+          secondary,
+          accent,
+          foreground: isDarkBg ? '#f0f0f5' : '#18181b',
+          muted: isDarkBg ? '#71717a' : '#71717a',
+          border: isDarkBg ? lightenColor(bg, 12) : darkenColor(bg, 10),
+          borderHover: isDarkBg ? lightenColor(bg, 20) : darkenColor(bg, 16),
         })
         setSelectedThemeId('custom')
+      }
+      if (data.brand.titleFont || data.brand.font) {
+        setCustomTitleFont(data.brand.titleFont || data.brand.font)
+      }
+      if (data.brand.bodyFont || data.brand.font) {
+        setCustomBodyFont(data.brand.bodyFont || data.brand.font)
       }
       if (data.brand.logo) {
         setForm(prev => ({ ...prev, logoUrl: data.brand.logo }))
@@ -519,6 +654,8 @@ export default function OnboardingPage() {
       if (data.brand.name && !form.studioName) {
         set('studioName', data.brand.name)
       }
+      // Collapse theme gallery since we have a custom theme now
+      setShowThemes(false)
     } catch {
       setError('Could not analyze website. Please try again.')
     }
@@ -898,52 +1035,64 @@ export default function OnboardingPage() {
                         <span>Colors detected</span>
                       </div>
                     )}
-                    {extractedBrand.font && (
-                      <span>Font: {extractedBrand.font}</span>
+                    {(extractedBrand.titleFont || extractedBrand.font) && (
+                      <span>Font: {extractedBrand.titleFont || extractedBrand.font}{extractedBrand.bodyFont && extractedBrand.bodyFont !== extractedBrand.titleFont ? ` / ${extractedBrand.bodyFont}` : ''}</span>
                     )}
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-card-border" />
-              <span className="text-xs text-muted">or choose a theme</span>
-              <div className="flex-1 h-px bg-card-border" />
-            </div>
+            {/* Theme gallery — collapsible after AI analysis */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowThemes(!showThemes)}
+                className="flex items-center gap-3 w-full"
+              >
+                <div className="flex-1 h-px bg-card-border" />
+                <span className="text-xs text-muted flex items-center gap-1.5">
+                  {showThemes ? 'choose a theme' : 'show themes'}
+                  <ChevronRight className={`w-3 h-3 transition-transform duration-300 ${showThemes ? 'rotate-90' : ''}`} />
+                </span>
+                <div className="flex-1 h-px bg-card-border" />
+              </button>
 
-            {/* Theme gallery */}
-            <div className="grid grid-cols-3 gap-2">
-              {THEMES.map(theme => {
-                const ThemeIcon = theme.icon
-                const isSelected = selectedThemeId === theme.id && !customColors
-                return (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => { setSelectedThemeId(theme.id); setCustomColors(null); setCustomFont(null); setExtractedBrand(null) }}
-                    className={`relative rounded-lg border p-3 text-left transition-all ${
-                      isSelected
-                        ? 'border-accent ring-1 ring-accent'
-                        : 'border-card-border hover:border-accent/30'
-                    }`}
-                  >
-                    {/* Theme mini preview */}
-                    <div className="flex gap-1 mb-2">
-                      <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.primary, borderColor: theme.border }} />
-                      <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.background, borderColor: theme.border }} />
-                      <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.card, borderColor: theme.border }} />
-                    </div>
-                    <span className="text-xs font-semibold text-foreground block" style={{ fontFamily: `"${theme.font}", ${theme.fontType}` }}>{theme.name}</span>
-                    <span className="text-[10px] text-muted">{theme.description}</span>
-                    {isSelected && (
-                      <div className="absolute top-1.5 right-1.5">
-                        <Check className="w-3.5 h-3.5 text-accent" />
+              <div
+                className={`grid grid-cols-3 gap-2 transition-all duration-500 ease-in-out origin-top ${
+                  showThemes ? 'mt-3 max-h-[500px] opacity-100 scale-y-100' : 'max-h-0 opacity-0 scale-y-0 overflow-hidden'
+                }`}
+              >
+                {THEMES.map(theme => {
+                  const isSelected = selectedThemeId === theme.id && !customColors
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => { setSelectedThemeId(theme.id); setCustomColors(null); setCustomTitleFont(null); setCustomBodyFont(null); setExtractedBrand(null) }}
+                      className={`relative rounded-lg border p-3 text-left transition-all ${
+                        isSelected
+                          ? 'border-accent ring-1 ring-accent'
+                          : 'border-card-border hover:border-accent/30'
+                      }`}
+                    >
+                      {/* Theme mini preview */}
+                      <div className="flex gap-1 mb-2">
+                        <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.primary, borderColor: theme.border }} />
+                        <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.background, borderColor: theme.border }} />
+                        <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.surface, borderColor: theme.border }} />
                       </div>
-                    )}
-                  </button>
-                )
-              })}
+                      <span className="text-xs font-semibold text-foreground block" style={{ fontFamily: `"${theme.titleFont}", ${theme.titleFontType}` }}>{theme.name}</span>
+                      <span className="text-[10px] text-muted">{theme.description}</span>
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5">
+                          <Check className="w-3.5 h-3.5 text-accent" />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Live preview */}
@@ -1004,17 +1153,41 @@ export default function OnboardingPage() {
                     )}
                   </div>
 
-                  {/* Font selector */}
+                  {/* Title font selector */}
                   <div>
-                    <label className="block text-xs text-muted mb-2">Font</label>
+                    <label className="block text-xs text-muted mb-2">Title font</label>
                     <div className="grid grid-cols-2 gap-2">
                       {FONT_OPTIONS.map(f => (
                         <button
                           key={f.value}
                           type="button"
-                          onClick={() => setCustomFont(f.value)}
+                          onClick={() => setCustomTitleFont(f.value)}
                           className={`px-3 py-2.5 rounded-lg border text-left transition-all ${
-                            (customFont || effectiveTheme.font) === f.value
+                            (customTitleFont || effectiveTheme.titleFont) === f.value
+                              ? 'border-accent bg-accent/10'
+                              : 'border-card-border bg-card hover:border-accent/30'
+                          }`}
+                        >
+                          <span className="text-sm font-semibold text-foreground block" style={{ fontFamily: `"${f.value}", ${f.type.toLowerCase()}` }}>
+                            {f.label}
+                          </span>
+                          <span className="text-[10px] text-muted">{f.type}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Body font selector */}
+                  <div>
+                    <label className="block text-xs text-muted mb-2">Body font</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {FONT_OPTIONS.map(f => (
+                        <button
+                          key={f.value}
+                          type="button"
+                          onClick={() => setCustomBodyFont(f.value)}
+                          className={`px-3 py-2.5 rounded-lg border text-left transition-all ${
+                            (customBodyFont || effectiveTheme.bodyFont) === f.value
                               ? 'border-accent bg-accent/10'
                               : 'border-card-border bg-card hover:border-accent/30'
                           }`}
@@ -1035,7 +1208,9 @@ export default function OnboardingPage() {
                       {[
                         { key: 'primary', label: 'Primary' },
                         { key: 'secondary', label: 'Secondary' },
+                        { key: 'accent', label: 'Accent' },
                         { key: 'background', label: 'Background' },
+                        { key: 'surface', label: 'Surface' },
                         { key: 'foreground', label: 'Text' },
                       ].map(({ key, label }) => {
                         const colorValue = (customColors?.[key] || effectiveTheme[key]) ?? '#000000'
@@ -1046,7 +1221,24 @@ export default function OnboardingPage() {
                               <input
                                 type="color"
                                 value={colorValue}
-                                onChange={e => setCustomColors(prev => ({ ...(prev || {}), [key]: e.target.value }))}
+                                onChange={e => {
+                                  const newColors = { ...(customColors || {}), [key]: e.target.value }
+                                  // Auto-derive related shades when primary colors change
+                                  if (key === 'primary') {
+                                    newColors.primaryHover = darkenColor(e.target.value, 10)
+                                  } else if (key === 'background') {
+                                    const dark = isColorDark(e.target.value)
+                                    newColors.surface = dark ? lightenColor(e.target.value, 8) : darkenColor(e.target.value, 3)
+                                    newColors.surfaceHover = dark ? lightenColor(e.target.value, 14) : darkenColor(e.target.value, 6)
+                                    newColors.border = dark ? lightenColor(e.target.value, 12) : darkenColor(e.target.value, 10)
+                                    newColors.borderHover = dark ? lightenColor(e.target.value, 20) : darkenColor(e.target.value, 16)
+                                    newColors.foreground = dark ? '#f0f0f5' : '#18181b'
+                                    newColors.muted = '#71717a'
+                                  } else if (key === 'surface') {
+                                    newColors.surfaceHover = isColorDark(e.target.value) ? lightenColor(e.target.value, 6) : darkenColor(e.target.value, 4)
+                                  }
+                                  setCustomColors(newColors)
+                                }}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                               />
                             </div>
