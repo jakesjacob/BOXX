@@ -282,3 +282,42 @@ CREATE INDEX idx_user_credits_user_id ON user_credits(user_id);
 CREATE INDEX idx_user_credits_status ON user_credits(status);
 CREATE INDEX idx_waitlist_class_schedule_id ON waitlist(class_schedule_id);
 CREATE INDEX idx_login_attempts_email ON login_attempts(email);
+
+-- ─────────────────────────────────────
+-- UNIQUE CONSTRAINTS (payment security)
+-- ─────────────────────────────────────
+-- Prevent duplicate credit allocation from webhook replays
+CREATE UNIQUE INDEX idx_user_credits_stripe_payment_id
+  ON user_credits(stripe_payment_id)
+  WHERE stripe_payment_id IS NOT NULL;
+
+-- ─────────────────────────────────────
+-- FUNCTIONS (atomic credit operations)
+-- ─────────────────────────────────────
+
+-- Atomically deduct 1 credit; returns true if successful, false if no credits
+CREATE OR REPLACE FUNCTION deduct_credit(credit_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+  rows_affected INT;
+BEGIN
+  UPDATE user_credits
+  SET credits_remaining = credits_remaining - 1
+  WHERE id = credit_id
+    AND credits_remaining > 0;
+
+  GET DIAGNOSTICS rows_affected = ROW_COUNT;
+  RETURN rows_affected > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Atomically restore 1 credit (used when booking insert fails)
+CREATE OR REPLACE FUNCTION restore_credit(credit_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE user_credits
+  SET credits_remaining = credits_remaining + 1
+  WHERE id = credit_id
+    AND credits_remaining IS NOT NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

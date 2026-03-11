@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { rateLimit } from '@/lib/rate-limit'
 import { getStripeAsync } from '@/lib/stripe'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
@@ -18,6 +19,12 @@ export async function POST(request) {
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit: 5 checkout attempts per minute per user
+    const { limited } = rateLimit(`checkout:${session.user.id}`, 5, 60 * 1000)
+    if (limited) {
+      return NextResponse.json({ error: 'Too many requests. Please wait a moment.' }, { status: 429 })
     }
 
     const body = await request.json()
@@ -116,6 +123,6 @@ export async function POST(request) {
     return NextResponse.json({ url: checkoutSession.url })
   } catch (error) {
     console.error('[stripe/checkout] Error:', error.message, error.stack)
-    return NextResponse.json({ error: error.message || 'Something went wrong. Please try again.' }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
   }
 }

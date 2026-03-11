@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { rateLimit } from '@/lib/rate-limit'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendBookingConfirmation, sendCreditsLowWarning } from '@/lib/email'
 import { NextResponse } from 'next/server'
@@ -17,6 +18,12 @@ export async function POST(request) {
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit: 10 booking attempts per minute per user
+    const { limited } = rateLimit(`booking:${session.user.id}`, 10, 60 * 1000)
+    if (limited) {
+      return NextResponse.json({ error: 'Too many requests. Please wait a moment.' }, { status: 429 })
     }
 
     const body = await request.json()
@@ -92,17 +99,15 @@ export async function POST(request) {
 
     const credit = credits[0]
 
-    // 5. Deduct credit (skip for unlimited)
+    // 5. Deduct credit atomically (skip for unlimited)
     if (credit.credits_remaining !== null) {
-      const { error: deductError } = await supabaseAdmin
-        .from('user_credits')
-        .update({ credits_remaining: credit.credits_remaining - 1 })
-        .eq('id', credit.id)
-        .gt('credits_remaining', 0) // Optimistic lock
+      // Use server-side decrement to prevent race conditions
+      const { data: updated, error: deductError } = await supabaseAdmin
+        .rpc('deduct_credit', { credit_id: credit.id })
 
-      if (deductError) {
+      if (deductError || !updated) {
         console.error('[bookings/create] Credit deduct error:', deductError)
-        return NextResponse.json({ error: 'Failed to deduct credit. Please try again.' }, { status: 500 })
+        return NextResponse.json({ error: 'No credits available. Please try again.' }, { status: 400 })
       }
     }
 
@@ -120,12 +125,10 @@ export async function POST(request) {
 
     if (bookingError) {
       console.error('[bookings/create] Booking error:', bookingError)
-      // Attempt to restore credit if booking failed
+      // Restore credit atomically (increment by 1, not set to original)
       if (credit.credits_remaining !== null) {
         await supabaseAdmin
-          .from('user_credits')
-          .update({ credits_remaining: credit.credits_remaining })
-          .eq('id', credit.id)
+          .rpc('restore_credit', { credit_id: credit.id })
       }
       return NextResponse.json({ error: 'Failed to create booking. Please try again.' }, { status: 500 })
     }

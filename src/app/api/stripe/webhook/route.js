@@ -104,7 +104,7 @@ async function handleCheckoutCompleted(session) {
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + pack.validity_days)
 
-  // Insert user credits
+  // Insert user credits (unique constraint on stripe_payment_id prevents duplicates)
   const { error } = await supabaseAdmin.from('user_credits').insert({
     user_id: userId,
     class_pack_id: packId,
@@ -117,6 +117,11 @@ async function handleCheckoutCompleted(session) {
   })
 
   if (error) {
+    // Unique constraint violation = already processed (safe to ignore)
+    if (error.code === '23505') {
+      console.log('[stripe/webhook] Duplicate webhook, already processed:', paymentId)
+      return
+    }
     console.error('[stripe/webhook] Failed to allocate credits:', error)
     return
   }
