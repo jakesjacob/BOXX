@@ -942,22 +942,51 @@ function PaymentsTab() {
         </CardContent>
       </Card>
 
-      {/* Setup instructions */}
-      {!stripeConfigured && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Setup Guide</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="space-y-2 text-sm text-muted list-decimal list-inside">
-              <li>Create a <a href="https://dashboard.stripe.com/register" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Stripe account</a> (or sign in to your existing one)</li>
-              <li>Go to <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Developers → API Keys</a> and copy your <strong>Secret Key</strong></li>
-              <li>Paste it above and click <strong>Connect Stripe</strong> — webhooks are set up automatically</li>
-              <li>Create Products in Stripe for each class pack, then add the Price IDs on the <a href="/admin/packs" className="text-accent hover:underline">Packs page</a></li>
-            </ol>
-          </CardContent>
-        </Card>
-      )}
+      {/* Setup instructions — always visible */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{stripeConfigured ? 'Linking Products' : 'Setup Guide'}</CardTitle>
+          <CardDescription>
+            {stripeConfigured
+              ? 'Link each of your class packs to a Stripe product so customers can pay.'
+              : 'Follow these steps to start accepting payments.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ol className="space-y-3 text-sm text-muted list-decimal list-inside">
+            {!stripeConfigured && (
+              <>
+                <li>Create a <a href="https://dashboard.stripe.com/register" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Stripe account</a> (or sign in to your existing one)</li>
+                <li>Go to <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Developers → API Keys</a> and copy your <strong className="text-foreground">Secret Key</strong></li>
+                <li>Paste it above and click <strong className="text-foreground">Connect Stripe</strong> — webhooks are set up automatically</li>
+              </>
+            )}
+            <li>
+              Go to your <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Stripe Product Catalogue</a> and create a <strong className="text-foreground">Product</strong> for each class pack (e.g. &quot;5 Class Pack — ฿2,750&quot;). Set the price when creating the product.
+            </li>
+            <li>
+              Copy the <strong className="text-foreground">product URL</strong> from your browser address bar (it looks like <code className="text-xs bg-white/5 px-1.5 py-0.5 rounded">https://dashboard.stripe.com/products/prod_...</code>)
+            </li>
+            <li>
+              Go to the <a href="/admin/packs" className="text-accent hover:underline">Class Packs</a> page, edit each pack, and paste the URL into the <strong className="text-foreground">Stripe Product</strong> field. The system will automatically link it.
+            </li>
+          </ol>
+          {stripeConfigured && (
+            <div className="mt-4 flex gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer">
+                  Product Catalogue ↗
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/admin/packs">
+                  Class Packs →
+                </a>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
