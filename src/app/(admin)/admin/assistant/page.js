@@ -36,14 +36,14 @@ export default function AssistantPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState(null)
   const [convoLoading, setConvoLoading] = useState(true)
-  const [vpOffset, setVpOffset] = useState(0)
-  const [vpHeight, setVpHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800)
   const [usage, setUsage] = useState(null) // { cost_usd, limit_usd, limited }
   const [usageLimited, setUsageLimited] = useState(false)
 
   const messagesEndRef = useRef(null)
   const messagesRef = useRef(null)
+  const containerRef = useRef(null)
   const inputRef = useRef(null)
+  const scrollDebounceRef = useRef(null)
 
   // Lock page scroll + track keyboard via visualViewport
   useEffect(() => {
@@ -69,22 +69,31 @@ export default function AssistantPage() {
 
     const vv = window.visualViewport
     if (vv) {
+      // Apply position/size directly to DOM to avoid React re-render jitter
+      // during keyboard animation. Only debounce a scroll-to-bottom at the end.
       const update = () => {
-        // Use visualViewport dimensions directly — much more reliable
-        // than trying to calculate keyboard height from innerHeight
-        setVpHeight(vv.height)
-        setVpOffset(vv.offsetTop)
-
-        // Try to prevent iOS from accumulating scroll offset
-        if (vv.offsetTop > 0) {
-          window.scrollTo(0, 0)
-        }
-
-        // Shift the admin header to compensate for iOS viewport scroll
+        const el = containerRef.current
         const header = document.querySelector('header[class*="fixed"]')
-        if (header) {
-          header.style.transform = `translateY(${vv.offsetTop}px)`
+        const offset = vv.offsetTop
+        const height = vv.height
+
+        // Direct DOM style updates — no React state, no re-render flicker
+        if (el) {
+          el.style.top = `${64 + offset}px`
+          el.style.height = `${height - 64}px`
         }
+        if (header) {
+          header.style.transform = `translateY(${offset}px)`
+        }
+
+        // Prevent iOS scroll offset accumulation
+        if (offset > 0) window.scrollTo(0, 0)
+
+        // Debounced scroll-to-bottom after keyboard settles
+        clearTimeout(scrollDebounceRef.current)
+        scrollDebounceRef.current = setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }, 150)
       }
 
       vv.addEventListener('resize', update)
@@ -94,6 +103,7 @@ export default function AssistantPage() {
       return () => {
         vv.removeEventListener('resize', update)
         vv.removeEventListener('scroll', update)
+        clearTimeout(scrollDebounceRef.current)
         document.removeEventListener('touchmove', preventTouch)
         html.style.overflow = ''
         html.style.overscrollBehavior = ''
@@ -120,10 +130,10 @@ export default function AssistantPage() {
     }
   }, [])
 
-  // Scroll to bottom when messages change or viewport resizes (keyboard)
+  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, vpHeight])
+  }, [messages])
 
   // Focus input on load
   useEffect(() => {
@@ -294,11 +304,12 @@ export default function AssistantPage() {
   return (
     <>
       <div
+        ref={containerRef}
         className={cn(
           'fixed left-0 right-0 flex flex-col bg-background z-20',
           'lg:static lg:z-auto lg:flex-row lg:h-[calc(100vh-4rem)] lg:-m-6 lg:overflow-hidden'
         )}
-        style={{ top: `${64 + vpOffset}px`, height: `${vpHeight - 64}px` }}
+        style={{ top: '64px', height: 'calc(100vh - 64px)' }}
       >
         {/* Mobile sidebar overlay */}
         {sidebarOpen && (
