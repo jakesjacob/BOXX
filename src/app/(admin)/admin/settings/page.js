@@ -30,8 +30,6 @@ const TABS = [
 function SettingsContent() {
   const searchParams = useSearchParams()
   const defaultTab = searchParams.get('tab') || 'payments'
-  const connected = searchParams.get('connected')
-  const error = searchParams.get('error')
   const [activeTab, setActiveTab] = useState(defaultTab)
 
   return (
@@ -58,7 +56,7 @@ function SettingsContent() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'payments' && <PaymentsTab connected={connected} error={error} />}
+      {activeTab === 'payments' && <PaymentsTab />}
       {activeTab === 'studio' && <StudioInfoTab />}
       {activeTab === 'social' && <SocialLinksTab />}
       {activeTab === 'seo' && <SeoTab />}
@@ -764,14 +762,14 @@ function RemindersTab() {
 
 // ─── Payments Tab (existing) ─────────────────────────────────────────────────
 
-function PaymentsTab({ connected, error }) {
-  const [stripeStatus, setStripeStatus] = useState(null)
+function PaymentsTab() {
   const [packs, setPacks] = useState([])
   const [priceIds, setPriceIds] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [disconnecting, setDisconnecting] = useState(false)
   const [saveMessage, setSaveMessage] = useState(null)
+  const [stripeConfigured, setStripeConfigured] = useState(false)
+  const [checkingStripe, setCheckingStripe] = useState(true)
 
   useEffect(() => {
     fetchData()
@@ -779,18 +777,10 @@ function PaymentsTab({ connected, error }) {
 
   async function fetchData() {
     try {
-      const [settingsRes, packsRes] = await Promise.all([
-        fetch('/api/admin/settings'),
+      const [packsRes, stripeRes] = await Promise.all([
         fetch('/api/admin/packs'),
+        fetch('/api/settings/stripe-status'),
       ])
-
-      if (settingsRes.ok) {
-        const { settings } = await settingsRes.json()
-        setStripeStatus({
-          accountId: settings.stripe_account_id || '',
-          isConnected: !!settings.stripe_account_id,
-        })
-      }
 
       if (packsRes.ok) {
         const { packs: packData } = await packsRes.json()
@@ -801,28 +791,16 @@ function PaymentsTab({ connected, error }) {
         })
         setPriceIds(ids)
       }
+
+      if (stripeRes.ok) {
+        const data = await stripeRes.json()
+        setStripeConfigured(data.configured)
+      }
     } catch (err) {
       console.error('Failed to load settings:', err)
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleDisconnect() {
-    if (!confirm('Are you sure you want to disconnect your Stripe account? Members will not be able to purchase class packs.')) {
-      return
-    }
-
-    setDisconnecting(true)
-    try {
-      const res = await fetch('/api/stripe/connect', { method: 'DELETE' })
-      if (res.ok) {
-        setStripeStatus({ accountId: '', isConnected: false })
-      }
-    } catch (err) {
-      console.error('Disconnect failed:', err)
-    } finally {
-      setDisconnecting(false)
+      setCheckingStripe(false)
     }
   }
 
@@ -863,122 +841,93 @@ function PaymentsTab({ connected, error }) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Connection status messages */}
-      {connected && (
-        <div className="p-3 sm:p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
-          <p className="text-green-400 text-sm font-medium">Stripe account connected successfully!</p>
-        </div>
-      )}
-      {error && (
-        <div className="p-3 sm:p-4 bg-red-600/10 border border-red-600/20 rounded-lg">
-          <p className="text-red-400 text-sm font-medium">
-            {error === 'denied' && 'Stripe connection was cancelled.'}
-            {error === 'invalid' && 'Invalid connection request.'}
-            {error === 'failed' && 'Failed to connect Stripe account. Please try again.'}
-            {error === 'no_code' && 'No authorization code received.'}
-            {error === 'db' && 'Failed to save connection. Please try again.'}
-          </p>
-        </div>
-      )}
-
-      {/* Stripe Connection Card */}
+      {/* Stripe Status Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <span>💳</span> Stripe Connection
+            <span>💳</span> Stripe Payments
           </CardTitle>
           <CardDescription>
-            Connect your Stripe account to accept payments.
+            Stripe processes all payments directly to your account.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {stripeStatus?.isConnected ? (
+          {stripeConfigured ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Badge variant="success">Connected</Badge>
+                <Badge variant="success">Configured</Badge>
               </div>
-              <p className="text-xs text-muted break-all">
-                Account: {stripeStatus.accountId}
-              </p>
               <p className="text-xs text-muted">
-                Payments go directly to your Stripe account.
+                Stripe API keys are set. Payments are active.
               </p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
-                  <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer">
-                    Stripe Dashboard ↗
-                  </a>
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="w-full sm:w-auto"
-                  onClick={handleDisconnect}
-                  disabled={disconnecting}
-                >
-                  {disconnecting ? 'Disconnecting...' : 'Disconnect'}
-                </Button>
-              </div>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
+                <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer">
+                  Stripe Dashboard ↗
+                </a>
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">Not Configured</Badge>
+              </div>
               <p className="text-sm text-muted">
-                Connect your Stripe account to start accepting payments.
+                Stripe API keys need to be added to the environment variables to enable payments.
               </p>
-              <Button className="w-full sm:w-auto" asChild>
-                <a href="/api/stripe/connect">Connect with Stripe</a>
-              </Button>
+              <div className="px-3 py-2 bg-card border border-card-border rounded text-xs text-muted space-y-1">
+                <p className="font-medium text-foreground">Required env vars:</p>
+                <p><code className="text-accent">STRIPE_SECRET_KEY</code> — your Stripe secret key</p>
+                <p><code className="text-accent">STRIPE_WEBHOOK_SECRET</code> — webhook signing secret</p>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Price IDs Card — only show when connected */}
-      {stripeStatus?.isConnected && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Stripe Price IDs</CardTitle>
-            <CardDescription>
-              Create products in Stripe, then paste Price IDs here.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {packs.map((pack) => (
-              <div key={pack.id} className="space-y-1.5">
-                <Label htmlFor={`price-${pack.id}`}>{pack.name}</Label>
-                <Input
-                  id={`price-${pack.id}`}
-                  placeholder="price_xxxxxxxxxxxx"
-                  value={priceIds[pack.id] || ''}
-                  onChange={(e) =>
-                    setPriceIds((prev) => ({ ...prev, [pack.id]: e.target.value }))
-                  }
-                />
-              </div>
-            ))}
-
-            {saveMessage && (
-              <p className={cn('text-sm', saveMessage.type === 'success' ? 'text-green-400' : 'text-red-400')}>
-                {saveMessage.text}
-              </p>
-            )}
-
-            <div className="space-y-2 pt-2">
-              <Button onClick={handleSavePriceIds} disabled={saving} className="w-full sm:w-auto">
-                {saving ? 'Saving...' : 'Save Price IDs'}
-              </Button>
-              <a
-                href="https://docs.stripe.com/products-prices/how-products-and-prices-work#what-is-a-price"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-xs text-accent hover:underline"
-              >
-                How to find your Price IDs →
-              </a>
+      {/* Price IDs Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Stripe Price IDs</CardTitle>
+          <CardDescription>
+            Create products in your Stripe dashboard, then paste the Price IDs here to link them to your packs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {packs.map((pack) => (
+            <div key={pack.id} className="space-y-1.5">
+              <Label htmlFor={`price-${pack.id}`}>{pack.name}</Label>
+              <Input
+                id={`price-${pack.id}`}
+                placeholder="price_xxxxxxxxxxxx"
+                value={priceIds[pack.id] || ''}
+                onChange={(e) =>
+                  setPriceIds((prev) => ({ ...prev, [pack.id]: e.target.value }))
+                }
+              />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ))}
+
+          {saveMessage && (
+            <p className={cn('text-sm', saveMessage.type === 'success' ? 'text-green-400' : 'text-red-400')}>
+              {saveMessage.text}
+            </p>
+          )}
+
+          <div className="space-y-2 pt-2">
+            <Button onClick={handleSavePriceIds} disabled={saving} className="w-full sm:w-auto">
+              {saving ? 'Saving...' : 'Save Price IDs'}
+            </Button>
+            <a
+              href="https://docs.stripe.com/products-prices/how-products-and-prices-work#what-is-a-price"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-xs text-accent hover:underline"
+            >
+              How to find your Price IDs →
+            </a>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

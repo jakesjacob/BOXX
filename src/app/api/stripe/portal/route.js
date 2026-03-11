@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { getClientStripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
@@ -34,15 +34,15 @@ export async function POST(request) {
       )
     }
 
-    const clientStripe = await getClientStripe()
-    if (!clientStripe) {
+    const stripe = getStripe()
+    if (!stripe) {
       return NextResponse.json(
         { error: 'Payments are not configured.' },
         { status: 400 }
       )
     }
 
-    const portalSession = await clientStripe.billingPortal.sessions.create({
+    const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripe_customer_id,
       return_url: `${APP_URL}/dashboard`,
     })

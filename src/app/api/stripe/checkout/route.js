@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { getClientStripe, getConnectedAccount } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -68,9 +68,9 @@ export async function POST(request) {
       )
     }
 
-    // Get connected Stripe account
-    const clientStripe = await getClientStripe()
-    if (!clientStripe) {
+    // Get Stripe instance
+    const stripe = getStripe()
+    if (!stripe) {
       return NextResponse.json(
         { error: 'Payments are not set up yet. Please contact the studio.' },
         { status: 400 }
@@ -87,7 +87,7 @@ export async function POST(request) {
     let customerId = user?.stripe_customer_id
 
     if (!customerId) {
-      const customer = await clientStripe.customers.create({
+      const customer = await stripe.customers.create({
         email: user.email,
         name: user.name,
         metadata: { userId: session.user.id },
@@ -101,7 +101,7 @@ export async function POST(request) {
     }
 
     // Create Checkout Session
-    const checkoutSession = await clientStripe.checkout.sessions.create({
+    const checkoutSession = await stripe.checkout.sessions.create({
       mode: pack.is_membership ? 'subscription' : 'payment',
       customer: customerId,
       line_items: [{ price: pack.stripe_price_id, quantity: 1 }],
