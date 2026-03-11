@@ -37,22 +37,61 @@ export default function AssistantPage() {
   const [deleteDialog, setDeleteDialog] = useState(null)
   const [convoLoading, setConvoLoading] = useState(true)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [vpOffset, setVpOffset] = useState(0)
   const [usage, setUsage] = useState(null) // { cost_usd, limit_usd, limited }
   const [usageLimited, setUsageLimited] = useState(false)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Lock page scroll — prevents browser from scrolling the page
-  // when the keyboard opens to "reveal" the focused input
+  // Lock page scroll + track keyboard via visualViewport
   useEffect(() => {
     const html = document.documentElement
     const body = document.body
+
+    // Prevent document-level scroll
     html.style.overflow = 'hidden'
     body.style.overflow = 'hidden'
     body.style.position = 'fixed'
     body.style.width = '100%'
     body.style.top = '0'
+
+    const vv = window.visualViewport
+    if (vv) {
+      const update = () => {
+        // Keyboard height
+        const kb = window.innerHeight - vv.height - vv.offsetTop
+        setKeyboardHeight(Math.max(0, kb))
+
+        // iOS scrolls the visual viewport when keyboard opens,
+        // pushing fixed elements out of view. Track the offset
+        // so we can compensate on our fixed container + the header.
+        setVpOffset(vv.offsetTop)
+
+        // Also shift the admin header to compensate
+        const header = document.querySelector('header[class*="fixed"]')
+        if (header) {
+          header.style.transform = `translateY(${vv.offsetTop}px)`
+        }
+      }
+
+      vv.addEventListener('resize', update)
+      vv.addEventListener('scroll', update)
+      update()
+
+      return () => {
+        vv.removeEventListener('resize', update)
+        vv.removeEventListener('scroll', update)
+        html.style.overflow = ''
+        body.style.overflow = ''
+        body.style.position = ''
+        body.style.width = ''
+        body.style.top = ''
+        // Reset header
+        const header = document.querySelector('header[class*="fixed"]')
+        if (header) header.style.transform = ''
+      }
+    }
 
     return () => {
       html.style.overflow = ''
@@ -60,26 +99,6 @@ export default function AssistantPage() {
       body.style.position = ''
       body.style.width = ''
       body.style.top = ''
-    }
-  }, [])
-
-  // Track mobile keyboard via visualViewport
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-
-    const update = () => {
-      const kb = window.innerHeight - vv.height - vv.offsetTop
-      setKeyboardHeight(Math.max(0, kb))
-    }
-
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    update()
-
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
     }
   }, [])
 
@@ -261,7 +280,7 @@ export default function AssistantPage() {
           'fixed top-16 left-0 right-0 flex flex-col bg-background z-20',
           'lg:static lg:z-auto lg:flex-row lg:h-[calc(100vh-4rem)] lg:-m-6 lg:overflow-hidden'
         )}
-        style={{ bottom: `${keyboardHeight}px` }}
+        style={{ bottom: `${keyboardHeight}px`, transform: `translateY(${vpOffset}px)` }}
       >
         {/* Mobile sidebar overlay */}
         {sidebarOpen && (
