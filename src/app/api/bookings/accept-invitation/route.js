@@ -32,7 +32,7 @@ export async function POST(request) {
     const userId = session.user.id
 
     // Find the invited booking
-    const { data: booking } = await supabaseAdmin
+    const { data: booking, error: bookingErr } = await supabaseAdmin
       .from('bookings')
       .select('id, class_schedule_id, class_schedule(starts_at, status, class_types(name), instructors(name))')
       .eq('id', bookingId)
@@ -41,6 +41,7 @@ export async function POST(request) {
       .single()
 
     if (!booking) {
+      console.error('[accept-invitation] Booking not found:', { bookingId, userId, bookingErr })
       return NextResponse.json({ error: 'Invitation not found' }, { status: 404 })
     }
 
@@ -52,28 +53,51 @@ export async function POST(request) {
       return NextResponse.json({ error: 'This class has already started' }, { status: 400 })
     }
 
-    // Find available credit
-    const { data: allCredits } = await supabaseAdmin
+    // Find ALL credits for this user (no filtering on remaining — do it in JS)
+    const now = new Date().toISOString()
+    const { data: allCredits, error: creditsErr } = await supabaseAdmin
       .from('user_credits')
-      .select('id, credits_remaining')
+      .select('id, credits_remaining, credits_total, status, expires_at')
       .eq('user_id', userId)
-      .eq('status', 'active')
-      .gt('expires_at', new Date().toISOString())
       .order('expires_at', { ascending: true })
 
-    const credit = (allCredits || []).find(
-      (c) => c.credits_remaining > 0 || c.credits_remaining === null
+    console.log('[accept-invitation] All credits for user:', userId, JSON.stringify(allCredits))
+
+    // Filter to usable credits
+    const usable = (allCredits || []).filter(
+      (c) => c.status === 'active'
+        && new Date(c.expires_at) > new Date()
+        && (c.credits_remaining > 0 || c.credits_remaining === null)
     )
 
-    if (!credit) {
-      return NextResponse.json({ error: 'No available credits. Purchase a class pack first.' }, { status: 400 })
+    console.log('[accept-invitation] Usable credits:', JSON.stringify(usable))
+
+    if (!usable.length) {
+      return NextResponse.json({
+        error: 'No available credits. Purchase a class pack first.',
+        debug: {
+          totalCredits: allCredits?.length || 0,
+          credits: (allCredits || []).map((c) => ({
+            status: c.status,
+            remaining: c.credits_remaining,
+            expires: c.expires_at,
+            expired: new Date(c.expires_at) <= new Date(),
+          })),
+        },
+      }, { status: 400 })
     }
+
+    const credit = usable[0]
 
     // Deduct credit atomically
     if (credit.credits_remaining !== null) {
-      const { data: ok } = await supabaseAdmin.rpc('deduct_credit', { credit_id: credit.id })
+      const { data: ok, error: rpcErr } = await supabaseAdmin.rpc('deduct_credit', { credit_id: credit.id })
+      console.log('[accept-invitation] deduct_credit result:', { ok, rpcErr, creditId: credit.id })
       if (!ok) {
-        return NextResponse.json({ error: 'No credits available. Please try again.' }, { status: 400 })
+        return NextResponse.json({
+          error: 'Credit deduction failed. Please try again.',
+          debug: { creditId: credit.id, remaining: credit.credits_remaining, rpcResult: ok, rpcErr },
+        }, { status: 400 })
       }
     }
 

@@ -1957,7 +1957,7 @@ function BookingsSection({ upcoming, past, waitlist = [], credits = [], onUpdate
                                 })
                                 const result = await res.json()
                                 if (res.ok) onUpdate()
-                                else alert(result.error || 'Failed to accept')
+                                else alert(result.error + (result.debug ? '\n\nDebug: ' + JSON.stringify(result.debug) : '') || 'Failed to accept')
                               } catch { alert('Something went wrong') }
                             }}
                             className="shrink-0"
