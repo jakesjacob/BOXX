@@ -11,10 +11,10 @@ export default function NotFound() {
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
-            href="/"
+            href="/login"
             className="inline-flex items-center justify-center px-6 py-3 bg-accent text-background font-semibold rounded-lg hover:bg-accent-dim transition-colors"
           >
-            Back to Home
+            Log In
           </Link>
           <Link
             href="/dashboard"
@@ -23,9 +23,6 @@ export default function NotFound() {
             Member Dashboard
           </Link>
         </div>
-        <p className="text-muted text-sm mt-12">
-          BOXX Boxing Studio &middot; Chiang Mai, Thailand
-        </p>
       </div>
     </div>
   )
