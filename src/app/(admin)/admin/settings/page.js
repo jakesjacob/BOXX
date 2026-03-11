@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+import { CreditCard, Building2, Link2, Search, ClipboardList, Bell } from 'lucide-react'
 
 export default function SettingsPage() {
   return (
@@ -19,12 +20,12 @@ export default function SettingsPage() {
 }
 
 const TABS = [
-  { id: 'payments', label: 'Payments', icon: '💳' },
-  { id: 'studio', label: 'Studio', icon: '🏢' },
-  { id: 'social', label: 'Social Links', icon: '🔗' },
-  { id: 'seo', label: 'SEO', icon: '🔍' },
-  { id: 'booking', label: 'Booking', icon: '📋' },
-  { id: 'reminders', label: 'Reminders', icon: '🔔' },
+  { id: 'payments', label: 'Payments', icon: CreditCard },
+  { id: 'studio', label: 'Studio', icon: Building2 },
+  { id: 'social', label: 'Social Links', icon: Link2 },
+  { id: 'seo', label: 'SEO', icon: Search },
+  { id: 'booking', label: 'Booking', icon: ClipboardList },
+  { id: 'reminders', label: 'Reminders', icon: Bell },
 ]
 
 function SettingsContent() {
@@ -49,7 +50,7 @@ function SettingsContent() {
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             )}
           >
-            <span className="text-base">{tab.icon}</span>
+            <tab.icon className="w-4 h-4 shrink-0" />
             <span>{tab.label}</span>
           </button>
         ))}
@@ -871,7 +872,7 @@ function PaymentsTab() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <span>💳</span> Stripe Payments
+            <CreditCard className="w-4 h-4" /> Stripe Payments
           </CardTitle>
           <CardDescription>
             Paste your Stripe Secret Key to enable payments. Webhooks are configured automatically.

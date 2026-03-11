@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { X } from 'lucide-react'
 
 export default function AdminInstructorsPage() {
   const [instructors, setInstructors] = useState([])
@@ -113,7 +114,7 @@ export default function AdminInstructorsPage() {
             : 'bg-green-500/10 border-green-500/20 text-green-400'
         )}>
           <span className="text-sm flex-1">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100 shrink-0">✕</button>
+          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100 shrink-0"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 

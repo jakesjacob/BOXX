@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { CalendarDays, XCircle, UserPlus, Wrench, ClipboardList } from 'lucide-react'
 
 const eventTypeConfig = {
-  booking: { icon: '📅', label: 'Booking', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/20' },
-  cancellation: { icon: '❌', label: 'Cancellation', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' },
-  signup: { icon: '👤', label: 'Signup', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
-  admin: { icon: '🔧', label: 'Admin', color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
+  booking: { icon: CalendarDays, label: 'Booking', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/20' },
+  cancellation: { icon: XCircle, label: 'Cancellation', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' },
+  signup: { icon: UserPlus, label: 'Signup', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
+  admin: { icon: Wrench, label: 'Admin', color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
 }
 
 function formatTime(ts) {
@@ -178,7 +179,7 @@ export default function AdminEventsPage() {
                   : 'bg-card border border-card-border text-muted hover:text-foreground hover:border-card-border/80'
               )}
             >
-              {f.icon && <span className="mr-1">{f.icon}</span>}
+              {f.icon && <f.icon className="w-3 h-3 mr-1 inline" />}
               {f.label}
             </button>
           ))}
@@ -236,7 +237,7 @@ export default function AdminEventsPage() {
       ) : events.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-3xl mb-3">📭</p>
+            <p className="text-3xl mb-3 text-muted"><ClipboardList className="w-8 h-8 mx-auto" /></p>
             <p className="text-foreground font-medium">No events found</p>
             <p className="text-sm text-muted mt-1">Try adjusting your filters</p>
           </CardContent>
@@ -277,8 +278,8 @@ export default function AdminEventsPage() {
                         {/* Main row */}
                         <div className="flex items-start gap-3 p-3 sm:p-4">
                           {/* Type icon */}
-                          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-lg', config.bg)}>
-                            {config.icon}
+                          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', config.bg)}>
+                            <config.icon className={cn('w-4 h-4', config.color)} />
                           </div>
 
                           {/* Content */}

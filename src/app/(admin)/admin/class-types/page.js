@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { X } from 'lucide-react'
 
 const COLOR_OPTIONS = [
   { label: 'Gold', value: '#c8a750' },
@@ -172,7 +173,7 @@ export default function ClassTypesPage() {
       {toast && (
         <div className={cn('mb-6 px-4 py-3 rounded-lg border flex items-center justify-between', toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400')}>
           <span className="text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100">✕</button>
+          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 

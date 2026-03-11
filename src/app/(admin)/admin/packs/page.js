@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { X, ExternalLink, Trash2, Tag } from 'lucide-react'
 
 const emptyForm = {
   name: '',
@@ -168,9 +169,7 @@ export default function AdminPacksPage() {
         )}>
           <span className="text-sm">{toast.message}</span>
           <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -233,9 +232,7 @@ export default function AdminPacksPage() {
                     className="text-[10px] text-green-400/70 hover:text-green-400 mt-0.5 font-mono inline-flex items-center gap-1"
                   >
                     Stripe Product Linked
-                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
+                    <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 ) : (
                   <p className="text-[10px] text-red-400/70 mt-0.5">No Stripe product linked</p>
@@ -256,9 +253,7 @@ export default function AdminPacksPage() {
                   className="text-muted hover:text-red-400 transition-colors p-1"
                   title="Delete pack"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -269,7 +264,7 @@ export default function AdminPacksPage() {
       {/* Promo Codes Guide */}
       <div className="mt-8 border border-card-border rounded-lg bg-card p-5">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-base">🏷️</span>
+          <Tag className="w-4 h-4 text-accent" />
           <h2 className="text-sm font-semibold text-foreground">Promo Codes</h2>
         </div>
         <p className="text-sm text-muted mb-3">

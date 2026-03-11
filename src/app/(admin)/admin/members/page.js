@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { ChevronLeft, X } from 'lucide-react'
 
 export default function AdminMembersPage() {
   const { data: session } = useSession()
@@ -219,9 +220,7 @@ export default function AdminMembersPage() {
           onClick={() => { setSelectedMember(null); setDetail(null) }}
           className="flex items-center gap-1 text-sm text-muted hover:text-foreground transition-colors mb-4"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <ChevronLeft className="w-4 h-4" />
           Back to Members
         </button>
 
@@ -232,7 +231,7 @@ export default function AdminMembersPage() {
             toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
           )}>
             <span className="text-sm">{toast.message}</span>
-            <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100">✕</button>
+            <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
           </div>
         )}
 
@@ -551,7 +550,7 @@ export default function AdminMembersPage() {
           toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-green-500/10 border-green-500/20 text-green-400'
         )}>
           <span className="text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100">✕</button>
+          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 

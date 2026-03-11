@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
+import { CalendarDays, Users, Tag, Package, ClipboardList, Dumbbell, Mail, Settings, Loader2, ChevronDown } from 'lucide-react'
 
 function toDateStr(d) {
   return d.toLocaleDateString('en-CA') // YYYY-MM-DD
@@ -341,9 +342,7 @@ export default function AdminDashboard() {
                                 {cls.booked}/{cls.capacity}
                               </span>
                             )}
-                            <svg className={cn('w-4 h-4 text-muted transition-transform', isExpanded && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                            </svg>
+                            <ChevronDown className={cn('w-4 h-4 text-muted transition-transform', isExpanded && 'rotate-180')} />
                           </div>
                         </div>
                         {!isCancelled && (
@@ -716,12 +715,12 @@ export default function AdminDashboard() {
                       >
                         {sendingEmail === member.id ? (
                           <>
-                            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeLinecap="round" /></svg>
+                            <Loader2 className="w-3 h-3 animate-spin" />
                             Sending
                           </>
                         ) : (
                           <>
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            <Mail className="w-3 h-3" />
                             Remind
                           </>
                         )}
@@ -743,21 +742,21 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
-                { label: 'Add a Class', href: '/admin/schedule', icon: '📅' },
-                { label: 'Manage Members', href: '/admin/members', icon: '👥' },
-                { label: 'Class Types', href: '/admin/class-types', icon: '🏷️' },
-                { label: 'Edit Packs', href: '/admin/packs', icon: '📦' },
-                { label: 'View Activity', href: '/admin/bookings', icon: '📋' },
-                { label: 'Manage Instructors', href: '/admin/instructors', icon: '🥊' },
-                { label: 'Send Email', href: '/admin/emails', icon: '📧' },
-                { label: 'Studio Settings', href: '/admin/settings', icon: '⚙️' },
+                { label: 'Add a Class', href: '/admin/schedule', icon: CalendarDays },
+                { label: 'Manage Members', href: '/admin/members', icon: Users },
+                { label: 'Class Types', href: '/admin/class-types', icon: Tag },
+                { label: 'Edit Packs', href: '/admin/packs', icon: Package },
+                { label: 'View Activity', href: '/admin/bookings', icon: ClipboardList },
+                { label: 'Manage Instructors', href: '/admin/instructors', icon: Dumbbell },
+                { label: 'Send Email', href: '/admin/emails', icon: Mail },
+                { label: 'Studio Settings', href: '/admin/settings', icon: Settings },
               ].map((action) => (
                 <Link
                   key={action.href}
                   href={action.href}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-card-border text-sm text-muted hover:text-foreground hover:border-accent/30 transition-colors"
                 >
-                  <span>{action.icon}</span>
+                  <action.icon className="w-4 h-4 shrink-0" />
                   <span>{action.label}</span>
                 </Link>
               ))}

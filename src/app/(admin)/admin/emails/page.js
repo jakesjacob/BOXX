@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { MailOpen, ClipboardList, PenLine } from 'lucide-react'
 
 const TABS = [
-  { id: 'overview', label: 'Email Events', icon: '📧' },
-  { id: 'log', label: 'Send Log', icon: '📋' },
-  { id: 'compose', label: 'Compose', icon: '✉️' },
+  { id: 'overview', label: 'Email Events', icon: MailOpen },
+  { id: 'log', label: 'Send Log', icon: ClipboardList },
+  { id: 'compose', label: 'Compose', icon: PenLine },
 ]
 
 // ─── Email events ───────────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ export default function EmailsPage() {
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             )}
           >
-            <span className="text-base">{tab.icon}</span>
+            <tab.icon className="w-4 h-4 shrink-0" />
             <span>{tab.label}</span>
           </button>
         ))}
