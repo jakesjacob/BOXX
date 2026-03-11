@@ -283,35 +283,45 @@ async function aiAnalyzeBrand(html, cssContent, regexBrand) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
     // Extract a concise version of the page for Claude to analyze
-    // Strip scripts/styles/noscript, keep structure
     const cleaned = html
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/\s{2,}/g, ' ')
-      .slice(0, 15000) // Keep it concise for the prompt
+      .slice(0, 15000)
 
-    // Extract just CSS variable declarations and key rules
+    // Extract CSS variable declarations and key rules
     const cssSnippet = cssContent
-      .replace(/\/\*[\s\S]*?\*\//g, '') // strip comments
-      .match(/(?::root|body|html|\*)\s*\{[^}]+\}/gi)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .match(/(?::root|body|html|\*|\.(?:btn|button|nav|header|hero|card|footer))\s*\{[^}]+\}/gi)
       ?.join('\n')
-      ?.slice(0, 5000) || ''
+      ?.slice(0, 6000) || ''
+
+    // Also extract button/CTA styles specifically
+    const buttonStyles = cssContent
+      .match(/(?:\.btn[^{]*|button[^{]*|\.cta[^{]*|\[type=["']submit["']\][^{]*)\{[^}]+\}/gi)
+      ?.slice(0, 5)
+      ?.join('\n')
+      ?.slice(0, 2000) || ''
 
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [{
         role: 'user',
-        content: `You are a UI/UX design expert. Analyze this website's HTML and CSS to extract its brand identity. Be precise with hex color values.
+        content: `You are a senior UI/UX design system architect. Analyze this website and produce a complete, polished theme for a SaaS booking platform that matches this brand's identity.
+
+STEP 1 — EXTRACT: Find the brand's actual colors, fonts, and feel from the HTML/CSS.
+STEP 2 — DESIGN: Make smart design decisions to turn those raw extractions into a cohesive, production-ready theme. Don't just copy colors — design a system.
 
 Here's what regex extraction found (may be incomplete or wrong):
 - Name: ${regexBrand.name || 'not found'}
 - Primary color: ${regexBrand.colors?.primary || 'not found'}
 - Secondary color: ${regexBrand.colors?.secondary || 'not found'}
+- Accent color: ${regexBrand.colors?.accent || 'not found'}
+- Background color: ${regexBrand.colors?.background || 'not found'}
 - Font: ${regexBrand.font || 'not found'}
-- Description: ${regexBrand.description || 'not found'}
 
 HTML (truncated):
 ${cleaned}
@@ -319,30 +329,37 @@ ${cleaned}
 CSS variables & key rules:
 ${cssSnippet}
 
-Return a JSON object with your best assessment. Fix any incorrect regex results. Fill in missing values by analyzing the actual HTML structure and CSS.
+Button/CTA styles:
+${buttonStyles}
 
-For colors:
-- primary: the main brand/button/CTA color
-- secondary: a complementary brand color (links, hover states, secondary buttons)
-- accent: highlight/badge color
-- background: the main page background color
+DESIGN RULES you must follow:
+1. CONTRAST: foreground text must have WCAG AA contrast (4.5:1) against background. Muted text needs 3:1 minimum.
+2. SURFACE: surface color should be a subtle step from background (slightly lighter for dark themes, slightly darker for light). surfaceHover is one more step.
+3. HOVER STATES: primaryHover should be slightly darker than primary. borderHover slightly more visible than border.
+4. SECONDARY vs ACCENT: secondary complements primary (used for links, secondary buttons). Accent is for highlights, badges, decorative elements — can be more vibrant.
+5. HARMONY: all colors should feel like they belong together. If the brand only has one strong color, derive secondary/accent by shifting hue ±20-40° and adjusting saturation.
+6. BORDERS: should be subtle — derived from background, not primary. Just enough to define edges.
+7. MUTED: text color for labels/captions — should feel soft but readable against background.
+8. FONTS: If the site uses one font for everything, use it for both title and body. If it uses a decorative/serif font for headings and a clean sans for body, preserve that pairing. Only suggest well-known Google Fonts.
 
-For fonts:
-- titleFont: the font used for headings/titles (h1, h2, hero text)
-- bodyFont: the font used for body/paragraph text
-- titleFontType/bodyFontType: "sans-serif", "serif", or "monospace"
-
-Return ONLY valid JSON, no markdown:
+Return ONLY valid JSON, no markdown or explanation:
 {
   "name": "Business Name",
-  "primary": "#hex",
-  "secondary": "#hex",
-  "accent": "#hex",
-  "background": "#hex",
-  "titleFont": "Font Family Name",
-  "titleFontType": "sans-serif|serif|monospace",
-  "bodyFont": "Font Family Name",
-  "bodyFontType": "sans-serif|serif|monospace",
+  "background": "#hex — main page bg",
+  "surface": "#hex — card/panel bg, subtle step from background",
+  "surfaceHover": "#hex — hovered cards/panels",
+  "primary": "#hex — main CTA/button color from the brand",
+  "primaryHover": "#hex — darkened primary for hover",
+  "secondary": "#hex — links, secondary buttons, complementary to primary",
+  "accent": "#hex — highlights, badges, decorative touches",
+  "foreground": "#hex — main text, high contrast against background",
+  "muted": "#hex — secondary text, labels, captions",
+  "border": "#hex — subtle borders, derived from background",
+  "borderHover": "#hex — border on hover, slightly more visible",
+  "titleFont": "Google Font Name",
+  "titleFontType": "sans-serif|serif",
+  "bodyFont": "Google Font Name",
+  "bodyFontType": "sans-serif|serif",
   "mood": "dark|light|warm|cool|luxury|minimal|bold|playful"
 }`
       }],
@@ -351,7 +368,6 @@ Return ONLY valid JSON, no markdown:
     const text = message.content[0]?.text?.trim()
     if (!text) return null
 
-    // Parse JSON (handle potential markdown wrapping)
     const jsonStr = text.replace(/^```json?\n?/, '').replace(/\n?```$/, '')
     return JSON.parse(jsonStr)
   } catch (err) {
@@ -408,23 +424,37 @@ export async function POST(request) {
     // Step 2: AI analysis (enhances/corrects regex results)
     const aiResult = await aiAnalyzeBrand(html, cssContent, regexBrand)
 
-    // Merge: AI results take priority where they exist, regex fills gaps
+    // AI returns a complete designed theme; regex fills gaps if AI is unavailable
     const brand = {
       name: aiResult?.name || regexBrand.name,
       logo: regexBrand.logo, // AI can't extract logo URLs reliably
       description: regexBrand.description,
+      // Full theme (AI designs the complete system; regex is fallback for individual colors)
+      theme: aiResult ? {
+        background: aiResult.background,
+        surface: aiResult.surface,
+        surfaceHover: aiResult.surfaceHover,
+        primary: aiResult.primary,
+        primaryHover: aiResult.primaryHover,
+        secondary: aiResult.secondary,
+        accent: aiResult.accent,
+        foreground: aiResult.foreground,
+        muted: aiResult.muted,
+        border: aiResult.border,
+        borderHover: aiResult.borderHover,
+      } : null,
+      // Individual colors (fallback when AI unavailable)
       colors: {
         primary: aiResult?.primary || regexBrand.colors?.primary,
         secondary: aiResult?.secondary || regexBrand.colors?.secondary,
         accent: aiResult?.accent || regexBrand.colors?.accent,
         background: aiResult?.background || regexBrand.colors?.background,
       },
-      // Separate title/body fonts — fallback to single font for backwards compat
-      titleFont: aiResult?.titleFont || aiResult?.font || regexBrand.font,
-      titleFontType: aiResult?.titleFontType || aiResult?.fontType || null,
-      bodyFont: aiResult?.bodyFont || aiResult?.font || regexBrand.font,
-      bodyFontType: aiResult?.bodyFontType || aiResult?.fontType || null,
-      font: aiResult?.titleFont || aiResult?.font || regexBrand.font, // legacy compat
+      titleFont: aiResult?.titleFont || regexBrand.font,
+      titleFontType: aiResult?.titleFontType || null,
+      bodyFont: aiResult?.bodyFont || regexBrand.font,
+      bodyFontType: aiResult?.bodyFontType || null,
+      font: aiResult?.titleFont || regexBrand.font,
       mood: aiResult?.mood || null,
     }
 

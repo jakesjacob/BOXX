@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import {
   Check, ChevronRight, ChevronLeft, Loader2, Eye, EyeOff,
   Upload, X, Globe, Zap, Leaf, Dumbbell, Music, Target,
-  Sparkles, MapPin, Palette, Monitor, Sun, Moon,
+  Sparkles, MapPin, Palette, Sun, Moon,
   Crown, Trees, Waves, Flame, Wand2, ExternalLink, Building2,
+  Search, ChevronDown,
 } from 'lucide-react'
 
 // ─── Themes ────────────────────────────────────────────────
@@ -153,6 +154,24 @@ const FONT_OPTIONS = [
   { value: 'Poppins', label: 'Poppins', type: 'Sans-serif' },
   { value: 'Nunito', label: 'Nunito', type: 'Rounded' },
   { value: 'Playfair Display', label: 'Playfair Display', type: 'Serif' },
+  { value: 'Roboto', label: 'Roboto', type: 'Sans-serif' },
+  { value: 'Open Sans', label: 'Open Sans', type: 'Sans-serif' },
+  { value: 'Montserrat', label: 'Montserrat', type: 'Sans-serif' },
+  { value: 'Lato', label: 'Lato', type: 'Sans-serif' },
+  { value: 'Raleway', label: 'Raleway', type: 'Sans-serif' },
+  { value: 'Outfit', label: 'Outfit', type: 'Sans-serif' },
+  { value: 'Manrope', label: 'Manrope', type: 'Sans-serif' },
+  { value: 'Space Grotesk', label: 'Space Grotesk', type: 'Sans-serif' },
+  { value: 'Sora', label: 'Sora', type: 'Sans-serif' },
+  { value: 'Lexend', label: 'Lexend', type: 'Sans-serif' },
+  { value: 'Work Sans', label: 'Work Sans', type: 'Sans-serif' },
+  { value: 'Source Sans 3', label: 'Source Sans 3', type: 'Sans-serif' },
+  { value: 'Merriweather', label: 'Merriweather', type: 'Serif' },
+  { value: 'Lora', label: 'Lora', type: 'Serif' },
+  { value: 'Libre Baskerville', label: 'Libre Baskerville', type: 'Serif' },
+  { value: 'Cormorant Garamond', label: 'Cormorant Garamond', type: 'Serif' },
+  { value: 'DM Serif Display', label: 'DM Serif Display', type: 'Serif' },
+  { value: 'Fraunces', label: 'Fraunces', type: 'Serif' },
 ]
 
 // ─── Verticals (with icons) ───────────────────────────────
@@ -398,6 +417,222 @@ function isColorDark(hex) {
   try { const [,, l] = hexToHsl(hex); return l < 50 } catch { return true }
 }
 
+// ─── Font search dropdown ─────────────────────────────────
+
+function FontSelect({ value, onChange, label }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef(null)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    if (open && inputRef.current) inputRef.current.focus()
+  }, [open])
+
+  const filtered = FONT_OPTIONS.filter(f =>
+    f.label.toLowerCase().includes(search.toLowerCase()) ||
+    f.type.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const current = FONT_OPTIONS.find(f => f.value === value)
+
+  return (
+    <div>
+      <label className="block text-xs text-muted mb-2">{label}</label>
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => { setOpen(!open); setSearch('') }}
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-card-border bg-card text-left hover:border-accent/30 transition-colors"
+        >
+          <span className="text-sm text-foreground" style={{ fontFamily: current ? `"${current.value}", ${current.type.toLowerCase()}` : 'inherit' }}>
+            {current?.label || value || 'Select font...'}
+          </span>
+          <ChevronDown className={`w-4 h-4 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+
+        {open && (
+          <div className="absolute z-50 mt-1 w-full rounded-lg border border-card-border bg-card shadow-xl shadow-black/20 overflow-hidden">
+            <div className="p-2 border-b border-card-border">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search fonts..."
+                  className="w-full pl-8 pr-3 py-2 rounded-md bg-background border border-card-border text-sm text-foreground placeholder-muted/50 focus:outline-none focus:border-accent transition-colors"
+                />
+              </div>
+            </div>
+            <div className="max-h-48 overflow-y-auto py-1">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-4 text-xs text-muted text-center">No fonts match</div>
+              ) : (
+                filtered.map(f => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => { onChange(f.value); setOpen(false); setSearch('') }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-accent/10 transition-colors ${
+                      value === f.value ? 'bg-accent/10' : ''
+                    }`}
+                  >
+                    <span className="text-sm text-foreground" style={{ fontFamily: `"${f.value}", ${f.type.toLowerCase()}` }}>
+                      {f.label}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted">{f.type}</span>
+                      {value === f.value && <Check className="w-3.5 h-3.5 text-accent" />}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Color picker with popover ────────────────────────────
+
+function ColorPicker({ label, value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [hexInput, setHexInput] = useState(value)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    setHexInput(value)
+  }, [value])
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const [h, s, l] = hexToHsl(value)
+
+  const handleHexChange = (str) => {
+    setHexInput(str)
+    if (/^#[0-9a-fA-F]{6}$/.test(str)) {
+      onChange(str.toLowerCase())
+    }
+  }
+
+  // Quick palette: 5 variations of the current hue
+  const swatches = [
+    hslToHex(h, Math.min(100, s + 10), 30),
+    hslToHex(h, s, 40),
+    hslToHex(h, s, 50),
+    hslToHex(h, s, 65),
+    hslToHex(h, Math.max(0, s - 20), 85),
+  ]
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-card-border bg-card hover:border-accent/30 transition-colors text-left"
+      >
+        <div className="w-8 h-8 rounded-lg border border-card-border shrink-0" style={{ backgroundColor: value }} />
+        <div className="min-w-0">
+          <span className="text-xs text-foreground font-medium block">{label}</span>
+          <span className="text-[10px] font-mono text-muted">{value}</span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 w-56 rounded-lg border border-card-border bg-card shadow-xl shadow-black/20 p-3 space-y-3">
+          {/* Hue slider */}
+          <div>
+            <input
+              type="range"
+              min="0" max="360" value={Math.round(h)}
+              onChange={e => onChange(hslToHex(Number(e.target.value), s, l))}
+              className="w-full h-3 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
+              }}
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted">Hue</span>
+            </div>
+          </div>
+
+          {/* Saturation slider */}
+          <div>
+            <input
+              type="range"
+              min="0" max="100" value={Math.round(s)}
+              onChange={e => onChange(hslToHex(h, Number(e.target.value), l))}
+              className="w-full h-3 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, ${hslToHex(h, 0, l)}, ${hslToHex(h, 100, l)})`,
+              }}
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted">Saturation</span>
+            </div>
+          </div>
+
+          {/* Lightness slider */}
+          <div>
+            <input
+              type="range"
+              min="0" max="100" value={Math.round(l)}
+              onChange={e => onChange(hslToHex(h, s, Number(e.target.value)))}
+              className="w-full h-3 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #000000, ${hslToHex(h, s, 50)}, #ffffff)`,
+              }}
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-muted">Lightness</span>
+            </div>
+          </div>
+
+          {/* Quick swatches */}
+          <div className="flex gap-1.5">
+            {swatches.map((sw, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onChange(sw)}
+                className={`w-8 h-8 rounded-lg border transition-all ${sw === value ? 'border-accent ring-1 ring-accent' : 'border-card-border hover:border-accent/40'}`}
+                style={{ backgroundColor: sw }}
+              />
+            ))}
+          </div>
+
+          {/* Hex input */}
+          <div className="flex gap-2">
+            <div className="w-8 h-8 rounded-lg border border-card-border shrink-0" style={{ backgroundColor: value }} />
+            <input
+              type="text"
+              value={hexInput}
+              onChange={e => handleHexChange(e.target.value)}
+              placeholder="#000000"
+              maxLength={7}
+              className="flex-1 px-2 py-1.5 rounded-md bg-background border border-card-border text-sm font-mono text-foreground placeholder-muted/50 focus:outline-none focus:border-accent transition-colors"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Analyzing steps animation ────────────────────────────
 const ANALYZE_STEPS = [
   'Fetching website...',
@@ -615,29 +850,36 @@ export default function OnboardingPage() {
 
       setExtractedBrand(data.brand)
 
-      // Apply extracted brand — build full custom color set with derived shades
-      const c = data.brand.colors || {}
-      if (c.primary || c.background) {
-        const primary = c.primary || '#6366f1'
-        const secondary = c.secondary || c.accent || shiftColor(primary, 30)
-        const accent = c.accent || shiftColor(primary, 60)
-        const bg = c.background || '#0f0f0f'
-        const isDarkBg = isColorDark(bg)
-
-        setCustomColors({
-          background: bg,
-          surface: isDarkBg ? lightenColor(bg, 8) : darkenColor(bg, 3),
-          surfaceHover: isDarkBg ? lightenColor(bg, 14) : darkenColor(bg, 6),
-          primary,
-          primaryHover: darkenColor(primary, 10),
-          secondary,
-          accent,
-          foreground: isDarkBg ? '#f0f0f5' : '#18181b',
-          muted: isDarkBg ? '#71717a' : '#71717a',
-          border: isDarkBg ? lightenColor(bg, 12) : darkenColor(bg, 10),
-          borderHover: isDarkBg ? lightenColor(bg, 20) : darkenColor(bg, 16),
-        })
+      // Apply AI-designed theme directly if available, otherwise derive from raw colors
+      if (data.brand.theme) {
+        // AI produced a complete designed theme — use it directly
+        setCustomColors(data.brand.theme)
         setSelectedThemeId('custom')
+      } else {
+        // Fallback: derive from raw extracted colors
+        const c = data.brand.colors || {}
+        if (c.primary || c.background) {
+          const primary = c.primary || '#6366f1'
+          const secondary = c.secondary || c.accent || shiftColor(primary, 30)
+          const accent = c.accent || shiftColor(primary, 60)
+          const bg = c.background || '#0f0f0f'
+          const isDarkBg = isColorDark(bg)
+
+          setCustomColors({
+            background: bg,
+            surface: isDarkBg ? lightenColor(bg, 8) : darkenColor(bg, 3),
+            surfaceHover: isDarkBg ? lightenColor(bg, 14) : darkenColor(bg, 6),
+            primary,
+            primaryHover: darkenColor(primary, 10),
+            secondary,
+            accent,
+            foreground: isDarkBg ? '#f0f0f5' : '#18181b',
+            muted: '#71717a',
+            border: isDarkBg ? lightenColor(bg, 12) : darkenColor(bg, 10),
+            borderHover: isDarkBg ? lightenColor(bg, 20) : darkenColor(bg, 16),
+          })
+          setSelectedThemeId('custom')
+        }
       }
       if (data.brand.titleFont || data.brand.font) {
         setCustomTitleFont(data.brand.titleFont || data.brand.font)
@@ -1086,52 +1328,18 @@ export default function OnboardingPage() {
                     )}
                   </div>
 
-                  {/* Title font selector */}
-                  <div>
-                    <label className="block text-xs text-muted mb-2">Title font</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {FONT_OPTIONS.map(f => (
-                        <button
-                          key={f.value}
-                          type="button"
-                          onClick={() => setCustomTitleFont(f.value)}
-                          className={`px-3 py-2.5 rounded-lg border text-left transition-all ${
-                            (customTitleFont || effectiveTheme.titleFont) === f.value
-                              ? 'border-accent bg-accent/10'
-                              : 'border-card-border bg-card hover:border-accent/30'
-                          }`}
-                        >
-                          <span className="text-sm font-semibold text-foreground block" style={{ fontFamily: `"${f.value}", ${f.type.toLowerCase()}` }}>
-                            {f.label}
-                          </span>
-                          <span className="text-[10px] text-muted">{f.type}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Body font selector */}
-                  <div>
-                    <label className="block text-xs text-muted mb-2">Body font</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {FONT_OPTIONS.map(f => (
-                        <button
-                          key={f.value}
-                          type="button"
-                          onClick={() => setCustomBodyFont(f.value)}
-                          className={`px-3 py-2.5 rounded-lg border text-left transition-all ${
-                            (customBodyFont || effectiveTheme.bodyFont) === f.value
-                              ? 'border-accent bg-accent/10'
-                              : 'border-card-border bg-card hover:border-accent/30'
-                          }`}
-                        >
-                          <span className="text-sm font-semibold text-foreground block" style={{ fontFamily: `"${f.value}", ${f.type.toLowerCase()}` }}>
-                            {f.label}
-                          </span>
-                          <span className="text-[10px] text-muted">{f.type}</span>
-                        </button>
-                      ))}
-                    </div>
+                  {/* Font selectors */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <FontSelect
+                      label="Title font"
+                      value={customTitleFont || effectiveTheme.titleFont}
+                      onChange={setCustomTitleFont}
+                    />
+                    <FontSelect
+                      label="Body font"
+                      value={customBodyFont || effectiveTheme.bodyFont}
+                      onChange={setCustomBodyFont}
+                    />
                   </div>
 
                   {/* Color pickers */}
@@ -1148,38 +1356,28 @@ export default function OnboardingPage() {
                       ].map(({ key, label }) => {
                         const colorValue = (customColors?.[key] || effectiveTheme[key]) ?? '#000000'
                         return (
-                          <label key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-card-border bg-card cursor-pointer hover:border-accent/30 transition-colors">
-                            <div className="relative shrink-0">
-                              <div className="w-8 h-8 rounded-lg border border-card-border" style={{ backgroundColor: colorValue }} />
-                              <input
-                                type="color"
-                                value={colorValue}
-                                onChange={e => {
-                                  const newColors = { ...(customColors || {}), [key]: e.target.value }
-                                  // Auto-derive related shades when primary colors change
-                                  if (key === 'primary') {
-                                    newColors.primaryHover = darkenColor(e.target.value, 10)
-                                  } else if (key === 'background') {
-                                    const dark = isColorDark(e.target.value)
-                                    newColors.surface = dark ? lightenColor(e.target.value, 8) : darkenColor(e.target.value, 3)
-                                    newColors.surfaceHover = dark ? lightenColor(e.target.value, 14) : darkenColor(e.target.value, 6)
-                                    newColors.border = dark ? lightenColor(e.target.value, 12) : darkenColor(e.target.value, 10)
-                                    newColors.borderHover = dark ? lightenColor(e.target.value, 20) : darkenColor(e.target.value, 16)
-                                    newColors.foreground = dark ? '#f0f0f5' : '#18181b'
-                                    newColors.muted = '#71717a'
-                                  } else if (key === 'surface') {
-                                    newColors.surfaceHover = isColorDark(e.target.value) ? lightenColor(e.target.value, 6) : darkenColor(e.target.value, 4)
-                                  }
-                                  setCustomColors(newColors)
-                                }}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              />
-                            </div>
-                            <div>
-                              <span className="text-xs text-foreground font-medium block">{label}</span>
-                              <span className="text-[10px] font-mono text-muted">{colorValue}</span>
-                            </div>
-                          </label>
+                          <ColorPicker
+                            key={key}
+                            label={label}
+                            value={colorValue}
+                            onChange={val => {
+                              const newColors = { ...(customColors || {}), [key]: val }
+                              if (key === 'primary') {
+                                newColors.primaryHover = darkenColor(val, 10)
+                              } else if (key === 'background') {
+                                const dark = isColorDark(val)
+                                newColors.surface = dark ? lightenColor(val, 8) : darkenColor(val, 3)
+                                newColors.surfaceHover = dark ? lightenColor(val, 14) : darkenColor(val, 6)
+                                newColors.border = dark ? lightenColor(val, 12) : darkenColor(val, 10)
+                                newColors.borderHover = dark ? lightenColor(val, 20) : darkenColor(val, 16)
+                                newColors.foreground = dark ? '#f0f0f5' : '#18181b'
+                                newColors.muted = '#71717a'
+                              } else if (key === 'surface') {
+                                newColors.surfaceHover = isColorDark(val) ? lightenColor(val, 6) : darkenColor(val, 4)
+                              }
+                              setCustomColors(newColors)
+                            }}
+                          />
                         )
                       })}
                     </div>
@@ -1260,7 +1458,7 @@ export default function OnboardingPage() {
     <>
       {/* Google Fonts for theme previews */}
       <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Lato:wght@400;700&family=Raleway:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;500;600;700&family=Lexend:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=Merriweather:wght@400;700&family=Lora:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Serif+Display&family=Fraunces:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
 
@@ -1270,6 +1468,25 @@ export default function OnboardingPage() {
           100% { opacity: 1; }
         }
         .animate-tagline { animation: tagline-in 1.2s ease-in-out; }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: white;
+          border: 2px solid var(--accent);
+          cursor: pointer;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        }
+        input[type="range"]::-moz-range-thumb {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: white;
+          border: 2px solid var(--accent);
+          cursor: pointer;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        }
       `}</style>
 
       <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
