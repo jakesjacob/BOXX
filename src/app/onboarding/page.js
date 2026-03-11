@@ -627,6 +627,190 @@ function ColorPicker({ label, value, onChange }) {
   )
 }
 
+// ─── Launch / Success screen ──────────────────────────────
+
+function LaunchScreen({ result, form, effectiveTheme }) {
+  const [showButton, setShowButton] = useState(false)
+  const [showChecklist, setShowChecklist] = useState(false)
+  const canvasRef = useRef(null)
+
+  // Confetti effect
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    canvas.width = canvas.offsetWidth * 2
+    canvas.height = canvas.offsetHeight * 2
+    ctx.scale(2, 2)
+
+    const colors = [
+      effectiveTheme.primary,
+      effectiveTheme.secondary || effectiveTheme.primary,
+      effectiveTheme.accent || effectiveTheme.primary,
+      '#fbbf24', '#34d399', '#818cf8', '#f472b6',
+    ]
+
+    const particles = Array.from({ length: 80 }, () => ({
+      x: canvas.offsetWidth / 2 + (Math.random() - 0.5) * 100,
+      y: canvas.offsetHeight / 2,
+      vx: (Math.random() - 0.5) * 14,
+      vy: -Math.random() * 12 - 4,
+      size: Math.random() * 6 + 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 12,
+      opacity: 1,
+      shape: Math.random() > 0.5 ? 'rect' : 'circle',
+    }))
+
+    let frame = 0
+    const maxFrames = 120
+
+    function animate() {
+      if (frame > maxFrames) {
+        ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight)
+        return
+      }
+      ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight)
+
+      for (const p of particles) {
+        p.x += p.vx
+        p.vy += 0.25
+        p.y += p.vy
+        p.vx *= 0.99
+        p.rotation += p.rotationSpeed
+        p.opacity = Math.max(0, 1 - frame / maxFrames)
+
+        ctx.save()
+        ctx.translate(p.x, p.y)
+        ctx.rotate((p.rotation * Math.PI) / 180)
+        ctx.globalAlpha = p.opacity
+        ctx.fillStyle = p.color
+
+        if (p.shape === 'rect') {
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6)
+        } else {
+          ctx.beginPath()
+          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.restore()
+      }
+
+      frame++
+      requestAnimationFrame(animate)
+    }
+    requestAnimationFrame(animate)
+  }, [effectiveTheme])
+
+  // Staggered reveals
+  useEffect(() => {
+    const t1 = setTimeout(() => setShowChecklist(true), 800)
+    const t2 = setTimeout(() => setShowButton(true), 2000)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [])
+
+  const slug = result?.tenant?.slug || form.slug
+  const name = result?.tenant?.name || form.studioName
+  const isDark = isColorDark(effectiveTheme.background)
+
+  return (
+    <div className="relative text-center py-6 overflow-hidden">
+      {/* Confetti canvas */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none z-10"
+      />
+
+      {/* Animated check icon */}
+      <div className="relative mx-auto mb-5 w-20 h-20">
+        {/* Glow ring */}
+        <div className="absolute inset-0 rounded-full animate-success-glow" style={{ backgroundColor: effectiveTheme.primary, opacity: 0.15 }} />
+        {/* Pulse ring */}
+        <div className="absolute inset-[-8px] rounded-full animate-success-pulse" style={{ border: `2px solid ${effectiveTheme.primary}` }} />
+        {/* Circle fill */}
+        <div className="absolute inset-0 rounded-full animate-success-fill flex items-center justify-center" style={{ backgroundColor: effectiveTheme.primary }}>
+          <Check className="w-10 h-10 animate-success-check" style={{ color: isDark ? '#ffffff' : effectiveTheme.background }} />
+        </div>
+      </div>
+
+      <h2 className="text-2xl font-bold text-foreground mb-1 animate-success-fade-in">You&apos;re all set!</h2>
+      <p className="text-muted mb-8 animate-success-fade-in" style={{ animationDelay: '0.2s' }}>
+        <strong className="text-foreground">{name}</strong> is ready to go.
+      </p>
+
+      {/* Themed URL card */}
+      <div
+        className="relative rounded-xl p-5 mb-8 overflow-hidden animate-success-fade-in"
+        style={{
+          animationDelay: '0.4s',
+          backgroundColor: effectiveTheme.surface,
+          border: `1px solid ${effectiveTheme.border}`,
+        }}
+      >
+        {/* Gradient accent bar */}
+        <div
+          className="absolute top-0 left-0 right-0 h-1"
+          style={{ background: `linear-gradient(to right, ${effectiveTheme.primary}, ${effectiveTheme.secondary || effectiveTheme.primary}, ${effectiveTheme.accent || effectiveTheme.primary})` }}
+        />
+        <p className="text-xs font-medium mb-2" style={{ color: effectiveTheme.muted }}>Your booking page is live at</p>
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: effectiveTheme.primary }}>
+            <Globe className="w-4 h-4" style={{ color: isDark ? '#ffffff' : effectiveTheme.background }} />
+          </div>
+          <p className="text-lg font-semibold font-mono" style={{ color: effectiveTheme.foreground }}>
+            {slug}<span style={{ color: effectiveTheme.muted }}>.zatrovo.com</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Checklist — staggered in */}
+      <div className={`space-y-3 mb-8 transition-all duration-700 ${showChecklist ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <h3 className="text-sm font-semibold text-foreground">What to do next</h3>
+        <div className="text-left space-y-2">
+          {[
+            { icon: Zap, text: 'Add your first class type' },
+            { icon: Target, text: 'Create an instructor profile' },
+            { icon: Building2, text: 'Schedule your first class' },
+            { icon: Sparkles, text: 'Set up a class pack' },
+            { icon: Globe, text: 'Connect Stripe for payments' },
+            { icon: MapPin, text: 'Invite your first client' },
+          ].map((item, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 text-sm text-muted transition-all duration-500"
+              style={{
+                opacity: showChecklist ? 1 : 0,
+                transform: showChecklist ? 'translateX(0)' : 'translateX(-12px)',
+                transitionDelay: `${i * 100}ms`,
+              }}
+            >
+              <div className="w-6 h-6 rounded-lg border border-card-border bg-card flex items-center justify-center">
+                <item.icon className="w-3 h-3" />
+              </div>
+              {item.text}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dashboard button — delayed entrance with pulse prompt */}
+      <div className={`transition-all duration-700 ${showButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+        <button
+          onClick={() => window.location.href = '/admin'}
+          className={`w-full py-3.5 rounded-xl font-semibold text-background bg-accent hover:bg-accent-dim transition-all flex items-center justify-center gap-2 ${showButton ? 'animate-button-glow' : ''}`}
+        >
+          Go to Dashboard
+          <ChevronRight className="w-4 h-4" />
+        </button>
+        <p className={`text-xs text-muted/50 mt-2 transition-opacity duration-500 ${showButton ? 'animate-subtle-pulse' : 'opacity-0'}`} style={{ animationDelay: '1s' }}>
+          Your dashboard is waiting
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Analyzing steps animation ────────────────────────────
 const ANALYZE_STEPS = [
   'Fetching website...',
@@ -1386,62 +1570,7 @@ export default function OnboardingPage() {
 
       // ── STEP 3: Launch ──────────────────────────────────
       case 3:
-        return (
-          <div className="text-center py-6">
-            <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
-              <Check className="w-8 h-8 text-accent" />
-            </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">You&apos;re all set!</h2>
-            <p className="text-muted mb-8">
-              <strong>{result?.tenant?.name || form.studioName}</strong> is ready to go.
-            </p>
-
-            <div className="bg-card border border-card-border rounded-lg p-4 mb-8 text-left">
-              <p className="text-sm text-muted mb-1">Your URL</p>
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-accent" />
-                <p className="text-foreground font-mono text-sm">
-                  {result?.tenant?.slug || form.slug}.zatrovo.com
-                </p>
-                <ExternalLink className="w-3 h-3 text-muted" />
-              </div>
-              {result?.tenant?.trialEndsAt && (
-                <p className="text-xs text-muted mt-3">
-                  Free until {new Date(result.tenant.trialEndsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-3 mb-8">
-              <h3 className="text-sm font-semibold text-foreground">Get started checklist</h3>
-              <div className="text-left space-y-2">
-                {[
-                  { icon: Zap, text: 'Add your first class type' },
-                  { icon: Target, text: 'Create an instructor profile' },
-                  { icon: Building2, text: 'Schedule your first class' },
-                  { icon: Sparkles, text: 'Set up a class pack' },
-                  { icon: Globe, text: 'Connect Stripe for payments' },
-                  { icon: MapPin, text: 'Invite your first client' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm text-muted">
-                    <div className="w-6 h-6 rounded-lg border border-card-border bg-card flex items-center justify-center">
-                      <item.icon className="w-3 h-3" />
-                    </div>
-                    {item.text}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={() => window.location.href = '/admin'}
-              className="w-full py-3 rounded-lg font-semibold text-background bg-accent hover:bg-accent-dim transition-colors flex items-center justify-center gap-2"
-            >
-              Go to Dashboard
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )
+        return <LaunchScreen result={result} form={form} effectiveTheme={effectiveTheme} />
     }
   }
 
@@ -1481,6 +1610,53 @@ export default function OnboardingPage() {
           cursor: pointer;
           box-shadow: 0 1px 4px rgba(0,0,0,0.4);
         }
+
+        /* Success screen animations */
+        @keyframes success-fill {
+          0% { transform: scale(0); opacity: 0; }
+          50% { transform: scale(1.15); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-success-fill { animation: success-fill 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+        @keyframes success-check {
+          0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+          50% { transform: scale(0) rotate(-45deg); opacity: 0; }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .animate-success-check { animation: success-check 0.7s 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; }
+
+        @keyframes success-glow {
+          0% { transform: scale(1); opacity: 0.15; }
+          50% { transform: scale(1.6); opacity: 0.08; }
+          100% { transform: scale(1.8); opacity: 0; }
+        }
+        .animate-success-glow { animation: success-glow 2s ease-out forwards; }
+
+        @keyframes success-pulse {
+          0% { transform: scale(0.8); opacity: 0.6; }
+          50% { transform: scale(1.3); opacity: 0; }
+          100% { transform: scale(1.3); opacity: 0; }
+        }
+        .animate-success-pulse { animation: success-pulse 1.5s 0.3s ease-out forwards; opacity: 0; }
+
+        @keyframes success-fade-in {
+          0% { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-success-fade-in { animation: success-fade-in 0.6s 0.5s ease-out forwards; opacity: 0; }
+
+        @keyframes button-glow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(200, 167, 80, 0); }
+          50% { box-shadow: 0 0 20px 4px rgba(200, 167, 80, 0.2); }
+        }
+        .animate-button-glow { animation: button-glow 2.5s ease-in-out infinite; }
+
+        @keyframes subtle-pulse {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.7; }
+        }
+        .animate-subtle-pulse { animation: subtle-pulse 3s ease-in-out infinite; }
       `}</style>
 
       <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
