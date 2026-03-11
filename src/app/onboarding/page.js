@@ -1503,17 +1503,17 @@ export default function OnboardingPage() {
           {!isComplete && <StepIndicator current={step} steps={STEPS} />}
 
           <div className="bg-card border border-card-border rounded-xl p-8">
-            {error && (
-              <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
-                {error}
-              </div>
-            )}
-
             {renderStep()}
 
             {/* Navigation */}
             {!isComplete && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-card-border">
+              <div className="mt-8 pt-6 border-t border-card-border space-y-3">
+                {error && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+                    {error}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
                 {step > 0 ? (
                   <button
                     type="button"
@@ -1547,6 +1547,7 @@ export default function OnboardingPage() {
                     </button>
                   )}
                 </div>
+              </div>
               </div>
             )}
           </div>

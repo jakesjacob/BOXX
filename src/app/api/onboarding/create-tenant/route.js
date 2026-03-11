@@ -43,7 +43,7 @@ export async function POST(request) {
   // Rate limit by IP
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
-    await limiter.check(5, ip) // 5 signups per minute per IP
+    await limiter.check(15, ip) // 15 signups per minute per IP
   } catch {
     return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
   }
