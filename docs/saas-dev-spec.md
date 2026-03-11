@@ -245,36 +245,39 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 > Goal: New business owner signs up and is live in < 15 minutes.
 
 ### 4A. Onboarding UI
-- [ ] Route: `/signup` (or `/onboarding`)
-- [ ] Step 1 — Account: name, email, password
-- [ ] Step 2 — Studio: name, slug (live preview of subdomain), vertical selector, timezone
-- [ ] Step 3 — Location: name, address, city, country, phone
-- [ ] Step 4 — Brand: logo upload (Supabase Storage), primary color picker, live preview
-- [ ] Step 5 — Stripe: Connect tenant Stripe account (skippable)
-- [ ] Step 6 — Done: confetti, subdomain shown, first-week checklist
+- [x] Route: `/onboarding` — 5-step wizard
+- [x] Step 1 — Account: name, email, password (with show/hide toggle)
+- [x] Step 2 — Studio: name, slug (auto-generated, live availability check), vertical selector (6 types), timezone, currency
+- [x] Step 3 — Location: name, address, city, country, phone (all optional)
+- [x] Step 4 — Brand: logo upload, color picker (preset swatches + custom), live preview of buttons/branding
+- [x] Step 5 — Launch: celebration, studio URL shown, getting-started checklist, admin dashboard link
+- [ ] Step (deferred): Stripe Connect setup (skippable) — not built yet, can be done from admin settings
 
 ### 4B. Onboarding API
-- [ ] `POST /api/onboarding/create-tenant`:
-  - Create tenant row
-  - Create location row
-  - Create user (owner) row
-  - Create staff_tenants row (role: owner)
-  - Seed vertical-specific defaults (class types, packs, studio_settings)
-  - Start 14-day trial
-  - Send welcome email
-  - Log platform_event 'tenant_signup'
-- [ ] `POST /api/onboarding/check-slug` — availability check
-- [ ] `POST /api/onboarding/upload-logo` — Supabase Storage upload
+- [x] `POST /api/onboarding/create-tenant`:
+  - Creates tenant row (14-day free trial)
+  - Creates location row
+  - Creates owner user (hashed password)
+  - Creates staff_tenants row (role: owner)
+  - Enables all feature flags for trial period
+  - Seeds vertical-specific defaults (class types, packs, studio_settings)
+  - Adds studio_name to studio_settings
+  - Sends welcome email (non-blocking)
+  - Auto-logs in owner after creation
+  - Rollback: deletes tenant if owner creation fails
+- [x] `POST /api/onboarding/check-slug` — real-time availability check with reserved word list + regex validation
+- [x] `POST /api/onboarding/upload-logo` — Supabase Storage `tenant-logos` bucket, 2MB limit, updates tenant.logo_url
 
 ### 4C. First-Week Checklist
-- [ ] Stored in `studio_settings` key `onboarding_checklist`
-- [ ] Items: add class type → schedule class → add instructor → set up pack → connect Stripe → invite member → upload logo
-- [ ] Dismissible after 7 days
-- [ ] Show in admin dashboard
+- [x] Static checklist shown on launch step (6 items)
+- [ ] Stored in `studio_settings` key `onboarding_checklist` (deferred — dynamic tracking)
+- [ ] Dismissible after 7 days (deferred)
+- [ ] Show in admin dashboard (deferred)
 
 ### 4D. Vertical Defaults
-- [ ] Define seed data per vertical (class types, terminology, sample packs)
-- [ ] Supported verticals: boxing, yoga, pilates, gym, spa, hair, pt, dance, physio
+- [x] `src/lib/vertical-defaults.js` — seed data per vertical
+- [x] 6 verticals: boxing, yoga, fitness, dance, pt, other
+- [x] Each defines: class types (with colors, durations, private flags), packs (with pricing), studio settings
 
 ### Validation
 - [ ] End-to-end: sign up → onboard → create class → book as member → verify isolation
@@ -283,10 +286,11 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 - [ ] Test: vertical defaults seed correctly
 
 ### Security Checkpoint 3
-- [ ] Rate limit on signup endpoint (prevent spam tenant creation)
-- [ ] Validate slug format (alphanumeric + hyphens only, no reserved words)
-- [ ] Logo upload: validate file type, size limit (2MB), sanitize filename
-- [ ] SQL injection check on all onboarding inputs
+- [x] Rate limit on signup endpoint (5 per minute per IP)
+- [x] Slug validation: regex (alphanumeric + hyphens, 3-50 chars), reserved words list
+- [x] Logo upload: file type validation (JPEG/PNG/WebP/SVG), 2MB size limit, sanitized filename
+- [x] All inputs validated via Zod schema
+- [ ] Create `tenant-logos` Supabase Storage bucket (needs manual creation)
 
 ---
 
