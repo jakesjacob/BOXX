@@ -647,7 +647,7 @@ const BUILDING_MESSAGES = [
 
 // ─── Launch / Building screen ─────────────────────────────
 
-function LaunchScreen({ form, effectiveTheme, googleAuth, session, updateSession, signIn, logoFile }) {
+function LaunchScreen({ form, effectiveTheme, signIn, logoFile }) {
   const [phase, setPhase] = useState('building') // 'building' | 'complete'
   const [fillPercent, setFillPercent] = useState(0)
   const [msgIndex, setMsgIndex] = useState(0)
@@ -706,11 +706,6 @@ function LaunchScreen({ form, effectiveTheme, googleAuth, session, updateSession
           bodyFont: effectiveTheme.bodyFont,
         }
 
-        if (googleAuth && session?.user?.id) {
-          payload.googleUserId = session.user.id
-          delete payload.password
-        }
-
         const isUploadedFile = logoFile && form.logoUrl?.startsWith('blob:')
         if (isUploadedFile) payload.logoUrl = null
 
@@ -737,24 +732,17 @@ function LaunchScreen({ form, effectiveTheme, googleAuth, session, updateSession
           } catch { /* non-critical */ }
         }
 
-        // Auth — sign in to the new tenant
-        console.log('[onboarding] Auth step. googleAuth:', googleAuth, 'tenantId:', data.tenant.id)
-        if (googleAuth) {
-          const updated = await updateSession()
-          console.log('[onboarding] Session updated:', updated?.user?.tenantId)
-        } else {
-          const signInResult = await signIn('credentials', {
-            email: form.ownerEmail,
-            password: form.password,
-            tenantId: data.tenant.id,
-            redirect: false,
-          })
-          console.log('[onboarding] signIn result:', JSON.stringify(signInResult))
-          if (signInResult?.error) {
-            console.error('[onboarding] Sign-in failed:', signInResult.error)
-            setError('Account created but sign-in failed. Please log in manually.')
-            return
-          }
+        // Auth — sign in to the new tenant with credentials
+        const signInResult = await signIn('credentials', {
+          email: form.ownerEmail,
+          password: form.password,
+          tenantId: data.tenant.id,
+          redirect: false,
+        })
+        if (signInResult?.error) {
+          console.error('[onboarding] Sign-in failed:', signInResult.error)
+          setError('Account created but sign-in failed. Please log in manually.')
+          return
         }
 
         // Complete! Fill to 100%
@@ -769,7 +757,7 @@ function LaunchScreen({ form, effectiveTheme, googleAuth, session, updateSession
     }
 
     createTenant()
-  }, [form, googleAuth, session, updateSession, signIn, logoFile])
+  }, [form, signIn, logoFile])
 
   // Confetti on complete
   useEffect(() => {
@@ -951,7 +939,6 @@ export default function OnboardingPage() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
-  const [googleAuth, setGoogleAuth] = useState(false)
 
   // Form data
   const [form, setForm] = useState({
@@ -1016,18 +1003,16 @@ export default function OnboardingPage() {
     setForm(prev => ({ ...prev, primaryColor: effectiveTheme.primary }))
   }, [effectiveTheme.primary])
 
-  // Detect Google OAuth return
+  // Pre-fill from existing session (but don't skip steps or set googleAuth)
   useEffect(() => {
-    if (session?.user && step === 0 && !googleAuth) {
-      setGoogleAuth(true)
+    if (session?.user && step === 0) {
       setForm(prev => ({
         ...prev,
-        ownerName: session.user.name || prev.ownerName,
-        ownerEmail: session.user.email || prev.ownerEmail,
+        ownerName: prev.ownerName || session.user.name || '',
+        ownerEmail: prev.ownerEmail || session.user.email || '',
       }))
-      setStep(1)
     }
-  }, [session, step, googleAuth])
+  }, [session, step])
 
   // Tagline rotation
   useEffect(() => {
@@ -1098,10 +1083,8 @@ export default function OnboardingPage() {
       if (!form.ownerName.trim()) errors.ownerName = 'Name is required'
       if (!form.ownerEmail.trim()) errors.ownerEmail = 'Email is required'
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.ownerEmail)) errors.ownerEmail = 'Invalid email'
-      if (!googleAuth) {
-        if (!form.password) errors.password = 'Password is required'
-        else if (form.password.length < 8) errors.password = 'At least 8 characters'
-      }
+      if (!form.password) errors.password = 'Password is required'
+      else if (form.password.length < 8) errors.password = 'At least 8 characters'
     }
     if (step === 1) {
       if (!form.studioName.trim()) errors.studioName = 'Business name is required'
@@ -1110,7 +1093,7 @@ export default function OnboardingPage() {
     }
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
-  }, [step, form, slugAvailable, googleAuth])
+  }, [step, form, slugAvailable])
 
   const next = () => {
     if (validateStep()) {
@@ -1621,9 +1604,6 @@ export default function OnboardingPage() {
           <LaunchScreen
             form={form}
             effectiveTheme={effectiveTheme}
-            googleAuth={googleAuth}
-            session={session}
-            updateSession={updateSession}
             signIn={signIn}
             logoFile={logoFile}
           />
