@@ -13,9 +13,9 @@ import {
 // ─── Themes ────────────────────────────────────────────────
 const THEMES = [
   {
-    id: 'midnight',
-    name: 'Midnight',
-    description: 'Dark & modern',
+    id: 'inter',
+    name: 'Inter',
+    description: 'Sans-serif / Dark & modern',
     icon: Moon,
     background: '#0f0f0f',
     foreground: '#f5f5f5',
@@ -28,9 +28,9 @@ const THEMES = [
     fontType: 'sans-serif',
   },
   {
-    id: 'ember',
-    name: 'Ember',
-    description: 'Warm & energetic',
+    id: 'dm-sans',
+    name: 'DM Sans',
+    description: 'Sans-serif / Warm & energetic',
     icon: Flame,
     background: '#0c0a09',
     foreground: '#fafaf9',
@@ -43,9 +43,9 @@ const THEMES = [
     fontType: 'sans-serif',
   },
   {
-    id: 'ivory',
-    name: 'Ivory',
-    description: 'Light & clean',
+    id: 'jakarta',
+    name: 'Plus Jakarta Sans',
+    description: 'Sans-serif / Light & clean',
     icon: Sun,
     background: '#fafafa',
     foreground: '#18181b',
@@ -58,9 +58,9 @@ const THEMES = [
     fontType: 'sans-serif',
   },
   {
-    id: 'royal',
-    name: 'Royal',
-    description: 'Bold & luxurious',
+    id: 'playfair',
+    name: 'Playfair Display',
+    description: 'Serif / Bold & luxurious',
     icon: Crown,
     background: '#09090b',
     foreground: '#fafafa',
@@ -73,9 +73,9 @@ const THEMES = [
     fontType: 'serif',
   },
   {
-    id: 'forest',
-    name: 'Forest',
-    description: 'Natural & calm',
+    id: 'nunito',
+    name: 'Nunito',
+    description: 'Rounded / Natural & calm',
     icon: Trees,
     background: '#f8faf5',
     foreground: '#1a2e1a',
@@ -88,9 +88,9 @@ const THEMES = [
     fontType: 'sans-serif',
   },
   {
-    id: 'ocean',
-    name: 'Ocean',
-    description: 'Fresh & professional',
+    id: 'poppins',
+    name: 'Poppins',
+    description: 'Sans-serif / Fresh & professional',
     icon: Waves,
     background: '#f8fafc',
     foreground: '#0f172a',
@@ -102,6 +102,16 @@ const THEMES = [
     font: 'Poppins',
     fontType: 'sans-serif',
   },
+]
+
+// ─── Font options for manual selection ─────────────────────
+const FONT_OPTIONS = [
+  { value: 'Inter', label: 'Inter', type: 'Sans-serif' },
+  { value: 'DM Sans', label: 'DM Sans', type: 'Sans-serif' },
+  { value: 'Plus Jakarta Sans', label: 'Plus Jakarta Sans', type: 'Sans-serif' },
+  { value: 'Poppins', label: 'Poppins', type: 'Sans-serif' },
+  { value: 'Nunito', label: 'Nunito', type: 'Rounded' },
+  { value: 'Playfair Display', label: 'Playfair Display', type: 'Serif' },
 ]
 
 // ─── Verticals (with icons) ───────────────────────────────
@@ -321,6 +331,7 @@ export default function OnboardingPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzeStep, setAnalyzeStep] = useState(0)
   const [extractedBrand, setExtractedBrand] = useState(null)
+  const [customFont, setCustomFont] = useState(null)
   const [hasLocation, setHasLocation] = useState(true)
   const [logoFile, setLogoFile] = useState(null)
   const [showCustomize, setShowCustomize] = useState(false)
@@ -339,15 +350,17 @@ export default function OnboardingPage() {
   // Effective theme (merged from selection + custom overrides)
   const effectiveTheme = useMemo(() => {
     const base = THEMES.find(t => t.id === selectedThemeId) || THEMES[0]
-    if (!customColors) return base
     return {
       ...base,
-      primary: customColors.primary || base.primary,
-      secondary: customColors.secondary || base.secondary,
-      background: customColors.background || base.background,
-      foreground: customColors.foreground || base.foreground,
+      ...(customColors ? {
+        primary: customColors.primary || base.primary,
+        secondary: customColors.secondary || base.secondary,
+        background: customColors.background || base.background,
+        foreground: customColors.foreground || base.foreground,
+      } : {}),
+      ...(customFont ? { font: customFont } : {}),
     }
-  }, [selectedThemeId, customColors])
+  }, [selectedThemeId, customColors, customFont])
 
   // Sync primary color to form
   useEffect(() => {
@@ -371,7 +384,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTaglineIndex(i => (i + 1) % TAGLINES.length)
-    }, 3000)
+    }, 6000)
     return () => clearInterval(interval)
   }, [])
 
@@ -908,7 +921,7 @@ export default function OnboardingPage() {
                   <button
                     key={theme.id}
                     type="button"
-                    onClick={() => { setSelectedThemeId(theme.id); setCustomColors(null); setExtractedBrand(null) }}
+                    onClick={() => { setSelectedThemeId(theme.id); setCustomColors(null); setCustomFont(null); setExtractedBrand(null) }}
                     className={`relative rounded-lg border p-3 text-left transition-all ${
                       isSelected
                         ? 'border-accent ring-1 ring-accent'
@@ -921,10 +934,7 @@ export default function OnboardingPage() {
                       <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.background, borderColor: theme.border }} />
                       <div className="w-5 h-5 rounded-full border" style={{ backgroundColor: theme.card, borderColor: theme.border }} />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <ThemeIcon className="w-3.5 h-3.5 text-muted" />
-                      <span className="text-xs font-semibold text-foreground">{theme.name}</span>
-                    </div>
+                    <span className="text-xs font-semibold text-foreground block" style={{ fontFamily: `"${theme.font}", ${theme.fontType}` }}>{theme.name}</span>
                     <span className="text-[10px] text-muted">{theme.description}</span>
                     {isSelected && (
                       <div className="absolute top-1.5 right-1.5">
@@ -959,62 +969,101 @@ export default function OnboardingPage() {
               </button>
 
               {showCustomize && (
-                <div className="mt-4 space-y-4 pl-6 border-l border-card-border">
+                <div className="mt-4 space-y-5 pl-6 border-l border-card-border">
                   {/* Logo upload */}
                   <div>
                     <label className="block text-xs text-muted mb-2">Logo</label>
-                    <div className="flex items-center gap-3">
-                      {form.logoUrl ? (
-                        <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-card-border bg-card">
+                    {form.logoUrl ? (
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-card-border bg-card">
                           <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain" />
                           <button
                             type="button"
                             onClick={() => { set('logoUrl', null); setLogoFile(null) }}
-                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center"
+                            className="absolute top-0 right-0 w-5 h-5 rounded-bl-lg bg-background/80 text-muted hover:text-red-400 flex items-center justify-center transition-colors"
                           >
-                            <X className="w-2.5 h-2.5" />
+                            <X className="w-3 h-3" />
                           </button>
                         </div>
-                      ) : (
-                        <label className="w-12 h-12 rounded-lg border border-dashed border-card-border bg-card flex items-center justify-center cursor-pointer hover:border-accent/30 transition-colors">
-                          <Upload className="w-4 h-4 text-muted" />
-                          <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                        <label className="text-xs text-accent cursor-pointer hover:underline">
+                          Change logo
+                          <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="hidden" onChange={handleLogoUpload} />
                         </label>
-                      )}
-                      <div className="text-[10px] text-muted">
-                        <p>PNG, JPG, WebP, or SVG</p>
-                        <p>Max 2MB</p>
                       </div>
+                    ) : (
+                      <label className="flex items-center gap-3 px-4 py-3 rounded-lg border border-dashed border-card-border bg-card/50 cursor-pointer hover:border-accent/30 transition-colors">
+                        <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center">
+                          <Upload className="w-4 h-4 text-muted" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-foreground font-medium">Upload your logo</p>
+                          <p className="text-[10px] text-muted">PNG, JPG, WebP, or SVG. Max 2MB.</p>
+                        </div>
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="hidden" onChange={handleLogoUpload} />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Font selector */}
+                  <div>
+                    <label className="block text-xs text-muted mb-2">Font</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {FONT_OPTIONS.map(f => (
+                        <button
+                          key={f.value}
+                          type="button"
+                          onClick={() => setCustomFont(f.value)}
+                          className={`px-3 py-2.5 rounded-lg border text-left transition-all ${
+                            (customFont || effectiveTheme.font) === f.value
+                              ? 'border-accent bg-accent/10'
+                              : 'border-card-border bg-card hover:border-accent/30'
+                          }`}
+                        >
+                          <span className="text-sm font-semibold text-foreground block" style={{ fontFamily: `"${f.value}", ${f.type.toLowerCase()}` }}>
+                            {f.label}
+                          </span>
+                          <span className="text-[10px] text-muted">{f.type}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
 
                   {/* Color pickers */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { key: 'primary', label: 'Primary' },
-                      { key: 'secondary', label: 'Secondary' },
-                      { key: 'background', label: 'Background' },
-                      { key: 'foreground', label: 'Text' },
-                    ].map(({ key, label }) => (
-                      <div key={key}>
-                        <label className="block text-[10px] text-muted mb-1">{label}</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={(customColors?.[key] || effectiveTheme[key]) ?? '#000000'}
-                            onChange={e => setCustomColors(prev => ({ ...(prev || {}), [key]: e.target.value }))}
-                            className="w-8 h-8 rounded cursor-pointer border border-card-border bg-transparent"
-                          />
-                          <span className="text-[10px] font-mono text-muted">
-                            {(customColors?.[key] || effectiveTheme[key]) ?? ''}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                  <div>
+                    <label className="block text-xs text-muted mb-2">Colors</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: 'primary', label: 'Primary' },
+                        { key: 'secondary', label: 'Secondary' },
+                        { key: 'background', label: 'Background' },
+                        { key: 'foreground', label: 'Text' },
+                      ].map(({ key, label }) => {
+                        const colorValue = (customColors?.[key] || effectiveTheme[key]) ?? '#000000'
+                        return (
+                          <label key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-card-border bg-card cursor-pointer hover:border-accent/30 transition-colors">
+                            <div className="relative shrink-0">
+                              <div className="w-8 h-8 rounded-lg border border-card-border" style={{ backgroundColor: colorValue }} />
+                              <input
+                                type="color"
+                                value={colorValue}
+                                onChange={e => setCustomColors(prev => ({ ...(prev || {}), [key]: e.target.value }))}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-xs text-foreground font-medium block">{label}</span>
+                              <span className="text-[10px] font-mono text-muted">{colorValue}</span>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
+
+            <p className="text-xs text-muted/50 text-center">You can change all of this anytime in Settings.</p>
           </div>
         )
 
@@ -1093,10 +1142,10 @@ export default function OnboardingPage() {
 
       <style>{`
         @keyframes tagline-in {
-          0% { opacity: 0; transform: translateY(8px); }
-          100% { opacity: 1; transform: translateY(0); }
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
-        .animate-tagline { animation: tagline-in 0.5s ease-out; }
+        .animate-tagline { animation: tagline-in 1.2s ease-in-out; }
       `}</style>
 
       <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
@@ -1109,13 +1158,10 @@ export default function OnboardingPage() {
               </h1>
               <p
                 key={taglineIndex}
-                className="animate-tagline text-accent text-lg font-medium h-7"
+                className="animate-tagline text-muted/60 text-sm font-medium h-5"
               >
                 {TAGLINES[taglineIndex]}
               </p>
-              {step === 0 && (
-                <p className="text-muted text-sm mt-2">Get started for free! No credit card required.</p>
-              )}
             </div>
           )}
 

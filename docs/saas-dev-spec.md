@@ -252,6 +252,7 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 - [x] Step 4 — Brand: logo upload, color picker (preset swatches + custom), live preview of buttons/branding
 - [x] Step 5 — Launch: celebration, studio URL shown, getting-started checklist, admin dashboard link
 - [ ] Step (deferred): Stripe Connect setup (skippable) — not built yet, can be done from admin settings
+- [ ] Step (deferred): AI data migration (skippable) — "Import your existing data" with drag-and-drop (see Phase 7J)
 
 ### 4B. Onboarding API
 - [x] `POST /api/onboarding/create-tenant`:
@@ -426,10 +427,64 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 - [ ] 3 retries with exponential backoff
 - [ ] `cron/webhook-retry`
 
-### 7J. Data Import (Growth+)
-- [ ] `import_jobs` table
-- [ ] CSV import for members, classes, bookings
-- [ ] Validation, error reporting, rollback on failure
+### 7J. AI Data Migration (Starter+)
+
+> Goal: Zero-friction onboarding. Drop in any data and we populate your Zatrovo automatically. Minimises switching cost.
+
+#### Migration Engine
+- [ ] `migration_jobs` table — id, tenant_id, status (pending/processing/mapping/reviewing/importing/complete/failed), source_type, file_urls[], row_counts, error_log, created_at
+- [ ] `migration_mappings` table — job_id, source_column, target_table, target_column, transform_fn, confidence, user_confirmed
+- [ ] `POST /api/onboarding/migrate` — upload endpoint (CSV, XLSX, JSON, or raw export dump)
+- [ ] `POST /api/onboarding/migrate/confirm` — user confirms AI-proposed column mappings
+- [ ] `GET /api/onboarding/migrate/[jobId]` — poll job status + progress
+
+#### AI Column Mapping
+- [ ] Claude API analyzes uploaded file headers + sample rows
+- [ ] Auto-maps columns to Zatrovo schema (members → users, appointments → bookings, packages → class_packs, etc.)
+- [ ] Handles messy data: inconsistent date formats, merged name fields, currency symbols, phone formats
+- [ ] Confidence scoring per mapping (high/medium/low) — user reviews medium/low
+- [ ] Smart defaults: fills timezone, currency, tenant_id automatically
+
+#### Supported Data Sources
+- [ ] Generic CSV/XLSX (any column names — AI figures out the mapping)
+- [ ] Mindbody export format (known schema)
+- [ ] Glofox export format (known schema)
+- [ ] WellnessLiving export format
+- [ ] Google Sheets link (fetch via Sheets API)
+- [ ] Raw JSON / API dump
+- [ ] Multi-file upload (e.g., separate members.csv + bookings.csv)
+
+#### Import Pipeline
+- [ ] Step 1: Upload file(s) → validate format, extract headers + 5 sample rows
+- [ ] Step 2: AI mapping → show proposed column mappings with confidence indicators
+- [ ] Step 3: User review → confirm/adjust mappings, handle conflicts (duplicate emails, etc.)
+- [ ] Step 4: Dry run → import to staging, show summary (X members, Y bookings, Z packs to import)
+- [ ] Step 5: Execute → import with progress bar, rollback on critical failure
+- [ ] Step 6: Report → show imported counts, skipped rows with reasons, warnings
+
+#### Data Transforms
+- [ ] Name splitting (full name → first + last)
+- [ ] Date parsing (any format → ISO 8601)
+- [ ] Phone normalization (any format → E.164)
+- [ ] Email validation + dedup
+- [ ] Credit/pack balance migration (map source pack → closest Zatrovo pack)
+- [ ] Booking history import (historical records, no double-charging)
+- [ ] Membership status inference (active/expired/cancelled from dates)
+
+#### Onboarding Integration
+- [ ] Optional step in onboarding wizard (between Brand and Launch): "Import your existing data"
+- [ ] Also accessible from Admin → Settings → Import Data (post-onboarding)
+- [ ] "Switching from..." selector with known platforms for optimized import
+- [ ] Drag-and-drop file upload with progress
+
+#### Safety & Validation
+- [ ] All imports wrapped in DB transaction — atomic commit or full rollback
+- [ ] Duplicate detection: email, phone, booking date+time combos
+- [ ] Row-level error reporting (don't fail entire import for one bad row)
+- [ ] Max file size: 10MB per file, 50MB total per job
+- [ ] Rate limit: 1 active migration job per tenant
+- [ ] Imported data gets `source: 'migration'` tag for audit trail
+- [ ] Admin can undo entire migration (soft delete imported rows) within 7 days
 
 ### 7K. Forms & Waivers (Growth+)
 - [ ] `forms`, `form_responses` tables
