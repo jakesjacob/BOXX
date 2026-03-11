@@ -201,11 +201,28 @@ function extractColors(html, cssContent) {
     '#374151', '#1f2937', '#111827', '#030712',
   ])
 
+  // Common UI framework status/utility colors — NOT brand colors
+  // These appear in Tailwind, Bootstrap, etc. for error/success/warning states
+  const uiFrameworkColors = new Set([
+    // Reds (error/destructive/danger)
+    '#ef4444', '#dc2626', '#b91c1c', '#f87171', '#fca5a5', '#fee2e2',
+    '#dc3545', '#c82333', '#ff0000', '#ff4444', '#e53e3e', '#fc8181',
+    '#f56565', '#feb2b2', '#fed7d7', '#e11d48', '#be123c', '#9f1239',
+    // Greens (success)
+    '#22c55e', '#16a34a', '#15803d', '#4ade80', '#86efac', '#dcfce7',
+    '#28a745', '#218838', '#10b981', '#059669', '#047857', '#34d399',
+    // Yellows/Amber (warning)
+    '#eab308', '#ca8a04', '#f59e0b', '#d97706', '#fbbf24', '#fcd34d',
+    '#ffc107', '#e0a800', '#f6e05e', '#fefcbf',
+    // Blues (info — only generic framework blues, not brand blues)
+    '#0d6efd', '#0b5ed7', '#17a2b8', '#138496',
+  ])
+
   const freq = {}
   const hexMatches = allContent.matchAll(/#([0-9a-fA-F]{6})\b/g)
   for (const m of hexMatches) {
     const hex = '#' + m[1].toLowerCase()
-    if (neutrals.has(hex)) continue
+    if (neutrals.has(hex) || uiFrameworkColors.has(hex)) continue
     freq[hex] = (freq[hex] || 0) + 1
   }
 
@@ -332,12 +349,18 @@ ${cssSnippet}
 Button/CTA styles:
 ${buttonStyles}
 
-DESIGN RULES you must follow:
+CRITICAL RULES:
+- ONLY use colors that ACTUALLY EXIST on the website. Do NOT invent or hallucinate colors.
+- If you cannot find a distinct secondary or accent color, derive one from the primary by shifting its hue slightly (±20-40°) — do NOT introduce random colors like red unless red is genuinely part of the brand.
+- Ignore standard UI framework colors (red for errors, green for success, yellow for warnings) — these are NOT brand colors.
+- The regex hints above may be WRONG (they sometimes pick up framework utility colors). Trust what you see in the actual HTML/CSS structure over the regex hints.
+
+DESIGN RULES:
 1. CONTRAST: foreground text must have WCAG AA contrast (4.5:1) against background. Muted text needs 3:1 minimum.
 2. SURFACE: surface color should be a subtle step from background (slightly lighter for dark themes, slightly darker for light). surfaceHover is one more step.
 3. HOVER STATES: primaryHover should be slightly darker than primary. borderHover slightly more visible than border.
-4. SECONDARY vs ACCENT: secondary complements primary (used for links, secondary buttons). Accent is for highlights, badges, decorative elements — can be more vibrant.
-5. HARMONY: all colors should feel like they belong together. If the brand only has one strong color, derive secondary/accent by shifting hue ±20-40° and adjusting saturation.
+4. SECONDARY vs ACCENT: secondary complements primary (same color family or analogous hue). Accent is for highlights/badges — should harmonize, not clash. When in doubt, keep secondary and accent in the same hue family as primary with different saturation/lightness.
+5. HARMONY: all colors should feel like they belong together. The theme should look like ONE coherent brand, not a rainbow.
 6. BORDERS: should be subtle — derived from background, not primary. Just enough to define edges.
 7. MUTED: text color for labels/captions — should feel soft but readable against background.
 8. FONTS: If the site uses one font for everything, use it for both title and body. If it uses a decorative/serif font for headings and a clean sans for body, preserve that pairing. Only suggest well-known Google Fonts.
