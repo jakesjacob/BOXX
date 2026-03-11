@@ -71,6 +71,20 @@ export const AGENT_TOOLS = [
     },
   },
 
+  {
+    name: 'delete_class',
+    description: 'Permanently delete a cancelled class from the schedule. The class must already be cancelled before it can be deleted.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        class_type: { type: 'string', description: 'Name of the class type to find' },
+        date: { type: 'string', description: 'Date of the class (YYYY-MM-DD)' },
+        start_time: { type: 'string', description: 'Start time (HH:MM) to disambiguate if multiple classes that day' },
+      },
+      required: ['class_type', 'date'],
+    },
+  },
+
   // ── Roster ────────────────────────────────────────
   {
     name: 'add_member_to_class',

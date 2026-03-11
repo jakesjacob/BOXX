@@ -138,61 +138,64 @@ export async function POST(request) {
       return NextResponse.json({ error: 'No messages provided' }, { status: 400 })
     }
 
-    // Resolve or create conversation
+    // Resolve or create conversation (best-effort — chat works without persistence)
     let convoId = conversationId
     const userMessage = messages[messages.length - 1]?.content || ''
 
-    if (newConversation || !convoId) {
-      // Enforce conversation cap
-      const { count } = await supabaseAdmin
-        .from('agent_conversations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', session.user.id)
+    try {
+      if (newConversation || !convoId) {
+        // Enforce conversation cap
+        const { count } = await supabaseAdmin
+          .from('agent_conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', session.user.id)
 
-      if (count >= MAX_CONVERSATIONS) {
-        const { data: oldest } = await supabaseAdmin
+        if (count >= MAX_CONVERSATIONS) {
+          const { data: oldest } = await supabaseAdmin
+            .from('agent_conversations')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .order('updated_at', { ascending: true })
+            .limit(count - MAX_CONVERSATIONS + 1)
+
+          if (oldest?.length) {
+            await supabaseAdmin.from('agent_conversations').delete().in('id', oldest.map((c) => c.id))
+          }
+        }
+
+        const { data: convo } = await supabaseAdmin
+          .from('agent_conversations')
+          .insert({
+            user_id: session.user.id,
+            title: generateTitle(userMessage),
+          })
+          .select('id')
+          .single()
+
+        convoId = convo?.id
+      } else {
+        // Verify ownership
+        const { data: convo } = await supabaseAdmin
           .from('agent_conversations')
           .select('id')
+          .eq('id', convoId)
           .eq('user_id', session.user.id)
-          .order('updated_at', { ascending: true })
-          .limit(count - MAX_CONVERSATIONS + 1)
+          .single()
 
-        if (oldest?.length) {
-          await supabaseAdmin.from('agent_conversations').delete().in('id', oldest.map((c) => c.id))
-        }
+        if (!convo) convoId = null // conversation missing — continue without persistence
       }
 
-      const { data: convo } = await supabaseAdmin
-        .from('agent_conversations')
-        .insert({
-          user_id: session.user.id,
-          title: generateTitle(userMessage),
+      // Save user message
+      if (convoId) {
+        await supabaseAdmin.from('agent_messages').insert({
+          conversation_id: convoId,
+          role: 'user',
+          content: userMessage,
         })
-        .select('id')
-        .single()
-
-      convoId = convo?.id
-    } else {
-      // Verify ownership
-      const { data: convo } = await supabaseAdmin
-        .from('agent_conversations')
-        .select('id')
-        .eq('id', convoId)
-        .eq('user_id', session.user.id)
-        .single()
-
-      if (!convo) {
-        return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
       }
-    }
-
-    // Save user message
-    if (convoId) {
-      await supabaseAdmin.from('agent_messages').insert({
-        conversation_id: convoId,
-        role: 'user',
-        content: userMessage,
-      })
+    } catch (err) {
+      console.error('[admin/agent] Conversation persistence error:', err.message)
+      convoId = null // continue without persistence
     }
 
     const systemPrompt = await buildSystemPrompt(session.user.name)
@@ -248,20 +251,22 @@ export async function POST(request) {
       .map((b) => b.text)
       .join('\n')
 
-    // Save assistant message
+    // Save assistant message (best-effort)
     if (convoId) {
-      await supabaseAdmin.from('agent_messages').insert({
-        conversation_id: convoId,
-        role: 'assistant',
-        content: textContent,
-        tool_results: toolResults.length ? toolResults : null,
-      })
-
-      // Update conversation timestamp
-      await supabaseAdmin
-        .from('agent_conversations')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', convoId)
+      try {
+        await supabaseAdmin.from('agent_messages').insert({
+          conversation_id: convoId,
+          role: 'assistant',
+          content: textContent,
+          tool_results: toolResults.length ? toolResults : null,
+        })
+        await supabaseAdmin
+          .from('agent_conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', convoId)
+      } catch (err) {
+        console.error('[admin/agent] Message save error:', err.message)
+      }
     }
 
     // Update memory (best-effort, non-blocking)

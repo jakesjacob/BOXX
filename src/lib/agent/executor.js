@@ -36,6 +36,7 @@ export async function executeTool(toolName, input, context) {
       case 'create_class': return await createClass(input, context)
       case 'create_recurring_classes': return await createRecurringClasses(input, context)
       case 'cancel_class': return await cancelClass(input, context)
+      case 'delete_class': return await deleteClass(input, context)
       case 'get_schedule': return await getSchedule(input)
       case 'add_member_to_class': return await addMemberToClass(input, context)
       case 'search_members': return await searchMembers(input)
@@ -141,23 +142,30 @@ async function resolvePack(name) {
   return match
 }
 
-async function resolveClass(classTypeName, date, startTime) {
+async function resolveClass(classTypeName, date, startTime, { allowStatus } = {}) {
   const ct = await resolveClassType(classTypeName)
 
   const dayStart = `${date}T00:00:00+07:00`
   const dayEnd = `${date}T23:59:59+07:00`
 
-  const { data: classes } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('class_schedule')
     .select('id, starts_at, ends_at, capacity, status, instructors(name)')
     .eq('class_type_id', ct.id)
-    .eq('status', 'active')
     .gte('starts_at', dayStart)
     .lte('starts_at', dayEnd)
     .order('starts_at')
 
+  if (allowStatus) {
+    query = query.eq('status', allowStatus)
+  } else {
+    query = query.eq('status', 'active')
+  }
+
+  const { data: classes } = await query
+
   if (!classes?.length) {
-    throw new Error(`No active "${ct.name}" class found on ${date}.`)
+    throw new Error(`No ${allowStatus || 'active'} "${ct.name}" class found on ${date}.`)
   }
 
   if (classes.length === 1) return { classId: classes[0].id, cls: classes[0], classType: ct }
@@ -369,6 +377,69 @@ async function cancelClass(input, context) {
     data: {
       message: `Cancelled "${classType.name}" on ${input.date} at ${time}. ${bookings?.length || 0} booking(s) cancelled, ${creditsRefunded} credit(s) refunded.`,
     },
+  }
+}
+
+async function deleteClass(input, context) {
+  // Find cancelled class specifically
+  const ct = await resolveClassType(input.class_type)
+  const dayStart = `${input.date}T00:00:00+07:00`
+  const dayEnd = `${input.date}T23:59:59+07:00`
+
+  const { data: classes } = await supabaseAdmin
+    .from('class_schedule')
+    .select('id, starts_at, status, instructors(name)')
+    .eq('class_type_id', ct.id)
+    .eq('status', 'cancelled')
+    .gte('starts_at', dayStart)
+    .lte('starts_at', dayEnd)
+
+  if (!classes?.length) {
+    // Check if there's an active one
+    const { data: active } = await supabaseAdmin
+      .from('class_schedule')
+      .select('id, status')
+      .eq('class_type_id', ct.id)
+      .eq('status', 'active')
+      .gte('starts_at', dayStart)
+      .lte('starts_at', dayEnd)
+      .limit(1)
+
+    if (active?.length) {
+      throw new Error(`"${ct.name}" on ${input.date} is still active. Cancel it first before deleting.`)
+    }
+    throw new Error(`No cancelled "${ct.name}" class found on ${input.date}.`)
+  }
+
+  let target = classes[0]
+  if (classes.length > 1 && input.start_time) {
+    const normTime = normaliseTime(input.start_time).replace(':', '')
+    const match = classes.find((c) => {
+      const t = new Date(c.starts_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }).replace(':', '')
+      return t === normTime
+    })
+    if (match) target = match
+  }
+
+  // Delete related records first (cascade should handle this but be explicit)
+  await supabaseAdmin.from('bookings').delete().eq('class_schedule_id', target.id)
+  await supabaseAdmin.from('waitlist').delete().eq('class_schedule_id', target.id)
+
+  const { error } = await supabaseAdmin.from('class_schedule').delete().eq('id', target.id)
+  if (error) throw new Error(`Failed to delete class: ${error.message}`)
+
+  await supabaseAdmin.from('admin_audit_log').insert({
+    admin_id: context.adminId,
+    action: 'delete_class',
+    target_type: 'class_schedule',
+    target_id: target.id,
+    details: { via: 'agent', class_type: ct.name },
+  })
+
+  const displayTime = new Date(target.starts_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Bangkok' })
+  return {
+    success: true,
+    data: { message: `Permanently deleted "${ct.name}" on ${input.date} at ${displayTime}.` },
   }
 }
 
