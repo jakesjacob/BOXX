@@ -87,20 +87,23 @@ export async function POST(request) {
 
     // 4. Find user's best credit (closest to expiry first, active + not expired)
     const now = new Date().toISOString()
-    const { data: credits } = await supabaseAdmin
+    const { data: allCredits } = await supabaseAdmin
       .from('user_credits')
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'active')
       .gt('expires_at', now)
-      .or('credits_remaining.gt.0,credits_remaining.is.null') // null = unlimited
       .order('expires_at', { ascending: true })
 
-    if (!credits || credits.length === 0) {
+    const availableCredits = (allCredits || []).filter(
+      (c) => c.credits_remaining > 0 || c.credits_remaining === null
+    )
+
+    if (!availableCredits.length) {
       return NextResponse.json({ error: 'No available credits. Purchase a class pack first.' }, { status: 400 })
     }
 
-    const credit = credits[0]
+    const credit = availableCredits[0]
 
     // 5. Deduct credit atomically (skip for unlimited)
     if (credit.credits_remaining !== null) {

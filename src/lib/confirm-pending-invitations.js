@@ -25,14 +25,17 @@ export async function confirmPendingInvitations(userId) {
     if (!valid.length) return 0
 
     // 2. Find available credits
-    const { data: credits } = await supabaseAdmin
+    const { data: allCredits } = await supabaseAdmin
       .from('user_credits')
       .select('id, credits_remaining')
       .eq('user_id', userId)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
-      .or('credits_remaining.gt.0,credits_remaining.is.null')
       .order('expires_at', { ascending: true })
+
+    const credits = (allCredits || []).filter(
+      (c) => c.credits_remaining > 0 || c.credits_remaining === null
+    )
 
     if (!credits?.length) return 0
 

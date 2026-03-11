@@ -53,21 +53,21 @@ export async function POST(request) {
     }
 
     // Find available credit
-    const { data: credits } = await supabaseAdmin
+    const { data: allCredits } = await supabaseAdmin
       .from('user_credits')
       .select('id, credits_remaining')
       .eq('user_id', userId)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
-      .or('credits_remaining.gt.0,credits_remaining.is.null')
       .order('expires_at', { ascending: true })
-      .limit(1)
 
-    if (!credits?.length) {
+    const credit = (allCredits || []).find(
+      (c) => c.credits_remaining > 0 || c.credits_remaining === null
+    )
+
+    if (!credit) {
       return NextResponse.json({ error: 'No available credits. Purchase a class pack first.' }, { status: 400 })
     }
-
-    const credit = credits[0]
 
     // Deduct credit atomically
     if (credit.credits_remaining !== null) {

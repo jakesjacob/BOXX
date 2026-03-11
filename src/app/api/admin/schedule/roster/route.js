@@ -58,17 +58,18 @@ export async function POST(request) {
     ])
 
     // Check if member has available credits
-    const { data: credits } = await supabaseAdmin
+    const { data: allCredits } = await supabaseAdmin
       .from('user_credits')
       .select('id, credits_remaining')
       .eq('user_id', userId)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
-      .or('credits_remaining.gt.0,credits_remaining.is.null')
       .order('expires_at', { ascending: true })
-      .limit(1)
 
-    const hasCredits = credits?.length > 0
+    const credits = (allCredits || []).filter(
+      (c) => c.credits_remaining > 0 || c.credits_remaining === null
+    )
+    const hasCredits = credits.length > 0
     let creditId = null
 
     // Deduct credit if available
