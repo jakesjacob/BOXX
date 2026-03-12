@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
+    minimumCacheTTL: 86400, // Cache optimized images for 24 hours
     remotePatterns: [
       {
         protocol: 'https',

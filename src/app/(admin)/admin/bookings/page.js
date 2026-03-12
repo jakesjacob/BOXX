@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { CalendarDays, XCircle, UserPlus, Wrench, ClipboardList } from 'lucide-react'
 
@@ -308,7 +309,7 @@ export default function AdminEventsPage() {
                               <div className="flex items-center gap-2 mt-2">
                                 <div className="w-5 h-5 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                                   {event.user.avatar_url ? (
-                                    <img src={event.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                                    <Image src={event.user.avatar_url} alt="" width={20} height={20} className="object-cover rounded-full" unoptimized />
                                   ) : (
                                     <span className="text-accent text-[8px] font-medium">
                                       {(event.user.name || event.user.email)?.[0]?.toUpperCase() || '?'}

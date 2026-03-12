@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { X } from 'lucide-react'
 
@@ -143,7 +144,7 @@ export default function AdminInstructorsPage() {
                 {/* Photo */}
                 <div className="w-11 h-11 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                   {inst.photo_url ? (
-                    <img src={inst.photo_url} alt="" className="w-full h-full object-cover" />
+                    <Image src={inst.photo_url} alt="" width={44} height={44} className="object-cover rounded-full" unoptimized />
                   ) : (
                     <span className="text-accent text-sm font-medium">
                       {inst.name?.[0]?.toUpperCase() || '?'}

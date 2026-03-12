@@ -278,11 +278,13 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
                 onClick={() => fileInputRef.current?.click()}
               >
                 {(localAvatar || user?.avatar_url) ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
+                  <Image
                     src={localAvatar || user.avatar_url}
                     alt={user?.name || 'Avatar'}
-                    className="w-full h-full object-cover"
+                    width={72}
+                    height={72}
+                    className="object-cover rounded-full"
+                    unoptimized
                   />
                 ) : (
                   <span className="text-2xl font-bold text-accent">

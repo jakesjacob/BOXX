@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { ChevronLeft, X } from 'lucide-react'
 
@@ -249,7 +250,7 @@ export default function AdminMembersPage() {
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
                       {detail.member.avatar_url ? (
-                        <img src={detail.member.avatar_url} alt="" className="w-full h-full object-cover" />
+                        <Image src={detail.member.avatar_url} alt="" width={48} height={48} className="object-cover rounded-full" unoptimized />
                       ) : (
                         <span className="text-accent text-lg sm:text-xl font-bold">
                           {(detail.member.name || detail.member.email)?.[0]?.toUpperCase() || '?'}
@@ -651,7 +652,7 @@ export default function AdminMembersPage() {
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                     {member.avatar_url ? (
-                      <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                      <Image src={member.avatar_url} alt="" width={32} height={32} className="object-cover rounded-full" unoptimized />
                     ) : (
                       <span className="text-accent text-xs font-medium">
                         {(member.name || member.email)?.[0]?.toUpperCase() || '?'}

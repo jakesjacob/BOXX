@@ -92,23 +92,19 @@ export default function ThemeProvider({ children }) {
     return () => { link.remove() }
   }, [theme?.titleFont, theme?.bodyFont])
 
+  // Render children immediately — don't block on theme fetch.
+  // CSS variables apply as soon as theme loads (no layout shift, just color swap).
   return (
     <ThemeContext.Provider value={{ theme, loading }}>
-      {loading ? (
-        <div className="min-h-screen bg-[#0a0a0a]" />
-      ) : (
-        <>
-          {theme?.bodyFont && (
-            <style>{`
-              .tenant-body { font-family: var(--font-tenant-body, inherit); }
-              .tenant-title { font-family: var(--font-tenant-title, var(--font-tenant-body, inherit)); }
-            `}</style>
-          )}
-          <div className={theme?.bodyFont ? 'tenant-body' : ''}>
-            {children}
-          </div>
-        </>
+      {theme?.bodyFont && (
+        <style>{`
+          .tenant-body { font-family: var(--font-tenant-body, inherit); }
+          .tenant-title { font-family: var(--font-tenant-title, var(--font-tenant-body, inherit)); }
+        `}</style>
       )}
+      <div className={theme?.bodyFont ? 'tenant-body' : ''}>
+        {children}
+      </div>
     </ThemeContext.Provider>
   )
 }

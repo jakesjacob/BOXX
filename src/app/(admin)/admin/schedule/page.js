@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { Lock, X, Trash2, CalendarDays, Clock, User, Check, Plus, ChevronLeft, ChevronRight, Mail, MailX } from 'lucide-react'
 
@@ -1375,7 +1376,7 @@ export default function AdminSchedulePage() {
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
                               {m.avatar_url ? (
-                                <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                                <Image src={m.avatar_url} alt="" width={24} height={24} className="object-cover rounded-full" unoptimized />
                               ) : (
                                 <span className="text-accent text-[9px] font-bold">{(m.name || m.email)?.[0]?.toUpperCase()}</span>
                               )}
@@ -1408,7 +1409,7 @@ export default function AdminSchedulePage() {
                         <div key={m.id} className="flex items-center gap-1.5 bg-amber-400/5 border border-amber-400/20 rounded-full pl-1 pr-2 py-0.5">
                           <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center overflow-hidden shrink-0">
                             {m.avatar_url ? (
-                              <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                              <Image src={m.avatar_url} alt="" width={20} height={20} className="object-cover rounded-full" unoptimized />
                             ) : (
                               <span className="text-[8px] font-bold text-accent">{(m.name || '?')[0]?.toUpperCase()}</span>
                             )}
@@ -1525,7 +1526,7 @@ export default function AdminSchedulePage() {
                               <div key={m.id || i} className="flex items-center gap-1.5 bg-background rounded-full pl-1 pr-2.5 py-1 border border-card-border">
                                 <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center overflow-hidden shrink-0">
                                   {m.avatar_url ? (
-                                    <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                                    <Image src={m.avatar_url} alt="" width={20} height={20} className="object-cover rounded-full" unoptimized />
                                   ) : (
                                     <span className="text-[8px] font-bold text-accent">{(m.name || '?')[0]?.toUpperCase()}</span>
                                   )}
@@ -1544,7 +1545,7 @@ export default function AdminSchedulePage() {
                               <div key={m.id || i} className="flex items-center gap-1.5 bg-background/50 rounded-full pl-1 pr-2.5 py-1 border border-card-border opacity-60">
                                 <div className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center overflow-hidden shrink-0">
                                   {m.avatar_url ? (
-                                    <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                                    <Image src={m.avatar_url} alt="" width={20} height={20} className="object-cover rounded-full" unoptimized />
                                   ) : (
                                     <span className="text-[8px] font-bold text-muted">{(m.name || '?')[0]?.toUpperCase()}</span>
                                   )}
@@ -2007,7 +2008,7 @@ function RosterDialog({ cls, onClose, onUpdate, setToast }) {
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
                       {m.avatar_url ? (
-                        <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                        <Image src={m.avatar_url} alt="" width={24} height={24} className="object-cover rounded-full" unoptimized />
                       ) : (
                         <span className="text-accent text-[9px] font-bold">{(m.name || m.email)?.[0]?.toUpperCase()}</span>
                       )}
@@ -2045,7 +2046,7 @@ function RosterDialog({ cls, onClose, onUpdate, setToast }) {
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
                     {m.avatar_url ? (
-                      <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                      <Image src={m.avatar_url} alt="" width={28} height={28} className="object-cover rounded-full" unoptimized />
                     ) : (
                       <span className="text-accent text-[10px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
                     )}
@@ -2090,7 +2091,7 @@ function RosterDialog({ cls, onClose, onUpdate, setToast }) {
                   </div>
                   <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
                     {m.avatar_url ? (
-                      <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                      <Image src={m.avatar_url} alt="" width={28} height={28} className="object-cover rounded-full" unoptimized />
                     ) : (
                       <span className="text-accent text-[10px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
                     )}

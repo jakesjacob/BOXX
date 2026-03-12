@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 import Link from 'next/link'
 import { CalendarDays, Users, Tag, Package, ClipboardList, Dumbbell, Mail, Settings, Loader2, ChevronDown } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
@@ -375,7 +376,7 @@ export default function AdminDashboard() {
                                   <div key={m.id || i} className="flex items-center gap-2 py-1.5 px-2 rounded border border-card-border">
                                     <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
                                       {m.avatar_url ? (
-                                        <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                                        <Image src={m.avatar_url} alt="" width={24} height={24} className="object-cover rounded-full" unoptimized />
                                       ) : (
                                         <span className="text-accent text-[9px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
                                       )}
@@ -397,7 +398,7 @@ export default function AdminDashboard() {
                                     <span className="text-[9px] text-muted font-bold w-4 text-center shrink-0">#{m.position || i + 1}</span>
                                     <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
                                       {m.avatar_url ? (
-                                        <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                                        <Image src={m.avatar_url} alt="" width={24} height={24} className="object-cover rounded-full" unoptimized />
                                       ) : (
                                         <span className="text-accent text-[9px] font-bold">{(m.name || '?')[0]?.toUpperCase()}</span>
                                       )}
@@ -504,7 +505,7 @@ export default function AdminDashboard() {
                     <div key={user.id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-card-border">
                       <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                         {user.avatar_url ? (
-                          <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <Image src={user.avatar_url} alt="" width={32} height={32} className="object-cover rounded-full" unoptimized />
                         ) : (
                           <span className="text-accent text-xs font-medium">
                             {(user.name || user.email)?.[0]?.toUpperCase() || '?'}
@@ -655,7 +656,7 @@ export default function AdminDashboard() {
                       </div>
                       <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                         {member.avatar_url ? (
-                          <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <Image src={member.avatar_url} alt="" width={32} height={32} className="object-cover rounded-full" unoptimized />
                         ) : (
                           <span className="text-accent text-xs font-medium">
                             {(member.name || member.email)?.[0]?.toUpperCase() || '?'}
@@ -686,7 +687,7 @@ export default function AdminDashboard() {
                     <div key={member.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-card-border">
                       <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
                         {member.avatar_url ? (
-                          <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                          <Image src={member.avatar_url} alt="" width={32} height={32} className="object-cover rounded-full" unoptimized />
                         ) : (
                           <span className="text-accent text-xs font-medium">
                             {(member.name || member.email)?.[0]?.toUpperCase() || '?'}
