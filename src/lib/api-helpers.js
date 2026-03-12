@@ -59,6 +59,7 @@ export async function requireAuth(request) {
  */
 export async function requireStaff(request) {
   const session = await auth()
+  console.log('[requireStaff] session:', session ? { id: session.user?.id, role: session.user?.role, tenantId: session.user?.tenantId } : 'NULL')
   if (!session) {
     return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
@@ -85,6 +86,7 @@ export async function requireStaff(request) {
 export async function requireAdmin(request) {
   const session = await auth()
   const role = session?.user?.role
+  console.log('[requireAdmin] session:', session ? { id: session.user?.id, role, tenantId: session.user?.tenantId } : 'NULL')
   if (!session || (role !== 'admin' && role !== 'owner')) {
     return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
