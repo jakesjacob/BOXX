@@ -75,12 +75,15 @@ export default function RegisterForm({ tenantId, tenantSlug }) {
   }
 
   const handleGoogleRegister = () => {
-    // Set cookie so the OAuth callback can associate with this tenant
-    // Use root domain so the cookie is readable at zatrovo.com (where OAuth callback lands)
+    // Set cookies so the OAuth callback can associate with this tenant
+    // Use root domain so cookies are readable at zatrovo.com (where OAuth callback lands)
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
+    const domainAttr = baseDomain && !baseDomain.includes('localhost') ? `;domain=.${baseDomain}` : ''
     if (tenantId) {
-      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
-      const domainAttr = baseDomain && !baseDomain.includes('localhost') ? `;domain=.${baseDomain}` : ''
       document.cookie = `pending_tenant_id=${tenantId};path=/;max-age=600;samesite=lax${domainAttr}`
+    }
+    if (tenantSlug) {
+      document.cookie = `pending_tenant_slug=${tenantSlug};path=/;max-age=600;samesite=lax${domainAttr}`
     }
     // Use the smart redirect page — it reads the session and redirects to the right tenant/role
     signIn('google', { callbackUrl: '/auth/redirect' })

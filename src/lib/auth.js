@@ -89,61 +89,117 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider === 'google') {
         if (!supabaseAdmin) return false
 
-        // Check if user exists by google_id first
-        const { data: existing } = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .eq('google_id', account.providerAccountId)
-          .single()
-
-        if (existing) {
-          if (existing.role === 'frozen') return false
-          user.id = existing.id
-          user.role = existing.role
-          user.image = existing.avatar_url
-          user.tenantId = existing.tenant_id
-          // Look up slug for redirect
-          const { data: t } = await supabaseAdmin.from('tenants').select('slug').eq('id', existing.tenant_id).single()
-          user.tenantSlug = t?.slug
-          return true
-        }
-
-        // New Google user — create account
-        // Read tenant from cookie set by login/register page before OAuth redirect
-        let tenantId = process.env.DEFAULT_TENANT_ID || 'a0000000-0000-0000-0000-000000000001'
+        // Read target tenant from cookie (set by login/register page before OAuth redirect)
+        let targetTenantId = null
         try {
           const cookieStore = await cookies()
           const pendingTenant = cookieStore.get('pending_tenant_id')?.value
-          if (pendingTenant) tenantId = pendingTenant
+          if (pendingTenant) targetTenantId = pendingTenant
         } catch {
           // cookies() may not be available in all contexts
         }
 
-        // Check if a user with this email already exists on the target tenant
-        const { data: existingByEmail } = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .eq('email', user.email.toLowerCase())
-          .eq('tenant_id', tenantId)
-          .single()
+        // Helper to populate user fields + tenant slug
+        async function setUserFields(dbUser) {
+          user.id = dbUser.id
+          user.role = dbUser.role
+          user.image = dbUser.avatar_url
+          user.tenantId = dbUser.tenant_id
+          const { data: t } = await supabaseAdmin.from('tenants').select('slug').eq('id', dbUser.tenant_id).single()
+          user.tenantSlug = t?.slug
+        }
 
-        if (existingByEmail) {
-          // Link Google account to existing email user
-          if (existingByEmail.role === 'frozen') return false
-          await supabaseAdmin
+        // 1. If we have a target tenant, look for user on THAT tenant first
+        if (targetTenantId) {
+          // Check by google_id on target tenant
+          const { data: onTenant } = await supabaseAdmin
             .from('users')
-            .update({ google_id: account.providerAccountId, avatar_url: user.image })
-            .eq('id', existingByEmail.id)
+            .select('*')
+            .eq('google_id', account.providerAccountId)
+            .eq('tenant_id', targetTenantId)
+            .single()
 
-          user.id = existingByEmail.id
-          user.role = existingByEmail.role
-          user.tenantId = existingByEmail.tenant_id
-          const { data: t2 } = await supabaseAdmin.from('tenants').select('slug').eq('id', existingByEmail.tenant_id).single()
-          user.tenantSlug = t2?.slug
+          if (onTenant) {
+            if (onTenant.role === 'frozen') return false
+            await setUserFields(onTenant)
+            return true
+          }
+
+          // Check by email on target tenant (link Google account)
+          const { data: byEmail } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .eq('email', user.email.toLowerCase())
+            .eq('tenant_id', targetTenantId)
+            .single()
+
+          if (byEmail) {
+            if (byEmail.role === 'frozen') return false
+            await supabaseAdmin
+              .from('users')
+              .update({ google_id: account.providerAccountId, avatar_url: user.image })
+              .eq('id', byEmail.id)
+            await setUserFields(byEmail)
+            return true
+          }
+
+          // New user on target tenant — create account
+          const { data: newUser, error } = await supabaseAdmin
+            .from('users')
+            .insert({
+              email: user.email.toLowerCase(),
+              name: user.name,
+              avatar_url: user.image,
+              google_id: account.providerAccountId,
+              role: 'member',
+              tenant_id: targetTenantId,
+            })
+            .select()
+            .single()
+
+          if (error) {
+            console.error('[auth] Google signup failed:', error.message)
+            return false
+          }
+
+          await setUserFields(newUser)
           return true
         }
 
-        // Truly new user — create account
+        // 2. No target tenant (root domain login) — find by google_id globally
+        const { data: existing } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .eq('google_id', account.providerAccountId)
+          .limit(1)
+          .single()
+
+        if (existing) {
+          if (existing.role === 'frozen') return false
+          await setUserFields(existing)
+          return true
+        }
+
+        // 3. No google_id match, no target tenant — check by email globally
+        const { data: byEmailGlobal } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .eq('email', user.email.toLowerCase())
+          .limit(1)
+          .single()
+
+        if (byEmailGlobal) {
+          if (byEmailGlobal.role === 'frozen') return false
+          await supabaseAdmin
+            .from('users')
+            .update({ google_id: account.providerAccountId, avatar_url: user.image })
+            .eq('id', byEmailGlobal.id)
+          await setUserFields(byEmailGlobal)
+          return true
+        }
+
+        // 4. Completely new user, no target tenant — use default
+        const defaultTenantId = process.env.DEFAULT_TENANT_ID || 'a0000000-0000-0000-0000-000000000001'
         const { data: newUser, error } = await supabaseAdmin
           .from('users')
           .insert({
@@ -152,7 +208,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             avatar_url: user.image,
             google_id: account.providerAccountId,
             role: 'member',
-            tenant_id: tenantId,
+            tenant_id: defaultTenantId,
           })
           .select()
           .single()
@@ -162,11 +218,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return false
         }
 
-        user.id = newUser.id
-        user.role = newUser.role
-        user.tenantId = newUser.tenant_id
-        const { data: t3 } = await supabaseAdmin.from('tenants').select('slug').eq('id', newUser.tenant_id).single()
-        user.tenantSlug = t3?.slug
+        await setUserFields(newUser)
       }
 
       return true

@@ -135,6 +135,13 @@ export default auth(async (req) => {
     }
 
     response.headers.set('x-tenant-id', session.user.tenantId)
+  } else if (isRootDomain && !session && (pathname === '/login' || pathname === '/register') && req.nextUrl.search) {
+    // Unauthenticated error redirect on root domain (e.g. Google OAuth failure)
+    // Use pending_tenant_id cookie to redirect back to the correct subdomain
+    const pendingTenantSlug = req.cookies.get('pending_tenant_slug')?.value
+    if (pendingTenantSlug) {
+      return NextResponse.redirect(new URL(`https://${pendingTenantSlug}.${baseDomain}${pathname}${req.nextUrl.search}`))
+    }
   } else if (session?.user?.tenantId) {
     // Authenticated user's tenant from JWT (for non-subdomain access like vercel.app)
     response.headers.set('x-tenant-id', session.user.tenantId)
