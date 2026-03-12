@@ -1,10 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { useState, useEffect } from 'react'
+import { signIn, signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 
 export default function RegisterForm({ tenantId, tenantSlug }) {
+  const { data: session } = useSession()
+
+  // If user has an active session for a DIFFERENT tenant, sign them out
+  useEffect(() => {
+    if (session?.user && tenantId && session.user.tenantId !== tenantId) {
+      signOut({ redirect: false })
+    }
+  }, [session, tenantId])
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

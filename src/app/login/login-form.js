@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { signIn } from 'next-auth/react'
+import { useState, useEffect, Suspense } from 'react'
+import { signIn, signOut, useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -14,9 +14,18 @@ export default function LoginForm({ tenantId, tenantSlug }) {
 }
 
 function LoginFormInner({ tenantId, tenantSlug }) {
+  const { data: session } = useSession()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const errorParam = searchParams.get('error')
+
+  // If user has an active session for a DIFFERENT tenant, sign them out
+  // so they can cleanly log in to this tenant
+  useEffect(() => {
+    if (session?.user && tenantId && session.user.tenantId !== tenantId) {
+      signOut({ redirect: false })
+    }
+  }, [session, tenantId])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
