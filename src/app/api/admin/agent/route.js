@@ -101,12 +101,14 @@ async function checkDailyLimit(userId, tenantId) {
 }
 
 /**
- * Auto-generate a conversation title from the first user message
+ * Auto-generate a conversation title from the current date/time
  */
-function generateTitle(message) {
-  const clean = message.replace(/[#*_`]/g, '').trim()
-  if (clean.length <= 40) return clean
-  return clean.slice(0, 40).replace(/\s\S*$/, '') + '...'
+function generateTitle() {
+  const now = new Date()
+  return now.toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  })
 }
 
 /**
@@ -177,7 +179,7 @@ export async function POST(request) {
           .insert({
             tenant_id: tenantId,
             user_id: session.user.id,
-            title: generateTitle(userMessage),
+            title: generateTitle(),
           })
           .select('id')
           .single()

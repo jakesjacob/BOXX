@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────
--- Test Tenant #2 — "FitZone Studio"
+-- Test Tenant #2 — "TenantTest"
 -- Used for multi-tenant isolation validation.
 -- Run AFTER the multi-tenant migration and main seed data.
 -- ─────────────────────────────────────
@@ -23,12 +23,12 @@ DELETE FROM tenants WHERE id = 'a0000000-0000-0000-0000-000000000002';
 INSERT INTO tenants (id, name, slug, vertical, plan, timezone, currency, primary_color, is_active)
 VALUES (
   'a0000000-0000-0000-0000-000000000002',
-  'FitZone Studio',
-  'fitzone',
+  'TenantTest',
+  'tenanttest',
   'fitness',
   'starter',
-  'America/New_York',
-  'USD',
+  'Europe/London',
+  'GBP',
   '#3b82f6',
   true
 );
@@ -38,12 +38,12 @@ INSERT INTO locations (id, tenant_id, name, address, city, country, phone, timez
 VALUES (
   'b0000000-0000-0000-0000-000000000002',
   'a0000000-0000-0000-0000-000000000002',
-  'FitZone Downtown',
-  '123 Main Street',
-  'New York',
-  'USA',
-  '+1 555 123 4567',
-  'America/New_York'
+  'TenantTest HQ',
+  '1 Test Street',
+  'London',
+  'UK',
+  '+44 20 1234 5678',
+  'Europe/London'
 );
 
 -- ─── Feature flags (enable all for testing) ───
@@ -56,8 +56,8 @@ INSERT INTO users (id, tenant_id, email, name, role, password_hash)
 VALUES (
   'e0000000-0000-0000-0000-000000000001',
   'a0000000-0000-0000-0000-000000000002',
-  'owner@fitzone.com',
-  'FitZone Owner',
+  'owner@tenanttest.com',
+  'TenantTest Owner',
   'owner',
   -- password: "test1234"
   '$2a$10$8K1p/a0dR1xqM8KJF1OagOEFzGDG7bA4KXm5kEqRvKr.9MqNWCKS2'
@@ -71,8 +71,8 @@ INSERT INTO users (id, tenant_id, email, name, role, password_hash)
 VALUES (
   'e0000000-0000-0000-0000-000000000002',
   'a0000000-0000-0000-0000-000000000002',
-  'member@fitzone.com',
-  'FitZone Member',
+  'member@tenanttest.com',
+  'TenantTest Member',
   'member',
   '$2a$10$8K1p/a0dR1xqM8KJF1OagOEFzGDG7bA4KXm5kEqRvKr.9MqNWCKS2'
 );
@@ -80,7 +80,7 @@ VALUES (
 INSERT INTO staff_tenants (user_id, tenant_id, role)
 VALUES ('e0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'member');
 
--- ─── Class Types (different from BOXX) ───
+-- ─── Class Types ───
 INSERT INTO class_types (id, tenant_id, name, description, color, active) VALUES
   ('f0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'HIIT Blast', 'High intensity interval training', '#ef4444', true),
   ('f0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'Yoga Flow', 'Relaxing yoga session', '#22c55e', true);
@@ -92,8 +92,8 @@ INSERT INTO instructors (id, tenant_id, name, bio, active) VALUES
 
 -- ─── Class Packs ───
 INSERT INTO class_packs (id, tenant_id, name, credits, price_thb, validity_days, active) VALUES
-  ('f2000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', '5-Class Pack', 5, 4999, 30, true),
-  ('f2000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', '10-Class Pack', 10, 8999, 60, true);
+  ('f2000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', '5-Class Pack', 5, 2500, 30, true),
+  ('f2000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', '10-Class Pack', 10, 4500, 60, true);
 
 -- ─── Schedule (a few future classes) ───
 INSERT INTO class_schedule (id, tenant_id, location_id, class_type_id, instructor_id, starts_at, ends_at, capacity, status) VALUES
@@ -114,7 +114,7 @@ VALUES (
   5, 5,
   CURRENT_DATE + INTERVAL '30 days',
   'active',
-  'seed_fitzone_001'
+  'seed_tenanttest_001'
 );
 
 -- ─── A booking for the member ───
@@ -130,5 +130,5 @@ VALUES (
 
 -- ─── Studio settings ───
 INSERT INTO studio_settings (tenant_id, key, value) VALUES
-  ('a0000000-0000-0000-0000-000000000002', 'studio_name', 'FitZone Studio'),
+  ('a0000000-0000-0000-0000-000000000002', 'studio_name', 'TenantTest'),
   ('a0000000-0000-0000-0000-000000000002', 'cancellation_window_hours', '12');

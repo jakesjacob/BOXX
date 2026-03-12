@@ -19,10 +19,10 @@ export async function GET(request) {
       return NextResponse.json({ theme: null })
     }
 
-    // Fetch tenant record (logo, primary_color, name)
+    // Fetch tenant record (logo, primary_color, name, vertical)
     const { data: tenant } = await supabaseAdmin
       .from('tenants')
-      .select('name, slug, logo_url, primary_color, currency')
+      .select('name, slug, logo_url, primary_color, currency, vertical')
       .eq('id', tenantId)
       .single()
 
@@ -55,6 +55,7 @@ export async function GET(request) {
         logoUrl: tenant?.logo_url || null,
         primaryColor: tenant?.primary_color || '#c8a750',
         currency: tenant?.currency || 'USD',
+        vertical: tenant?.vertical || 'fitness',
         ...theme,
       },
     }, {

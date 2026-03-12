@@ -26,6 +26,13 @@ export async function GET(request) {
       .order('updated_at', { ascending: false })
       .limit(50)
 
+    // Add creator name from session (all conversations belong to the current user)
+    if (conversations) {
+      for (const c of conversations) {
+        c.created_by = session.user.name || null
+      }
+    }
+
     const [suggestions, usage] = await Promise.all([
       getSuggestions(session.user.id),
       getUsage(session.user.id).catch(() => null),

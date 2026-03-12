@@ -14,6 +14,7 @@ export function useTheme() {
  */
 export default function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch('/api/tenant/theme')
@@ -22,6 +23,7 @@ export default function ThemeProvider({ children }) {
         if (data.theme) setTheme(data.theme)
       })
       .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   // Inject CSS variables when theme loads
@@ -91,16 +93,22 @@ export default function ThemeProvider({ children }) {
   }, [theme?.titleFont, theme?.bodyFont])
 
   return (
-    <ThemeContext.Provider value={{ theme }}>
-      {theme?.bodyFont && (
-        <style>{`
-          .tenant-body { font-family: var(--font-tenant-body, inherit); }
-          .tenant-title { font-family: var(--font-tenant-title, var(--font-tenant-body, inherit)); }
-        `}</style>
+    <ThemeContext.Provider value={{ theme, loading }}>
+      {loading ? (
+        <div className="min-h-screen bg-[#0a0a0a]" />
+      ) : (
+        <>
+          {theme?.bodyFont && (
+            <style>{`
+              .tenant-body { font-family: var(--font-tenant-body, inherit); }
+              .tenant-title { font-family: var(--font-tenant-title, var(--font-tenant-body, inherit)); }
+            `}</style>
+          )}
+          <div className={theme?.bodyFont ? 'tenant-body' : ''}>
+            {children}
+          </div>
+        </>
       )}
-      <div className={theme?.bodyFont ? 'tenant-body' : ''}>
-        {children}
-      </div>
     </ThemeContext.Provider>
   )
 }

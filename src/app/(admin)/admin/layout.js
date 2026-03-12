@@ -21,7 +21,20 @@ import {
   Settings,
   ChevronsLeft,
   ArrowLeft,
+  Zap,
+  Leaf,
+  Music,
+  Target,
 } from 'lucide-react'
+
+const VERTICAL_ICONS = {
+  boxing: Zap,
+  yoga: Leaf,
+  fitness: Dumbbell,
+  dance: Music,
+  pt: Target,
+  other: Sparkles,
+}
 
 const assistantLink = { name: 'AI Assistant', href: '/admin/assistant', icon: Sparkles, adminOnly: true }
 
@@ -59,6 +72,7 @@ function AdminLayoutInner({ children }) {
 
   const studioName = theme?.studioName || 'Studio'
   const logoUrl = theme?.logoUrl
+  const VerticalIcon = VERTICAL_ICONS[theme?.vertical] || Dumbbell
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -81,14 +95,19 @@ function AdminLayoutInner({ children }) {
         {/* Sidebar header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-card-border">
           {!collapsed && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {logoUrl ? (
-                <Image src={logoUrl} alt={studioName} width={24} height={24} className="w-6 h-6 rounded object-cover" />
+                <Image src={logoUrl} alt={studioName} width={80} height={32} className="h-6 w-auto object-contain" />
               ) : (
-                <Dumbbell className="w-5 h-5 text-accent" />
+                <>
+                  <VerticalIcon className="w-5 h-5 text-accent shrink-0" />
+                  <span className="font-bold text-foreground tracking-wide tenant-title truncate">{studioName}</span>
+                </>
               )}
-              <span className="font-bold text-foreground tracking-wide tenant-title">{studioName}</span>
             </div>
+          )}
+          {collapsed && (
+            <VerticalIcon className="w-5 h-5 text-accent mx-auto" />
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}

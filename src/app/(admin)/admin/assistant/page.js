@@ -267,7 +267,10 @@ export default function AssistantPage() {
         setActiveConvoId(data.conversationId)
         setConversations((prev) => [{
           id: data.conversationId,
-          title: msg.length <= 40 ? msg : msg.slice(0, 40).replace(/\s\S*$/, '') + '...',
+          title: new Date().toLocaleDateString('en-GB', {
+            day: 'numeric', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+          }),
           updated_at: new Date().toISOString(),
         }, ...prev])
       } else if (data.conversationId) {
@@ -357,7 +360,9 @@ export default function AssistantPage() {
                     title={convo.title}
                   >
                     <span className="block truncate text-[13px]">{convo.title}</span>
-                    <span className="block text-[10px] text-muted/60 mt-0.5">{timeAgo(convo.updated_at)}</span>
+                    <span className="block text-[10px] text-muted/60 mt-0.5">
+                      {convo.created_by && <>{convo.created_by} · </>}{timeAgo(convo.updated_at)}
+                    </span>
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteDialog(convo.id) }}
@@ -385,7 +390,7 @@ export default function AssistantPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden w-8 h-8 flex items-center justify-center rounded hover:bg-white/5"
+                className="lg:hidden w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/5"
               >
                 <Menu className="w-5 h-5 text-muted" />
               </button>
