@@ -810,8 +810,11 @@ function LaunchScreen({ form, effectiveTheme, signIn, logoFile }) {
     }
     requestAnimationFrame(animate)
 
-    // Auto-redirect after 2.5 seconds
-    const redirect = setTimeout(() => { window.location.href = '/admin' }, 2500)
+    // Auto-redirect after 2.5 seconds to the tenant's subdomain
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'localhost:3000'
+    const protocol = baseDomain.includes('localhost') ? 'http' : 'https'
+    const tenantUrl = `${protocol}://${form.slug}.${baseDomain}/admin`
+    const redirect = setTimeout(() => { window.location.href = tenantUrl }, 2500)
     return () => clearTimeout(redirect)
   }, [phase, effectiveTheme])
 
