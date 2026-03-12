@@ -45,32 +45,38 @@ export async function promoteFromWaitlist(classScheduleId) {
       return { promoted: false }
     }
 
+    // Batch fetch credits for ALL waitlisted users upfront (instead of N+1)
+    const now = new Date()
+    const userIds = entries.map(e => e.user_id)
+    const { data: allCredits } = await supabaseAdmin
+      .from('user_credits')
+      .select('id, user_id, credits_remaining, expires_at')
+      .eq('tenant_id', cls.tenant_id)
+      .in('user_id', userIds)
+      .gt('credits_remaining', 0)
+      .gt('expires_at', now.toISOString())
+      .order('expires_at', { ascending: true })
+
+    // Group by user, pick earliest-expiring credit per user
+    const creditByUser = {}
+    ;(allCredits || []).forEach(c => {
+      if (!creditByUser[c.user_id]) creditByUser[c.user_id] = c
+    })
+
     // Try each waitlisted user in order until one has credits
     let promotedUserId = null
 
     for (const entry of entries) {
-      const now = new Date()
-
-      // Check user has valid credits on this tenant
-      const { data: credits } = await supabaseAdmin
-        .from('user_credits')
-        .select('id, credits_remaining')
-        .eq('tenant_id', cls.tenant_id)
-        .eq('user_id', entry.user_id)
-        .gt('credits_remaining', 0)
-        .gt('expires_at', now.toISOString())
-        .order('expires_at', { ascending: true })
-        .limit(1)
-
-      if (!credits || credits.length === 0) {
+      const credits = creditByUser[entry.user_id]
+      if (!credits) {
         continue // No credits — skip, try next
       }
 
       // Deduct credit
       await supabaseAdmin
         .from('user_credits')
-        .update({ credits_remaining: credits[0].credits_remaining - 1 })
-        .eq('id', credits[0].id)
+        .update({ credits_remaining: credits.credits_remaining - 1 })
+        .eq('id', credits.id)
 
       // Create booking
       const { error: bookingError } = await supabaseAdmin
@@ -78,7 +84,7 @@ export async function promoteFromWaitlist(classScheduleId) {
         .insert({
           user_id: entry.user_id,
           class_schedule_id: classScheduleId,
-          credit_id: credits[0].id,
+          credit_id: credits.id,
           status: 'confirmed',
           tenant_id: cls.tenant_id,
         })
@@ -87,8 +93,8 @@ export async function promoteFromWaitlist(classScheduleId) {
         // Restore credit on failure
         await supabaseAdmin
           .from('user_credits')
-          .update({ credits_remaining: credits[0].credits_remaining })
-          .eq('id', credits[0].id)
+          .update({ credits_remaining: credits.credits_remaining })
+          .eq('id', credits.id)
         console.error('[waitlist] Booking insert failed:', bookingError)
         continue
       }
@@ -137,7 +143,7 @@ export async function promoteFromWaitlist(classScheduleId) {
       break // Only promote one person per spot
     }
 
-    // Reorder remaining waitlist positions
+    // Reorder remaining waitlist positions (batch updates in parallel)
     const { data: remaining } = await supabaseAdmin
       .from('waitlist')
       .select('id, position')
@@ -145,14 +151,12 @@ export async function promoteFromWaitlist(classScheduleId) {
       .order('position', { ascending: true })
 
     if (remaining) {
-      for (let i = 0; i < remaining.length; i++) {
-        if (remaining[i].position !== i + 1) {
-          await supabaseAdmin
-            .from('waitlist')
-            .update({ position: i + 1 })
-            .eq('id', remaining[i].id)
-        }
-      }
+      const updates = remaining
+        .filter((r, i) => r.position !== i + 1)
+        .map((r, i) =>
+          supabaseAdmin.from('waitlist').update({ position: i + 1 }).eq('id', r.id)
+        )
+      if (updates.length) await Promise.all(updates)
     }
 
     return { promoted: !!promotedUserId, userId: promotedUserId }

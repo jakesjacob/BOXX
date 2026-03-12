@@ -59,60 +59,33 @@ export async function GET(request) {
       return NextResponse.json({ schedule: [] })
     }
 
-    // Fetch booking counts, user bookings, waitlist, and roster in parallel
-    const [countsRes, userBookingsRes, waitlistRes, rosterRes, waitlistRosterRes] = await Promise.all([
+    // Fetch bookings + waitlist in parallel (previously 5 queries → now 2)
+    const [allBookingsRes, allWaitlistRes] = await Promise.all([
       supabaseAdmin
         .from('bookings')
-        .select('class_schedule_id')
-        .eq('tenant_id', tenantId)
-        .in('class_schedule_id', scheduleIds)
-        .eq('status', 'confirmed'),
-      supabaseAdmin
-        .from('bookings')
-        .select('id, class_schedule_id')
-        .eq('tenant_id', tenantId)
-        .eq('user_id', userId)
-        .in('class_schedule_id', scheduleIds)
-        .eq('status', 'confirmed'),
-      supabaseAdmin
-        .from('waitlist')
-        .select('class_schedule_id, position')
-        .eq('tenant_id', tenantId)
-        .eq('user_id', userId)
-        .in('class_schedule_id', scheduleIds),
-      supabaseAdmin
-        .from('bookings')
-        .select('class_schedule_id, users(id, name, avatar_url, bio, show_in_roster)')
+        .select('id, class_schedule_id, user_id, users(id, name, avatar_url, bio, show_in_roster)')
         .eq('tenant_id', tenantId)
         .in('class_schedule_id', scheduleIds)
         .eq('status', 'confirmed'),
       supabaseAdmin
         .from('waitlist')
-        .select('class_schedule_id, position, users(id, name, avatar_url, show_in_roster)')
+        .select('class_schedule_id, position, user_id, users(id, name, avatar_url, show_in_roster)')
         .eq('tenant_id', tenantId)
         .in('class_schedule_id', scheduleIds)
         .order('position', { ascending: true }),
     ])
 
+    // Derive counts, user bookings, and roster from single bookings result
     const bookingCounts = {}
-    ;(countsRes.data || []).forEach((b) => {
-      bookingCounts[b.class_schedule_id] = (bookingCounts[b.class_schedule_id] || 0) + 1
-    })
-
     const userBookedMap = {}
-    ;(userBookingsRes.data || []).forEach((b) => {
-      userBookedMap[b.class_schedule_id] = b.id
-    })
-
-    const userWaitlist = {}
-    ;(waitlistRes.data || []).forEach((w) => {
-      userWaitlist[w.class_schedule_id] = w.position
-    })
-
     const rosterByClass = {}
-    ;(rosterRes.data || []).forEach((b) => {
-      if (!rosterByClass[b.class_schedule_id]) rosterByClass[b.class_schedule_id] = []
+    ;(allBookingsRes.data || []).forEach((b) => {
+      bookingCounts[b.class_schedule_id] = (bookingCounts[b.class_schedule_id] || 0) + 1
+      if (b.user_id === userId) {
+        userBookedMap[b.class_schedule_id] = b.id
+      }
       if (b.users?.show_in_roster !== false) {
+        if (!rosterByClass[b.class_schedule_id]) rosterByClass[b.class_schedule_id] = []
         rosterByClass[b.class_schedule_id].push({
           id: b.users?.id,
           name: b.users?.name,
@@ -122,10 +95,14 @@ export async function GET(request) {
       }
     })
 
+    const userWaitlist = {}
     const waitlistByClass = {}
-    ;(waitlistRosterRes.data || []).forEach((w) => {
-      if (!waitlistByClass[w.class_schedule_id]) waitlistByClass[w.class_schedule_id] = []
+    ;(allWaitlistRes.data || []).forEach((w) => {
+      if (w.user_id === userId) {
+        userWaitlist[w.class_schedule_id] = w.position
+      }
       if (w.users?.show_in_roster !== false) {
+        if (!waitlistByClass[w.class_schedule_id]) waitlistByClass[w.class_schedule_id] = []
         waitlistByClass[w.class_schedule_id].push({
           id: w.users?.id,
           name: w.users?.name,

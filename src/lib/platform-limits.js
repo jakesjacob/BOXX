@@ -65,18 +65,26 @@ async function ensureCounterPeriod(tenantId = DEFAULT_TENANT_ID) {
   const currentMonth = getMonthKey()
   const currentDay = getDayKey()
 
-  const storedMonth = await getCounter('limit_month_key', tenantId).then(String)
-  const storedDay = await getCounter('limit_day_key', tenantId).then(String)
+  // Batch fetch both period keys in one query
+  const { data: periodKeys } = await supabaseAdmin
+    .from('studio_settings')
+    .select('key, value')
+    .eq('tenant_id', tenantId)
+    .in('key', ['limit_month_key', 'limit_day_key'])
 
-  if (storedMonth !== currentMonth) {
-    await setCounter('limit_month_key', currentMonth, tenantId)
-    await setCounter('emails_sent_month', 0, tenantId)
-  }
+  const stored = {}
+  ;(periodKeys || []).forEach(r => { stored[r.key] = r.value })
 
-  if (storedDay !== currentDay) {
-    await setCounter('limit_day_key', currentDay, tenantId)
-    await setCounter('emails_sent_day', 0, tenantId)
+  const resets = []
+  if (stored.limit_month_key !== currentMonth) {
+    resets.push(setCounter('limit_month_key', currentMonth, tenantId))
+    resets.push(setCounter('emails_sent_month', 0, tenantId))
   }
+  if (stored.limit_day_key !== currentDay) {
+    resets.push(setCounter('limit_day_key', currentDay, tenantId))
+    resets.push(setCounter('emails_sent_day', 0, tenantId))
+  }
+  if (resets.length) await Promise.all(resets)
 }
 
 // ─── Email tracking ──────────────────────────────────────────────────────────
@@ -104,8 +112,10 @@ export async function trackEmailSent(tenantId = DEFAULT_TENANT_ID) {
 
 export async function checkEmailLimit(tenantId = DEFAULT_TENANT_ID) {
   await ensureCounterPeriod(tenantId)
-  const daily = await getCounter('emails_sent_day', tenantId)
-  const monthly = await getCounter('emails_sent_month', tenantId)
+  const [daily, monthly] = await Promise.all([
+    getCounter('emails_sent_day', tenantId),
+    getCounter('emails_sent_month', tenantId),
+  ])
 
   if (daily >= LIMITS.emails_per_day) {
     return { allowed: false, reason: `Daily email limit reached (${LIMITS.emails_per_day}/day)` }
@@ -289,22 +299,16 @@ async function sendPlatformAlert(type, details) {
 export async function checkTenantPlanLimit(tenantId, limitKey) {
   if (!supabaseAdmin || !tenantId) return { allowed: true }
 
-  // Get tenant's plan
-  const { data: tenant } = await supabaseAdmin
-    .from('tenants')
-    .select('plan')
-    .eq('id', tenantId)
-    .single()
+  // Fetch tenant plan and all plan limits in parallel
+  const [tenantRes, allLimitsRes] = await Promise.all([
+    supabaseAdmin.from('tenants').select('plan').eq('id', tenantId).single(),
+    supabaseAdmin.from('plan_limits').select('*'),
+  ])
 
+  const tenant = tenantRes.data
   if (!tenant) return { allowed: true }
 
-  // Get plan limits
-  const { data: planLimit } = await supabaseAdmin
-    .from('plan_limits')
-    .select('*')
-    .eq('plan', tenant.plan)
-    .single()
-
+  const planLimit = (allLimitsRes.data || []).find(l => l.plan === tenant.plan)
   if (!planLimit || !planLimit[limitKey]) return { allowed: true }
 
   const limit = planLimit[limitKey]

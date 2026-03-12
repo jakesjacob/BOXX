@@ -35,52 +35,56 @@ export async function GET(request) {
       return NextResponse.json({ sent: 0 })
     }
 
-    let sent = 0
+    const classIds = classes.map(c => c.id)
+    const classMap = Object.fromEntries(classes.map(c => [c.id, c]))
 
-    for (const cls of classes) {
-      // Get confirmed bookings for this class
-      const { data: bookings } = await supabaseAdmin
-        .from('bookings')
-        .select('user_id, users(email, name)')
-        .eq('class_schedule_id', cls.id)
-        .eq('status', 'confirmed')
-        .eq('reminder_2h_sent', false)
+    // Batch fetch ALL bookings needing reminders across all classes
+    const { data: allBookings } = await supabaseAdmin
+      .from('bookings')
+      .select('id, class_schedule_id, user_id, users(email, name)')
+      .in('class_schedule_id', classIds)
+      .eq('status', 'confirmed')
+      .eq('reminder_2h_sent', false)
 
-      if (!bookings || bookings.length === 0) continue
+    if (!allBookings || allBookings.length === 0) {
+      return NextResponse.json({ sent: 0 })
+    }
 
-      const time = new Date(cls.starts_at).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: 'Asia/Bangkok',
-      })
-
-      for (const b of bookings) {
-        if (!b.users?.email) continue
-        try {
-          await sendClassReminder({
+    // Send emails (fire all concurrently, don't block each other)
+    const results = await Promise.allSettled(
+      allBookings
+        .filter(b => b.users?.email)
+        .map(b => {
+          const cls = classMap[b.class_schedule_id]
+          const time = new Date(cls.starts_at).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: 'Asia/Bangkok',
+          })
+          return sendClassReminder({
             to: b.users.email,
             name: b.users.name,
             className: cls.class_types?.name || 'Class',
             instructor: cls.instructors?.name,
             time,
-          })
+          }).then(() => b.id)
+        })
+    )
 
-          // Mark reminder as sent
-          await supabaseAdmin
-            .from('bookings')
-            .update({ reminder_2h_sent: true })
-            .eq('class_schedule_id', cls.id)
-            .eq('user_id', b.user_id)
-            .eq('status', 'confirmed')
+    // Collect IDs of successfully sent reminders
+    const sentIds = results
+      .filter(r => r.status === 'fulfilled')
+      .map(r => r.value)
 
-          sent++
-        } catch (err) {
-          console.error(`[cron/reminders] Failed for ${b.users.email}:`, err)
-        }
-      }
+    // Batch update all sent reminders in one query
+    if (sentIds.length > 0) {
+      await supabaseAdmin
+        .from('bookings')
+        .update({ reminder_2h_sent: true })
+        .in('id', sentIds)
     }
 
-    return NextResponse.json({ sent })
+    return NextResponse.json({ sent: sentIds.length })
   } catch (error) {
     console.error('[cron/reminders] Error:', error)
     return NextResponse.json({ error: 'Cron failed' }, { status: 500 })

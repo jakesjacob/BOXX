@@ -5,7 +5,7 @@ const memberRoutes = ['/dashboard', '/book', '/profile', '/buy-classes', '/my-bo
 
 // ─── Tenant slug/domain → ID cache ──────────────────────────────────────────
 const tenantCache = new Map()
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const CACHE_TTL = 30 * 60 * 1000 // 30 minutes — tenant slugs rarely change
 
 async function resolveSlugToTenantId(slug) {
   const cacheKey = `slug:${slug}`

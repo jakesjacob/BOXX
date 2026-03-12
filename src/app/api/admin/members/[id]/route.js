@@ -246,30 +246,38 @@ export async function DELETE(request, { params }) {
       .eq('status', 'confirmed')
 
     const futureIds = []
-    if (futureBookings) {
-      for (const b of futureBookings) {
-        // Check if class is in the future
-        const { data: schedule } = await supabaseAdmin
-          .from('class_schedule')
-          .select('starts_at')
-          .eq('tenant_id', tenantId)
-          .eq('id', b.class_schedule_id)
-          .single()
+    if (futureBookings && futureBookings.length > 0) {
+      // Batch fetch all class schedules at once instead of N+1
+      const scheduleIds = [...new Set(futureBookings.map(b => b.class_schedule_id))]
+      const { data: schedules } = await supabaseAdmin
+        .from('class_schedule')
+        .select('id, starts_at')
+        .eq('tenant_id', tenantId)
+        .in('id', scheduleIds)
 
-        if (schedule && new Date(schedule.starts_at) > new Date()) {
+      const scheduleMap = Object.fromEntries((schedules || []).map(s => [s.id, s]))
+      const now = new Date()
+      const creditRefunds = []
+
+      for (const b of futureBookings) {
+        const schedule = scheduleMap[b.class_schedule_id]
+        if (schedule && new Date(schedule.starts_at) > now) {
           futureIds.push(b.id)
-          // Return credit
           if (b.user_credit_id) {
-            await supabaseAdmin.rpc('increment_credits', { credit_id: b.user_credit_id, amount: 1 }).catch(() => {
-              // Fallback: direct update
-              supabaseAdmin
-                .from('user_credits')
-                .update({ credits_remaining: supabaseAdmin.raw('credits_remaining + 1') })
-                .eq('id', b.user_credit_id)
-            })
+            creditRefunds.push(
+              supabaseAdmin.rpc('increment_credits', { credit_id: b.user_credit_id, amount: 1 }).catch(() => {
+                supabaseAdmin
+                  .from('user_credits')
+                  .update({ credits_remaining: supabaseAdmin.raw('credits_remaining + 1') })
+                  .eq('id', b.user_credit_id)
+              })
+            )
           }
         }
       }
+
+      // Run credit refunds in parallel
+      if (creditRefunds.length > 0) await Promise.all(creditRefunds)
 
       if (futureIds.length > 0) {
         await supabaseAdmin

@@ -192,71 +192,66 @@ export async function GET(request) {
         .order('starts_at', { ascending: true }),
     ])
 
-    // Additional activity queries: WAM, MAM, bookings this month + previous periods
+    // ── Member Engagement ──────────────────────────────────────
+    const thirtyDaysAgo = new Date(now)
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    // Run ALL remaining queries in a single parallel batch (was 3 sequential batches)
     const [
       weeklyActiveRes, prevWeeklyActiveRes,
       monthlyActiveRes, prevMonthlyActiveRes,
       monthBookingsRes, prevMonthBookingsRes,
       prevMonthRevenueRes,
+      topMembersBookingsRes, allMembersRes, allRecentBookingsRes,
+      allActiveCreditsRes,
     ] = await Promise.all([
-      // Weekly active members: unique users with a confirmed booking in last 7 days
-      supabaseAdmin
-        .from('bookings')
-        .select('user_id')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
+      // Weekly active members
+      supabaseAdmin.from('bookings').select('user_id')
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
         .gte('created_at', sevenDaysAgo.toISOString()),
-
-      // Previous week active members (7-14 days ago)
-      supabaseAdmin
-        .from('bookings')
-        .select('user_id')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
+      // Previous week active members
+      supabaseAdmin.from('bookings').select('user_id')
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
         .gte('created_at', fourteenDaysAgo.toISOString())
         .lt('created_at', sevenDaysAgo.toISOString()),
-
-      // Monthly active members: unique users with a confirmed booking this month
-      supabaseAdmin
-        .from('bookings')
-        .select('user_id')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
+      // Monthly active members
+      supabaseAdmin.from('bookings').select('user_id')
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
         .gte('created_at', monthStart.toISOString()),
-
       // Previous month active members
-      supabaseAdmin
-        .from('bookings')
-        .select('user_id')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
+      supabaseAdmin.from('bookings').select('user_id')
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
         .gte('created_at', lastMonthStart.toISOString())
         .lte('created_at', lastMonthEnd.toISOString()),
-
       // Total bookings this month
-      supabaseAdmin
-        .from('bookings')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
+      supabaseAdmin.from('bookings').select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
         .gte('created_at', monthStart.toISOString()),
-
       // Total bookings last month
-      supabaseAdmin
-        .from('bookings')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
+      supabaseAdmin.from('bookings').select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
         .gte('created_at', lastMonthStart.toISOString())
         .lte('created_at', lastMonthEnd.toISOString()),
-
       // Revenue last month
-      supabaseAdmin
-        .from('user_credits')
-        .select('id, class_packs(price_thb)')
+      supabaseAdmin.from('user_credits').select('id, class_packs(price_thb)')
         .eq('tenant_id', tenantId)
         .gte('purchased_at', lastMonthStart.toISOString())
         .lte('purchased_at', lastMonthEnd.toISOString()),
+      // Top members: bookings in last 30 days
+      supabaseAdmin.from('bookings').select('user_id')
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
+        .gte('created_at', thirtyDaysAgo.toISOString()),
+      // All members
+      supabaseAdmin.from('users').select('id, name, email, avatar_url, created_at')
+        .eq('tenant_id', tenantId).eq('role', 'member'),
+      // Most recent confirmed booking per user (for inactivity check)
+      supabaseAdmin.from('bookings').select('user_id, created_at')
+        .eq('tenant_id', tenantId).eq('status', 'confirmed')
+        .order('created_at', { ascending: false }),
+      // Active credit packs for all members
+      supabaseAdmin.from('user_credits').select('user_id, credits_remaining, expires_at, class_packs(name)')
+        .eq('tenant_id', tenantId).eq('status', 'active')
+        .gt('expires_at', now.toISOString()),
     ])
 
     const weeklyActiveMembers = new Set((weeklyActiveRes.data || []).map((b) => b.user_id)).size
@@ -266,35 +261,6 @@ export async function GET(request) {
     const bookingsThisMonth = monthBookingsRes.count || 0
     const bookingsLastMonth = prevMonthBookingsRes.count || 0
     const revenueLastMonth = (prevMonthRevenueRes.data || []).reduce((sum, uc) => sum + (uc.class_packs?.price_thb || 0), 0)
-
-    // ── Member Engagement ──────────────────────────────────────
-    const thirtyDaysAgo = new Date(now)
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-    const [topMembersBookingsRes, allMembersRes, allRecentBookingsRes] = await Promise.all([
-      // Confirmed bookings in last 30 days (for top members)
-      supabaseAdmin
-        .from('bookings')
-        .select('user_id')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
-        .gte('created_at', thirtyDaysAgo.toISOString()),
-
-      // All members with active credits
-      supabaseAdmin
-        .from('users')
-        .select('id, name, email, avatar_url, created_at')
-        .eq('tenant_id', tenantId)
-        .eq('role', 'member'),
-
-      // Most recent confirmed booking per user (for inactivity check)
-      supabaseAdmin
-        .from('bookings')
-        .select('user_id, created_at')
-        .eq('tenant_id', tenantId)
-        .eq('status', 'confirmed')
-        .order('created_at', { ascending: false }),
-    ])
 
     // Top members: count bookings per user in last 30 days
     const bookingCountByUser = {}
@@ -312,27 +278,21 @@ export async function GET(request) {
         ...memberMap[userId],
         bookings_30d: count,
       }))
-      .filter((m) => m.id) // exclude if user was deleted
+      .filter((m) => m.id)
 
     // Last booking date per user
     const lastBookingByUser = {}
     ;(allRecentBookingsRes.data || []).forEach((b) => {
       if (!lastBookingByUser[b.user_id]) {
-        lastBookingByUser[b.user_id] = b.created_at // first match = most recent (ordered desc)
+        lastBookingByUser[b.user_id] = b.created_at
       }
     })
 
-    // Get active credit packs for all members
-    const { data: allActiveCredits } = await supabaseAdmin
-      .from('user_credits')
-      .select('user_id, credits_remaining, expires_at, class_packs(name)')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'active')
-      .gt('expires_at', now.toISOString())
+    const allActiveCredits = allActiveCreditsRes.data || []
 
     // Build credits summary per user
     const creditsByUser = {}
-    ;(allActiveCredits || []).forEach((uc) => {
+    ;(allActiveCredits).forEach((uc) => {
       if (!creditsByUser[uc.user_id]) creditsByUser[uc.user_id] = { total: 0, packs: [] }
       if (uc.credits_remaining !== null) {
         creditsByUser[uc.user_id].total += uc.credits_remaining

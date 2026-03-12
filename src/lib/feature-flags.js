@@ -10,10 +10,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
  * 4. Rollout %: deterministic hash of (tenantId + flagKey)
  * 5. default_enabled fallback
  *
- * Results are cached in-memory for 30 seconds per tenant.
+ * Results are cached in-memory for 5 minutes per tenant.
  */
 
-const CACHE_TTL_MS = 30_000
+const CACHE_TTL_MS = 300_000 // 5 minutes — flags rarely change mid-session
 
 // Cache: tenantId → { flags: Map<string, boolean>, plan: string, fetchedAt: number }
 const _cache = new Map()
