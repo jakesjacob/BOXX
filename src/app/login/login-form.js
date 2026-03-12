@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import ZatrovoLoader from '@/components/ZatrovoLoader'
 
 export default function LoginForm({ tenantId, tenantSlug }) {
   return (
@@ -30,6 +31,7 @@ function LoginFormInner({ tenantId, tenantSlug }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [authenticating, setAuthenticating] = useState(false)
   const [error, setError] = useState(
     errorParam === 'OAuthAccountNotLinked'
       ? 'This email is already registered with a different sign-in method.'
@@ -57,6 +59,7 @@ function LoginFormInner({ tenantId, tenantSlug }) {
       setError('Invalid email or password')
       setLoading(false)
     } else if (result?.ok || result?.url) {
+      setAuthenticating(true)
       // Fetch session to determine role and tenant slug for smart redirect
       try {
         const sessionRes = await fetch('/api/auth/session')
@@ -88,6 +91,7 @@ function LoginFormInner({ tenantId, tenantSlug }) {
   }
 
   const handleGoogleLogin = () => {
+    setAuthenticating(true)
     // Set cookies so the OAuth callback can associate with this tenant
     // Use root domain so cookies are readable at zatrovo.com (where OAuth callback lands)
     const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
@@ -100,6 +104,10 @@ function LoginFormInner({ tenantId, tenantSlug }) {
     }
     // Use the smart redirect page — it reads the session and redirects to the right tenant/role
     signIn('google', { callbackUrl: '/auth/redirect' })
+  }
+
+  if (authenticating) {
+    return <ZatrovoLoader size="full" message="Signing you in..." />
   }
 
   return (

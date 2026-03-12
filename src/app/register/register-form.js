@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { signIn, signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
+import ZatrovoLoader from '@/components/ZatrovoLoader'
 
 export default function RegisterForm({ tenantId, tenantSlug }) {
   const { data: session } = useSession()
@@ -19,6 +20,7 @@ export default function RegisterForm({ tenantId, tenantSlug }) {
   const [password, setPassword] = useState('')
   const [consent, setConsent] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [authenticating, setAuthenticating] = useState(false)
   const [error, setError] = useState('')
 
   const handleRegister = async (e) => {
@@ -62,6 +64,7 @@ export default function RegisterForm({ tenantId, tenantSlug }) {
       })
 
       if (result?.ok || result?.url) {
+        setAuthenticating(true)
         // Members always go to /dashboard, but make sure we stay on the right subdomain
         const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
         const hostname = window.location.hostname
@@ -84,6 +87,7 @@ export default function RegisterForm({ tenantId, tenantSlug }) {
   }
 
   const handleGoogleRegister = () => {
+    setAuthenticating(true)
     // Set cookies so the OAuth callback can associate with this tenant
     // Use root domain so cookies are readable at zatrovo.com (where OAuth callback lands)
     const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
@@ -96,6 +100,10 @@ export default function RegisterForm({ tenantId, tenantSlug }) {
     }
     // Use the smart redirect page — it reads the session and redirects to the right tenant/role
     signIn('google', { callbackUrl: '/auth/redirect' })
+  }
+
+  if (authenticating) {
+    return <ZatrovoLoader size="full" message="Setting up your account..." />
   }
 
   return (
