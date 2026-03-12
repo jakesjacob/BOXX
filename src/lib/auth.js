@@ -52,6 +52,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Block frozen accounts
         if (user.role === 'frozen') return null
 
+        // Look up tenant slug for redirect after login
+        let tenantSlug = null
+        if (user.tenant_id) {
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('slug')
+            .eq('id', user.tenant_id)
+            .single()
+          tenantSlug = tenant?.slug
+        }
+
         console.log('[auth] authorize success. userId:', user.id, 'tenant_id:', user.tenant_id, 'role:', user.role)
         return {
           id: user.id,
@@ -60,6 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           image: user.avatar_url,
           role: user.role,
           tenantId: user.tenant_id,
+          tenantSlug,
         }
       },
     }),
@@ -90,6 +102,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.role = existing.role
           user.image = existing.avatar_url
           user.tenantId = existing.tenant_id
+          // Look up slug for redirect
+          const { data: t } = await supabaseAdmin.from('tenants').select('slug').eq('id', existing.tenant_id).single()
+          user.tenantSlug = t?.slug
           return true
         }
 
@@ -123,6 +138,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.id = existingByEmail.id
           user.role = existingByEmail.role
           user.tenantId = existingByEmail.tenant_id
+          const { data: t2 } = await supabaseAdmin.from('tenants').select('slug').eq('id', existingByEmail.tenant_id).single()
+          user.tenantSlug = t2?.slug
           return true
         }
 
@@ -148,6 +165,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         user.id = newUser.id
         user.role = newUser.role
         user.tenantId = newUser.tenant_id
+        const { data: t3 } = await supabaseAdmin.from('tenants').select('slug').eq('id', newUser.tenant_id).single()
+        user.tenantSlug = t3?.slug
       }
 
       return true
@@ -157,6 +176,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id
         token.role = user.role || 'member'
         token.tenantId = user.tenantId
+        token.tenantSlug = user.tenantSlug
       }
       // Refresh token data when session.update() is called (e.g. after onboarding)
       if (trigger === 'update' && token.id) {
@@ -168,6 +188,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (data) {
           token.tenantId = data.tenant_id
           token.role = data.role
+          const { data: t } = await supabaseAdmin.from('tenants').select('slug').eq('id', data.tenant_id).single()
+          token.tenantSlug = t?.slug
         }
       }
       return token
@@ -176,6 +198,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.id
       session.user.role = token.role
       session.user.tenantId = token.tenantId
+      session.user.tenantSlug = token.tenantSlug
 
       // Admin, owner, and employee sessions expire after 8 hours
       if (token.role === 'owner' || token.role === 'admin' || token.role === 'employee') {

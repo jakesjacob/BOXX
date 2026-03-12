@@ -70,13 +70,8 @@ export default function RegisterForm({ tenantId, tenantSlug }) {
       const domainAttr = baseDomain && !baseDomain.includes('localhost') ? `;domain=.${baseDomain}` : ''
       document.cookie = `pending_tenant_id=${tenantId};path=/;max-age=600;samesite=lax${domainAttr}`
     }
-    // Build full callback URL with tenant subdomain so user lands back on the right tenant
-    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
-    let fullCallbackUrl = '/dashboard'
-    if (tenantSlug && baseDomain && !baseDomain.includes('localhost')) {
-      fullCallbackUrl = `https://${tenantSlug}.${baseDomain}/dashboard`
-    }
-    signIn('google', { callbackUrl: fullCallbackUrl })
+    // Use the smart redirect page — it reads the session and redirects to the right tenant/role
+    signIn('google', { callbackUrl: '/auth/redirect' })
   }
 
   return (

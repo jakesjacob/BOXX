@@ -47,8 +47,34 @@ function LoginFormInner({ tenantId, tenantSlug }) {
     if (result?.error) {
       setError('Invalid email or password')
       setLoading(false)
-    } else if (result?.url) {
-      window.location.href = result.url
+    } else if (result?.ok || result?.url) {
+      // Fetch session to determine role and tenant slug for smart redirect
+      try {
+        const sessionRes = await fetch('/api/auth/session')
+        const session = await sessionRes.json()
+        const role = session?.user?.role
+        const slug = session?.user?.tenantSlug
+        const isStaff = ['owner', 'admin', 'employee'].includes(role)
+        const targetPath = isStaff ? '/admin' : '/dashboard'
+
+        const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
+        const hostname = window.location.hostname
+        const isOnSubdomain = baseDomain && hostname.endsWith(`.${baseDomain}`)
+
+        if (!isOnSubdomain && slug && baseDomain && !baseDomain.includes('localhost')) {
+          // Root domain login — redirect to tenant subdomain
+          window.location.href = `https://${slug}.${baseDomain}${targetPath}`
+        } else if (isOnSubdomain) {
+          // Subdomain login — stay on this subdomain
+          window.location.href = targetPath
+        } else {
+          // Fallback (localhost or no baseDomain)
+          window.location.href = targetPath
+        }
+      } catch {
+        // Fallback if session fetch fails
+        window.location.href = result?.url || '/dashboard'
+      }
     }
   }
 
@@ -60,15 +86,8 @@ function LoginFormInner({ tenantId, tenantSlug }) {
       const domainAttr = baseDomain && !baseDomain.includes('localhost') ? `;domain=.${baseDomain}` : ''
       document.cookie = `pending_tenant_id=${tenantId};path=/;max-age=600;samesite=lax${domainAttr}`
     }
-    // Build full callback URL with tenant subdomain so user lands back on the right tenant
-    let fullCallbackUrl = callbackUrl
-    if (tenantSlug) {
-      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
-      if (baseDomain && !baseDomain.includes('localhost')) {
-        fullCallbackUrl = `https://${tenantSlug}.${baseDomain}${callbackUrl}`
-      }
-    }
-    signIn('google', { callbackUrl: fullCallbackUrl })
+    // Use the smart redirect page — it reads the session and redirects to the right tenant/role
+    signIn('google', { callbackUrl: '/auth/redirect' })
   }
 
   return (
