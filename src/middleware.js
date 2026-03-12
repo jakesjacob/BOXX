@@ -112,38 +112,38 @@ export default auth(async (req) => {
     if (tenant.slug) {
       response.headers.set('x-tenant-slug', tenant.slug)
     }
-  } else if (isRootDomain && session?.user?.tenantSlug) {
-    // Authenticated user on root domain — redirect to their tenant subdomain
-    // (This happens after Google OAuth callback lands on zatrovo.com)
-    const slug = session.user.tenantSlug
-    const role = session.user.role
-    const isStaff = ['owner', 'admin', 'employee'].includes(role)
+  } else if (isRootDomain) {
+    // On root domain — handle redirects based on context
 
-    // Only redirect for pages that should be tenant-scoped (not /onboarding, /auth/redirect, etc.)
-    const shouldRedirect = pathname === '/dashboard' || pathname.startsWith('/admin') ||
-      pathname === '/book' || pathname === '/buy-classes' || pathname === '/my-bookings' ||
-      pathname === '/profile'
-
-    if (shouldRedirect) {
-      const targetPath = pathname === '/dashboard' && isStaff ? '/admin' : pathname
-      return NextResponse.redirect(new URL(`https://${slug}.${baseDomain}${targetPath}`))
-    }
-
-    // For login/register on root domain with error params, redirect to subdomain login
+    // 1. Error redirects (login/register with query params like ?error=...)
+    //    Priority: cookie (where user was trying to go) > session (where they're logged in)
     if ((pathname === '/login' || pathname === '/register') && req.nextUrl.search) {
-      return NextResponse.redirect(new URL(`https://${slug}.${baseDomain}${pathname}${req.nextUrl.search}`))
+      const pendingSlug = req.cookies.get('pending_tenant_slug')?.value
+      const targetSlug = pendingSlug || session?.user?.tenantSlug
+      if (targetSlug) {
+        return NextResponse.redirect(new URL(`https://${targetSlug}.${baseDomain}${pathname}${req.nextUrl.search}`))
+      }
     }
 
-    response.headers.set('x-tenant-id', session.user.tenantId)
-  } else if (isRootDomain && !session && (pathname === '/login' || pathname === '/register') && req.nextUrl.search) {
-    // Unauthenticated error redirect on root domain (e.g. Google OAuth failure)
-    // Use pending_tenant_id cookie to redirect back to the correct subdomain
-    const pendingTenantSlug = req.cookies.get('pending_tenant_slug')?.value
-    if (pendingTenantSlug) {
-      return NextResponse.redirect(new URL(`https://${pendingTenantSlug}.${baseDomain}${pathname}${req.nextUrl.search}`))
+    // 2. Authenticated user on tenant-scoped pages — redirect to their subdomain
+    if (session?.user?.tenantSlug) {
+      const slug = session.user.tenantSlug
+      const role = session.user.role
+      const isStaff = ['owner', 'admin', 'employee'].includes(role)
+
+      const shouldRedirect = pathname === '/dashboard' || pathname.startsWith('/admin') ||
+        pathname === '/book' || pathname === '/buy-classes' || pathname === '/my-bookings' ||
+        pathname === '/profile'
+
+      if (shouldRedirect) {
+        const targetPath = pathname === '/dashboard' && isStaff ? '/admin' : pathname
+        return NextResponse.redirect(new URL(`https://${slug}.${baseDomain}${targetPath}`))
+      }
+
+      response.headers.set('x-tenant-id', session.user.tenantId)
     }
   } else if (session?.user?.tenantId) {
-    // Authenticated user's tenant from JWT (for non-subdomain access like vercel.app)
+    // Non-root, non-subdomain (e.g. vercel.app) — use session tenant
     response.headers.set('x-tenant-id', session.user.tenantId)
   }
 
