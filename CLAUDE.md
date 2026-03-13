@@ -17,20 +17,23 @@ Multi-tenant SaaS studio management platform. Next.js 16 App Router with three r
 - `api/` — 52 API routes (auth, member, admin, cron, stripe, AI agent)
 
 **Key files:**
-- `src/lib/auth.js` — NextAuth v5 config (Google OAuth + credentials)
-- `src/lib/admin-auth.js` — Role-based access helpers (requireStaff/Admin/Owner)
-- `src/lib/email.js` — 15 Resend email templates
+- `src/lib/auth.js` — NextAuth v5 config (Google OAuth + credentials, cross-subdomain cookies)
+- `src/lib/api-helpers.js` — Tenant-aware auth helpers (requireAuth/Staff/Admin/Owner with cross-tenant user resolution)
+- `src/lib/email.js` — 18 Resend email templates (all tenant-scoped)
 - `src/lib/platform-limits.js` — Per-tenant resource limits
-- `src/lib/stripe.js` — Stripe Connect configuration
+- `src/lib/feature-flags.js` — Feature flag resolution (plan gates, rollout %, kill switches)
+- `src/lib/stripe.js` — Per-tenant Stripe keys (not Connect)
 - `src/lib/waitlist.js` — Waitlist promotion logic
 - `src/lib/gamification.js` — Badges and streaks
-- `supabase/schema.sql` — Full database schema
+- `src/lib/agent/executor.js` — AI assistant tool executor (all queries tenant-scoped)
+- `src/middleware.js` — Tenant resolution from subdomain/custom domain, route protection
+- `supabase/schema.sql` — Full database schema with composite indexes
 
 ## Database
 
 Supabase (Postgres) with Row Level Security. Tables include: users, class_types, instructors, class_schedule, bookings, user_credits, class_packs, waitlist, studio_settings, admin_audit_log, email_log, page_views, plus AI agent tables.
 
-Multi-tenancy via `tenant_id` on every table (migration in progress — see dev spec).
+Multi-tenancy via `tenant_id` on every table. Composite indexes on common query patterns (tenant+status+created_at, etc.). All API routes, email functions, and AI agent tools are fully tenant-scoped.
 
 ## Design Tokens (globals.css)
 
@@ -55,7 +58,7 @@ All task tracking lives in **`docs/saas-dev-spec.md`** — this is the single so
 ## Key Conventions
 
 - JavaScript only (no TypeScript)
-- shadcn/ui components for admin/member pages (Button, Card, Input, Label, Badge, Tabs, Dialog, Switch)
+- shadcn/ui components for admin/member pages (Button, Card, Input, Label, Badge, Dialog, Switch)
 - `cn()` from `@/lib/utils` for combining Tailwind classes
 - Dark luxury aesthetic: black backgrounds, white text, gold (#c8a750) accents
 - UI interactions should feel polished and layered — use subtle hover states, smooth transitions, and progressive disclosure rather than abrupt show/hide

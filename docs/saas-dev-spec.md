@@ -1,7 +1,7 @@
 # Studio SaaS — Development Spec & Task Tracker
 
 > Source of truth for all development work. Read at start of every session.
-> Last updated: 2026-03-11
+> Last updated: 2026-03-13
 
 ---
 
@@ -20,9 +20,9 @@
 
 **Hierarchy:** Tenant → Location → Zone → Resource (class / appointment)
 
-**Stack:** Next.js 16, React 19, JavaScript, Tailwind CSS v4, shadcn/ui, Supabase (Postgres + Storage), NextAuth v5, Stripe Connect + Stripe Billing, Resend, Claude API
+**Stack:** Next.js 16, React 19, JavaScript, Tailwind CSS v4, shadcn/ui, Supabase (Postgres + Storage), NextAuth v5, Stripe (per-tenant keys, not Connect), Resend, Claude API
 
-**Existing codebase:** 52 API routes, 12 DB tables, 15 email templates, 4 cron jobs, AI assistant with 12 tools. All currently single-tenant (BOXX Boxing Studio).
+**Existing codebase:** 52 API routes, 12 DB tables, 18 email templates (all tenant-branded), 4 cron jobs, AI assistant with 12 tools. Fully tenant-scoped — all queries include `tenant_id`, all auth via `api-helpers.js`.
 
 **Bert's seed IDs (hardcoded, never change):**
 - Tenant: `a0000000-0000-0000-0000-000000000001`
@@ -109,11 +109,11 @@
 
 These items are currently hardcoded to BOXX but will be resolved when tenant scoping is built — they'll read from `tenant` / `studio_settings` / `location` once those are tenant-aware:
 
-- Email FROM address, footer branding, CTA URLs → reads tenant's `studio_settings` (Phase 2)
+- ~~Email FROM address, footer branding, CTA URLs → reads tenant's `studio_settings`~~ — **DONE** (MVP Readiness, email branding)
 - Login/register page "BOXX" headlines → reads `tenant.name` from middleware (Phase 2)
 - Admin layout "BOXX Admin" → reads `tenant.name` (Phase 2)
-- Member footer "BOXX Thailand" copyright → reads `tenant.name` (Phase 2)
-- Logo references (`/images/brand/logo-primary-white.png`) → `tenants.logo_url` from onboarding upload (Phase 4)
+- ~~Member footer "BOXX Thailand" copyright → reads `tenant.name`~~ — **DONE** (MVP Readiness, social links commit)
+- ~~Logo references (`/images/brand/logo-primary-white.png`) → `tenants.logo_url` from onboarding upload~~ — **DONE** (MVP Readiness, branding tab)
 - OG image / favicon → generated from tenant branding (Phase 4)
 - Currency `฿` hardcoded in 11 places → `tenants.currency` field (Phase 2)
 - Google Calendar / iCal event details → reads tenant's location address (Phase 2)
@@ -145,10 +145,13 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 
 ### 2B. Auth Updates
 - [x] Update `src/lib/auth.js`:
-  - JWT now carries `tenantId` (from `user.tenant_id`)
+  - JWT now carries `tenantId` + `tenantSlug` (from `user.tenant_id`)
   - Credentials login: optional `tenantId` scopes user lookup
-  - Google OAuth: reads tenant_id from existing user or uses DEFAULT_TENANT_ID for new users
-  - Session exposes `session.user.tenantId`
+  - Google OAuth: reads tenant_id from existing user or `pending_tenant_id` cookie for new users
+  - Session exposes `session.user.tenantId` + `session.user.tenantSlug`
+  - Cross-subdomain redirect callback: validates `.zatrovo.com` subdomains
+  - CSRF cookies set with `domain=.zatrovo.com` for cross-subdomain auth
+  - `/auth/redirect` smart routing: staff→/admin, members→/dashboard on correct subdomain
 - [x] Create `src/lib/api-helpers.js`:
   - `getTenantId(session, request)` — JWT → header → DEFAULT fallback
   - `requireAuth(request)` — returns `{ session, tenantId }` or 401
@@ -161,14 +164,14 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 ### 2C. Scope All API Routes
 - [x] Admin routes (25 files): all imports switched from `admin-auth` to `api-helpers`, all queries scoped with `.eq('tenant_id', tenantId)`, all INSERTs include `tenant_id: tenantId`
 - [x] Member routes (18 files): all auth switched to `requireAuth()`, all queries scoped
-- [x] Public routes: `/api/settings/public` uses DEFAULT_TENANT_ID, `/api/analytics/track` includes tenant_id in INSERTs
+- [x] Public routes: `/api/settings/public` uses DEFAULT_TENANT_ID, `/api/analytics/track` reads `x-tenant-id` header from middleware (falls back to DEFAULT_TENANT_ID)
 - [x] Auth routes (3): register accepts optional tenantId, scopes email uniqueness check; forgot-password and reset-password scoped
 - [x] Stripe webhook: extracts tenantId from Stripe metadata, scopes all operations
 - [x] Cron routes (4): reviewed — no changes needed (operate on existing records which already have tenant_id; waitlist promotion fixed to include tenant_id on booking INSERT)
 
 ### 2D. Scope Library Functions
-- [x] `src/lib/email.js` — `isEmailEnabled()` and `getCustomMessage()` accept tenantId, scope studio_settings queries
-- [x] `src/lib/waitlist.js` — booking INSERT now includes `tenant_id` from class record
+- [x] `src/lib/email.js` — `isEmailEnabled()` and `getCustomMessage()` accept tenantId, scope studio_settings queries. All 16 email functions accept optional `tenantId` param, threaded through `sendAndLog` → `logEmail` → `email_log` insert.
+- [x] `src/lib/waitlist.js` — booking INSERT now includes `tenant_id` from class record. Credits batch-fetched upfront (N+1 eliminated). Waitlist position reordering batched.
 - [x] `src/lib/gamification.js` — pure computation, no DB queries (no changes needed)
 - [x] `src/lib/platform-limits.js` — all functions accept tenantId, all queries scoped by tenant_id
 - [x] `src/lib/stripe.js` — per-tenant Stripe keys from studio_settings, cached per key, all queries scoped
@@ -209,7 +212,7 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
   - `getPlanLimits(plan)` — get plan tier limits
   - `checkPlanLimit(tenantId, plan, limitKey, currentCount)` — check specific limit
   - `invalidateFlagCache(tenantId)` — bust cache on plan/flag changes
-  - 30s in-memory cache per tenant
+  - 5-minute in-memory cache per tenant (flags rarely change mid-session)
 - [x] `feature_flags` table seeded (24 flags) — done in Phase 1 migration
 - [x] `plan_limits` table seeded (5 tiers) — done in Phase 1 migration
 
@@ -351,8 +354,8 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 - [ ] Update email templates to use terminology
 
 ### 6B. Tenant Branding
-- [ ] Logo display in admin header, member pages, emails
-- [ ] Primary color applied to accent elements
+- [x] Logo display in admin header, member pages, emails (done in MVP Readiness)
+- [x] Primary color applied to accent elements (ThemeProvider + branding tab)
 - [ ] "Powered by [SaaS Name]" watermark on free plan (removable on growth+)
 - [ ] Favicon generation from logo
 
@@ -574,6 +577,112 @@ These items are currently hardcoded to BOXX but will be resolved when tenant sco
 
 ---
 
+## MVP Production Readiness (BOXX — First Client)
+
+> Goal: Make BOXX (Bert's boxing studio) fully production-ready. Completed 2026-03-13 across 6 commits.
+
+### Stripe Approach Decision
+- **Decision:** Singular per-tenant Stripe keys (not Stripe Connect). Each tenant configures their own Stripe secret + publishable key in Settings → Stripe. Simpler, no platform onboarding flow needed.
+- **Rationale:** For MVP with one client, Connect adds complexity without value. Can migrate to Connect later if marketplace features are needed.
+
+### Critical Fixes (commit 963662a)
+- [x] Stripe webhook `handleSubscriptionDeleted` — was updating credits globally by `stripe_sub_id` without tenant_id filter. Now fetches credit record first to get tenant_id, then scopes update
+- [x] Stripe webhook `handleInvoiceFailed` — now fetches tenant_id and sends payment failed email
+- [x] Removed 3 `console.log` statements from `/api/bookings/accept-invitation` exposing user credit data
+- [x] Removed 2 `console.log` statements from `/auth/redirect` exposing session/user data
+- [x] Removed `debug` fields from error responses in accept-invitation
+- [x] Added `sendPaymentFailedEmail` and `sendMembershipEndedEmail` functions
+
+### UX Fixes (commit 92ed1f2)
+- [x] Member dashboard: profile save shows success/error feedback near button (replaced no-feedback state)
+- [x] Member dashboard: avatar upload failure shows inline error (replaced `alert()`)
+- [x] Admin dashboard: reminder email shows inline "Sent!"/"Failed" feedback (replaced `alert()`)
+
+### Email Branding (commit eaee774)
+- [x] `getTenantBrand(tenantId)` with 5-minute cache — fetches tenant name, logo, colors from DB
+- [x] `brandedEmailTemplate()` async wrapper that auto-fetches brand and applies to email header/footer
+- [x] All 18 email functions updated from `emailTemplate()` to `await brandedEmailTemplate({ tenantId, ... })`
+- [x] `renderEmailPreview` now async and tenant-aware (preview API route updated)
+- [x] Email header shows tenant logo (or studio name fallback) with primary color bar
+- [x] Email footer shows tenant studio name
+
+### Settings: Branding Tab (commit e46f4e9)
+- [x] New "Branding" tab in admin settings with full theme customization
+- [x] 6 theme presets: Dark Gold, Midnight Blue, Forest Emerald, Sunset Coral, Royal Purple, Clean Light
+- [x] ColorPicker component with HSL sliders (hue, saturation, lightness)
+- [x] FontSelect with 20 Google Font options + search
+- [x] ThemePreview component showing live preview of buttons/cards/nav
+- [x] Logo upload (uses existing Supabase Storage integration)
+- [x] Saves as `theme_*` keys in `studio_settings` via existing PUT /api/admin/settings
+
+### Social Links & Theme API (commit 98263e2)
+- [x] SocialLinks component in member layout footer (Instagram, Facebook, TikTok, YouTube, LINE)
+- [x] Links only shown when configured in Settings → Social
+- [x] `/api/tenant/theme` consolidated from 3 queries to 2 — now returns social links alongside theme data
+
+### UX Polish (commit 9cb83c8)
+- [x] Buy-classes page: "Manage Subscription" button when user has active `stripe_sub_id` (opens Stripe portal)
+- [x] Register form: password hint ("Minimum 8 characters"), Google OAuth checks consent checkbox first
+- [x] Login form: `autoComplete="current-password"`, Register: `autoComplete="new-password"`
+
+---
+
+## To Test (MVP Readiness Checklist)
+
+> Manual testing checklist before BOXX goes live. Items grouped by area.
+
+### Stripe & Payments
+- [ ] Buy a class pack → credits appear in member account
+- [ ] Buy a subscription → credits appear, `stripe_sub_id` set
+- [ ] "Manage Subscription" button appears on buy-classes for active subscribers
+- [ ] "Manage Subscription" opens Stripe Customer Portal
+- [ ] Simulate `customer.subscription.deleted` webhook → credits deactivated, membership ended email sent
+- [ ] Simulate `invoice.payment_failed` webhook → payment failed email sent
+- [ ] Verify Stripe keys are per-tenant (Settings → Stripe tab)
+
+### Email Branding
+- [ ] Preview any email template (Admin → Emails → Preview) → shows tenant logo + branded header/footer
+- [ ] Send a test booking confirmation → email arrives with correct studio name, logo, colors
+- [ ] Change tenant primary color → next email reflects new color in header bar
+- [ ] Tenant without logo → email falls back to text studio name
+
+### Branding & Theme
+- [ ] Admin → Settings → Branding tab loads correctly
+- [ ] Click each of 6 theme presets → preview updates in real-time
+- [ ] Adjust ColorPicker sliders → preview reflects HSL changes
+- [ ] Select a different font → preview text updates
+- [ ] Upload a logo → appears in preview and member layout header
+- [ ] Save branding → member-facing pages reflect new theme (after page reload)
+- [ ] Social links: add Instagram URL in Settings → Social → appears in member footer
+- [ ] Social links: remove all social URLs → no social section in member footer
+
+### Auth & Security
+- [ ] Login with email/password → redirects to correct page (staff→/admin, member→/dashboard)
+- [ ] Login with Google OAuth → redirects correctly via /auth/redirect
+- [ ] Register with email → consent checkbox required for both email and Google signup
+- [ ] Password field shows `autoComplete` hints (browser password manager integration)
+- [ ] Login from subdomain (boxx.zatrovo.com) → stays on subdomain after login
+- [ ] No debug logs in production console (accept-invitation, auth/redirect cleaned up)
+
+### Member UX
+- [ ] Edit profile → save → see success message near button
+- [ ] Edit profile → trigger error → see error message near button (not alert)
+- [ ] Upload avatar → failure shows inline error (not alert)
+- [ ] Member footer shows social links when configured
+- [ ] Member footer shows studio logo/name, copyright year
+
+### Admin UX
+- [ ] Send class reminder → see inline "Sent!" / "Failed" feedback (not alert)
+- [ ] Admin dashboard loads without errors
+- [ ] Settings page: all tabs (General, Stripe, Email, Social, Branding) work correctly
+
+### Tenant Isolation (if testing with 2 tenants)
+- [ ] Tenant A cannot see Tenant B's classes, members, bookings, or settings
+- [ ] Theme API returns correct brand for each tenant
+- [ ] Emails sent from Tenant A show Tenant A's branding
+
+---
+
 ## Not Building in v1
 
 Revisit after 50 paying tenants:
@@ -622,41 +731,10 @@ WEBHOOK_SIGNING_SECRET=min_32_chars_random_string
 
 > After completing each phase, add the corresponding rules to CLAUDE.md so Claude Code works with the codebase as it actually is.
 
-### After Phase 1 (Database Migration)
-Add to CLAUDE.md:
-```
-## Database
-Supabase (Postgres) with Row Level Security. Every table has `tenant_id`.
-Bert's seed IDs (never use in app logic):
-- Tenant: a0000000-0000-0000-0000-000000000001
-- Location: b0000000-0000-0000-0000-000000000001
-```
-
-### After Phase 2 (Auth & Tenant Scoping)
-Add to CLAUDE.md Critical Rules section:
-```
-## Critical Rules
-1. Every Supabase query MUST include `.eq('tenant_id', tenantId)`. Missing this leaks data between tenants.
-2. Every API route MUST start with `requireAuth()`, `requireAdmin()`, or `requireOwner()` from `src/lib/api-helpers.js`.
-3. Never hardcode tenant IDs in application logic — always derive from JWT/session.
-```
-Add to Architecture section:
-```
-src/lib/tenant.js       — resolveTenant(): subdomain/custom domain → tenant
-src/lib/api-helpers.js  — requireAuth / requireAdmin / requireOwner
-src/middleware.js       — tenant resolution, auth guards, injects x-tenant-id header
-```
-
-### After Phase 3 (Feature Flags)
-Add to CLAUDE.md:
-```
-- Check feature flags via `getTenantFlags(tenantId, plan)` before gated operations
-- Return 402 with upgradeUrl when feature not on tenant's plan
-```
-Add to Architecture section:
-```
-src/lib/feature-flags.js — getTenantFlags(): plan gate + per-tenant overrides, 30s cache
-```
+### ~~After Phase 1 (Database Migration)~~ — APPLIED
+### ~~After Phase 2 (Auth & Tenant Scoping)~~ — APPLIED
+### ~~After Phase 3 (Feature Flags)~~ — APPLIED
+> Phases 1-4 triggers have been applied to CLAUDE.md. Key files list updated, database description updated, `admin-auth.js` removed (deleted, replaced by `api-helpers.js`).
 
 ### After Phase 5 (SaaS Billing)
 Add to CLAUDE.md Conventions:
@@ -692,7 +770,94 @@ Add to CLAUDE.md:
 
 ---
 
+## Performance & Tech Debt
+
+### Completed Optimizations (2026-03-12)
+
+**Backend — Cache TTLs:**
+- [x] Middleware tenant resolution cache: 5min → 30min (slugs rarely change)
+- [x] Feature flags cache: 30s → 5min (flags rarely change mid-session)
+- [x] `next/image` cache TTL: 24 hours (`minimumCacheTTL: 86400` in next.config.mjs)
+
+**Backend — N+1 Query Elimination:**
+- [x] `cron/reminders` — batch fetch all bookings in 1 query, send emails via `Promise.allSettled`, batch update reminder flags
+- [x] `admin/members/[id]` freeze — batch fetch class schedules, parallel credit refunds
+- [x] `waitlist.js` — batch fetch credits for all waitlisted users upfront, batch position reordering
+- [x] `platform-limits.js` — batch counter period queries, parallel daily/monthly limit checks, parallel tenant+limits fetch
+
+**Backend — Query Consolidation:**
+- [x] `admin/dashboard` — merged 3 sequential `Promise.all` batches into 2 (25 queries now run in 2 parallel batches instead of 3)
+- [x] `schedule` — merged 5 parallel queries → 2 (single bookings query derives counts + roster + user booking check)
+
+**Backend — Composite Indexes:**
+- [x] 8 composite indexes added to schema.sql (bookings, class_schedule, users, user_credits, page_views, email_log, agent_conversations, agent_messages)
+- [x] Standalone migration: `supabase/migrations/add_composite_indexes.sql` — **run on Supabase SQL Editor**
+
+**Frontend:**
+- [x] ThemeProvider: non-blocking render (children render immediately, CSS vars apply when theme loads)
+- [x] 22 raw `<img>` tags → `next/image` `<Image>` across 6 pages (admin dashboard, schedule, bookings, members, instructors; member dashboard)
+
+**Code Cleanup:**
+- [x] Deleted `src/lib/admin-auth.js` (0 imports — fully replaced by `api-helpers.js`)
+
+### Codebase Review & Cleanup (2026-03-13)
+
+**Critical Bug Fixes:**
+- [x] `auth.js` — Supabase query builder `.eq()` result not reassigned (tenant_id filter was silently ignored on credentials login) — **SECURITY FIX**
+- [x] `stripe.js` — `_stripe` variable never declared with `let`, causing `ReferenceError` on `getStripe()` call — **RUNTIME FIX**
+
+**Security:**
+- [x] Removed 5 debug `console.log` statements from `auth.js` that exposed cookie headers, tenant IDs, and Google account IDs
+- [x] Removed raw request body logging from `bookings/create` route (sensitive data exposure)
+- [x] `globals.css` — Removed `userScalable: false` from viewport config (WCAG 2.1 accessibility violation)
+
+**Performance — Memory Leak Prevention:**
+- [x] Added `MAX_CACHE_SIZE` limits + eviction to 5 unbounded in-memory caches:
+  - `middleware.js` tenantCache (500 entries)
+  - `email.js` brandCache (200 entries)
+  - `api-helpers.js` _planCache (500 entries)
+  - `feature-flags.js` _cache (500 entries)
+  - All caches evict expired entries first, then clear oldest half if still over limit
+
+**Performance — N+1 Query Elimination:**
+- [x] `waitlist/leave` — sequential position updates → parallel `Promise.all`
+- [x] `admin/schedule/cancel` — nested booking loop (N queries per booking for cancel + credit restore + user fetch + email) → batch cancel with `.in()`, batch credit fetch + parallel restore, batch user fetch + parallel emails via `Promise.allSettled`
+
+**Code Quality:**
+- [x] Fixed all 3 ESLint errors (analytics `Math.random()` in render, assistant unescaped apostrophe, emails setState in effect)
+- [x] Lint: 3 errors + 13 warnings → 0 errors + 13 warnings
+- [x] Deleted unused `Tabs` component (`src/components/ui/tabs.js`)
+- [x] Deleted unused public assets (`logo-primary-white.png`, `og-share.jpg`)
+- [x] Removed all hardcoded "BOXX" references from source code (18 occurrences across 8 files)
+- [x] Updated all fallback URLs from `boxxthailand.com` → `zatrovo.com`
+- [x] Updated email FROM fallback: `BOXX Thailand` → `Zatrovo`
+- [x] Updated OG image: BOXX-specific → generic Zatrovo branding
+- [x] Updated layout metadata: `boxxthailand.com` → `zatrovo.com`, title → "Zatrovo — Studio Management"
+- [x] `globals.css` — hardcoded scrollbar colors → CSS variables, added `cursor: not-allowed` for disabled elements
+- [x] Updated CLAUDE.md: email count (16→18), Stripe description (Connect→per-tenant), removed Tabs from components list
+
+### Frontend Component Splitting
+- [ ] Split `src/app/(admin)/admin/schedule/page.js` (~2100 lines) into sub-components: RosterDialog, NotifyDialog, CreateClassDialog, EditClassDialog, DragDropHandler, ScheduleGrid
+- [ ] Split `src/app/(member)/dashboard/page.js` (~2100 lines) into sub-components: ProfileSection, ScheduleSection, BookingsSection, CreditsSection
+- [ ] Extract shared dialog state management from schedule page (30+ useState calls cause full-page re-renders on drag/resize)
+- [ ] Move drag/resize state to useRef where possible (non-rendering state)
+
+> These are the two largest client components. Splitting them reduces re-render scope, improves code maintainability, and enables better code-splitting. Do as a dedicated refactor — high risk of regressions if rushed.
+
+---
+
 ## Notes & Decisions
+
+### Auth flow notes
+- Google OAuth callback always lands on `zatrovo.com` (NEXTAUTH_URL). Uses `pending_tenant_id` + `pending_tenant_slug` cookies (set with `domain=.zatrovo.com`) to route back to correct tenant subdomain.
+- Login/register forms show user-friendly error messages (not raw error objects).
+- Sign-out redirects stay on tenant subdomain.
+
+### Stripe approach: singular per-tenant keys (not Connect)
+- Each tenant stores their own Stripe secret/publishable key in `studio_settings`
+- No Stripe Connect platform account needed for MVP
+- Simpler setup — tenant configures keys in Admin → Settings → Stripe
+- Can migrate to Connect later if marketplace/platform fee features are needed
 
 ### Why shared-DB multi-tenancy?
 - Simplest to manage at our scale (< 1000 tenants)

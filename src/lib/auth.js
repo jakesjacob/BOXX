@@ -83,13 +83,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!supabaseAdmin) return null
 
         // Tenant-scoped login: if tenantId provided, scope lookup
-        const query = supabaseAdmin
+        let query = supabaseAdmin
           .from('users')
           .select('*')
           .eq('email', credentials.email.toLowerCase())
 
         if (credentials.tenantId) {
-          query.eq('tenant_id', credentials.tenantId)
+          query = query.eq('tenant_id', credentials.tenantId)
         }
 
         const { data: user, error } = await query.single()
@@ -149,8 +149,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const cookieHeader = headersList.get('cookie') || ''
           const tidMatch = cookieHeader.match(/pending_tenant_id=([^;]+)/)
           if (tidMatch) targetTenantId = tidMatch[1].trim()
-          console.log('[auth] DEBUG cookie header:', cookieHeader.substring(0, 200))
-          console.log('[auth] DEBUG targetTenantId:', targetTenantId)
         } catch (e) {
           console.error('[auth] headers() failed:', e.message)
         }
@@ -181,7 +179,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         try {
           // 1. If we have a target tenant, look for user on THAT tenant first
-          console.log('[auth] DEBUG path: targetTenantId =', targetTenantId, ', google_id =', account.providerAccountId)
           if (targetTenantId) {
             // Check by google_id on target tenant
             const { data: onTenant } = await supabaseAdmin
@@ -194,7 +191,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             if (onTenant) {
               if (onTenant.role === 'frozen') return false
               await setUserFields(onTenant)
-              console.log('[auth] DEBUG: found by google_id on target tenant, slug:', user.tenantSlug)
               return true
             }
 
@@ -251,7 +247,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (existing) {
             if (existing.role === 'frozen') return false
             await setUserFields(existing)
-            console.log('[auth] DEBUG: global google_id match, tenant:', existing.tenant_id, 'slug:', user.tenantSlug)
             return true
           }
 

@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'BOXX — Luxury Boutique Boxing Studio in Chiang Mai';
+export const alt = 'Zatrovo — Studio Management Platform';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -56,20 +56,20 @@ export default function OGImage() {
             marginBottom: 32,
           }}
         >
-          Chiang Mai, Thailand
+          Studio Management
         </span>
 
         {/* Logo text */}
         <span
           style={{
-            fontSize: 120,
+            fontSize: 100,
             fontWeight: 900,
             color: '#f5f5f5',
             letterSpacing: '-0.02em',
             lineHeight: 1,
           }}
         >
-          BOXX
+          ZATROVO
         </span>
 
         {/* Divider */}
@@ -92,7 +92,7 @@ export default function OGImage() {
             letterSpacing: '0.12em',
           }}
         >
-          Boxing & Strength Training, Done Properly
+          Run Your Studio, Your Way
         </span>
 
         {/* Bottom accent line */}

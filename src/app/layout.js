@@ -10,13 +10,11 @@ const geistSans = Geist({
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 }
 
 export const metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://www.boxxthailand.com"),
-  title: "Studio Platform",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://zatrovo.com"),
+  title: "Zatrovo — Studio Management",
   description: "Studio management platform",
 }
 

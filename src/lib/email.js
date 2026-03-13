@@ -2,8 +2,8 @@ import { Resend } from 'resend'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
-const FROM = process.env.EMAIL_FROM || 'BOXX Thailand <noreply@boxxthailand.com>'
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://boxxthailand.com'
+const FROM = process.env.EMAIL_FROM || 'Zatrovo <noreply@zatrovo.com>'
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://zatrovo.com'
 
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'a0000000-0000-0000-0000-000000000001'
 
@@ -11,6 +11,7 @@ const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'a0000000-0000-0000-0
 
 const brandCache = new Map()
 const BRAND_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const MAX_BRAND_CACHE = 200
 
 async function getTenantBrand(tenantId) {
   const tid = tenantId || DEFAULT_TENANT_ID
@@ -41,6 +42,11 @@ async function getTenantBrand(tenantId) {
       border: settingsMap.theme_border || '#1a1a1a',
     }
 
+    if (brandCache.size >= MAX_BRAND_CACHE) {
+      const now = Date.now()
+      for (const [k, v] of brandCache) { if (now - v.ts >= BRAND_CACHE_TTL) brandCache.delete(k) }
+      if (brandCache.size >= MAX_BRAND_CACHE) brandCache.clear()
+    }
     brandCache.set(tid, { brand, ts: Date.now() })
     return brand
   } catch {
@@ -126,7 +132,7 @@ async function brandedEmailTemplate({ heading, body, ctaUrl, ctaText, tenantId, 
 
 function emailTemplate({ heading, body, ctaUrl, ctaText, brand }) {
   const b = brand || {}
-  const studioName = b.studioName || 'BOXX'
+  const studioName = b.studioName || 'Studio'
   const primaryColor = b.primaryColor || '#c8a750'
   const bgColor = b.background || '#0a0a0a'
   const cardColor = b.surface || '#111111'
@@ -527,7 +533,7 @@ export async function sendCreditExpiryWarning({ to, name, packName, creditsRemai
 export async function sendWelcomeEmail({ to, name, studioName, dashboardUrl, brand, tenantId }) {
   if (!(await isEmailEnabled('welcome', tenantId))) return
   const custom = await getCustomMessage('welcome', tenantId)
-  const studio = studioName || 'BOXX'
+  const studio = studioName || 'Studio'
   const subject = custom.subject || `Welcome to ${studio}`
   const url = dashboardUrl || '${BASE_URL}/dashboard'
   const emailBrand = { studioName: studio, ...brand }
@@ -781,7 +787,7 @@ export async function sendAdminDirectEmail({ to, subject, body, tenantId }) {
 // ─── 14. Password Reset ─────────────────────────────────────────────────────
 
 export async function sendPasswordResetEmail({ to, name, resetUrl, brand, tenantId }) {
-  const studioName = brand?.studioName || 'BOXX'
+  const studioName = brand?.studioName || 'Studio'
   await sendAndLog({
     emailType: 'password_reset',
     to,

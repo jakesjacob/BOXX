@@ -54,7 +54,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Failed to leave waitlist' }, { status: 500 })
     }
 
-    // Reorder positions for those behind this user
+    // Batch-decrement positions for those behind this user using RPC or parallel updates
     const { data: behind } = await supabaseAdmin
       .from('waitlist')
       .select('id, position')
@@ -64,13 +64,15 @@ export async function POST(request) {
       .order('position', { ascending: true })
 
     if (behind && behind.length > 0) {
-      for (const w of behind) {
-        await supabaseAdmin
-          .from('waitlist')
-          .update({ position: w.position - 1 })
-          .eq('tenant_id', tenantId)
-          .eq('id', w.id)
-      }
+      await Promise.all(
+        behind.map((w) =>
+          supabaseAdmin
+            .from('waitlist')
+            .update({ position: w.position - 1 })
+            .eq('tenant_id', tenantId)
+            .eq('id', w.id)
+        )
+      )
     }
 
     return NextResponse.json({ message: 'Removed from waitlist' })

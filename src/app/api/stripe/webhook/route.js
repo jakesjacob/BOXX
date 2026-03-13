@@ -57,7 +57,7 @@ export async function POST(request) {
         break
       }
       default:
-        console.log(`[stripe/webhook] Unhandled event type: ${event.type}`)
+        break // Unhandled event types are silently ignored
     }
 
     return NextResponse.json({ received: true })

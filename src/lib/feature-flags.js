@@ -17,6 +17,7 @@ const CACHE_TTL_MS = 300_000 // 5 minutes — flags rarely change mid-session
 
 // Cache: tenantId → { flags: Map<string, boolean>, plan: string, fetchedAt: number }
 const _cache = new Map()
+const MAX_FLAG_CACHE = 500
 
 /**
  * Simple deterministic hash for rollout percentage.
@@ -89,6 +90,11 @@ async function loadTenantFlags(tenantId, plan) {
     resolved.set(flag.key, flag.default_enabled)
   }
 
+  if (_cache.size >= MAX_FLAG_CACHE) {
+    const now = Date.now()
+    for (const [k, v] of _cache) { if (now - v.fetchedAt >= CACHE_TTL_MS) _cache.delete(k) }
+    if (_cache.size >= MAX_FLAG_CACHE) _cache.clear()
+  }
   _cache.set(cacheKey, { flags: resolved, plan, fetchedAt: Date.now() })
   return resolved
 }

@@ -104,7 +104,7 @@ export async function POST(request) {
       sendCancellationConfirmation({
         to: cancelUser.email,
         name: cancelUser.name,
-        className: booking.class_schedule.class_types?.name || 'BOXX Class',
+        className: booking.class_schedule.class_types?.name || 'Class',
         date: startDate.toLocaleDateString('en-US', {
           weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
         }),

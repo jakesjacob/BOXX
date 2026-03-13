@@ -6,6 +6,7 @@ const memberRoutes = ['/dashboard', '/book', '/profile', '/buy-classes', '/my-bo
 // ─── Tenant slug/domain → ID cache ──────────────────────────────────────────
 const tenantCache = new Map()
 const CACHE_TTL = 30 * 60 * 1000 // 30 minutes — tenant slugs rarely change
+const MAX_CACHE_SIZE = 500 // prevent unbounded memory growth
 
 async function resolveSlugToTenantId(slug) {
   const cacheKey = `slug:${slug}`
@@ -28,6 +29,15 @@ async function resolveSlugToTenantId(slug) {
     )
     const data = await res.json()
     const tenantId = data?.[0]?.id || null
+    if (tenantCache.size >= MAX_CACHE_SIZE) {
+      // Evict expired entries; if still over limit, clear oldest half
+      const now = Date.now()
+      for (const [k, v] of tenantCache) { if (now >= v.expiresAt) tenantCache.delete(k) }
+      if (tenantCache.size >= MAX_CACHE_SIZE) {
+        const keys = [...tenantCache.keys()]
+        for (let i = 0; i < keys.length / 2; i++) tenantCache.delete(keys[i])
+      }
+    }
     tenantCache.set(cacheKey, { tenantId, expiresAt: Date.now() + CACHE_TTL })
     return tenantId
   } catch {
@@ -56,6 +66,14 @@ async function resolveCustomDomainToTenantId(domain) {
     )
     const data = await res.json()
     const tenantId = data?.[0]?.id || null
+    if (tenantCache.size >= MAX_CACHE_SIZE) {
+      const now = Date.now()
+      for (const [k, v] of tenantCache) { if (now >= v.expiresAt) tenantCache.delete(k) }
+      if (tenantCache.size >= MAX_CACHE_SIZE) {
+        const keys = [...tenantCache.keys()]
+        for (let i = 0; i < keys.length / 2; i++) tenantCache.delete(keys[i])
+      }
+    }
     tenantCache.set(cacheKey, { tenantId, expiresAt: Date.now() + CACHE_TTL })
     return tenantId
   } catch {

@@ -45,7 +45,7 @@ export async function GET(request) {
     const formatDate = (d) =>
       d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
 
-    const domain = (process.env.NEXT_PUBLIC_APP_URL || 'https://boxxthailand.com').replace(/^https?:\/\//, '')
+    const domain = (process.env.NEXT_PUBLIC_APP_URL || 'https://zatrovo.com').replace(/^https?:\/\//, '')
     const uid = `booking-${booking.id}@${domain}`
     const now = formatDate(new Date())
 
@@ -75,7 +75,7 @@ export async function GET(request) {
     return new NextResponse(ics, {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `attachment; filename="boxx-${className.toLowerCase().replace(/\s+/g, '-')}.ics"`,
+        'Content-Disposition': `attachment; filename="class-${className.toLowerCase().replace(/\s+/g, '-')}.ics"`,
       },
     })
   } catch (error) {

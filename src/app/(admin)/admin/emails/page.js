@@ -267,6 +267,7 @@ function EmailOverviewTab() {
 
       {/* Edit Dialog */}
       <EditEmailDialog
+        key={editSlug}
         slug={editSlug}
         event={EMAIL_EVENTS.find((e) => e.slug === editSlug)}
         customSubject={editSlug ? getCustomSubject(editSlug) : ''}
@@ -309,15 +310,9 @@ function EmailOverviewTab() {
 // ─── Edit Email Dialog ──────────────────────────────────────────────────────
 
 function EditEmailDialog({ slug, event, customSubject, customBody, saving, onSave, onClose }) {
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
-
-  useEffect(() => {
-    if (slug) {
-      setSubject(customSubject)
-      setBody(customBody)
-    }
-  }, [slug, customSubject, customBody])
+  // key={slug} on parent ensures fresh state when slug changes
+  const [subject, setSubject] = useState(customSubject || '')
+  const [body, setBody] = useState(customBody || '')
 
   if (!event) return null
 

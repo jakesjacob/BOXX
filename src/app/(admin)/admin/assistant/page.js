@@ -428,7 +428,7 @@ export default function AssistantPage() {
               </div>
               <h2 className="text-lg font-semibold text-foreground mb-2">Monthly limit reached</h2>
               <p className="text-sm text-muted max-w-sm mb-4">
-                You've used your AI assistant allowance for this month.
+                You&apos;ve used your AI assistant allowance for this month.
               </p>
               <p className="text-sm text-muted max-w-sm">
                 Your allowance resets on the 1st of each month. To increase your limit, please contact the developer.

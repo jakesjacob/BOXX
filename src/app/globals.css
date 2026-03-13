@@ -29,7 +29,6 @@ html {
   scroll-behavior: smooth;
   overflow-x: hidden;
   color-scheme: dark;
-  /* Prevent pinch-to-zoom on iOS Safari (which ignores user-scalable=no) */
   touch-action: manipulation;
 }
 
@@ -49,12 +48,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--card-border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--muted);
 }
 
 /* Cursor pointer on all interactive elements */
@@ -66,6 +65,11 @@ input[type="submit"],
 input[type="button"],
 input[type="reset"] {
   cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 /* Selection color */

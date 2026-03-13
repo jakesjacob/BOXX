@@ -6,6 +6,9 @@ const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'a0000000-0000-0000-0
 // Cache Stripe instances per tenant
 const _stripeCache = new Map()
 
+// Sync Stripe instance (env var only — for webhook signature verification)
+let _stripe = null
+
 /**
  * Get Stripe secret key — checks studio_settings first, falls back to env var
  */

@@ -69,7 +69,7 @@ export async function POST(request) {
       sendClassChanged({
         to: member.email,
         name: member.name,
-        className: cls.class_types?.name || 'BOXX Class',
+        className: cls.class_types?.name || 'Class',
         changes: changes || ['Class details have been updated'],
         date: dateStr,
         time: timeStr,

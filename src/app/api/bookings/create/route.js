@@ -28,7 +28,7 @@ export async function POST(request) {
     const body = await request.json()
     const parsed = bookingSchema.safeParse(body)
     if (!parsed.success) {
-      console.error('[bookings/create] Invalid input:', JSON.stringify(body), parsed.error.issues)
+      console.error('[bookings/create] Invalid input:', parsed.error.issues)
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
@@ -156,7 +156,7 @@ export async function POST(request) {
       sendBookingConfirmation({
         to: emailUser.email,
         name: emailUser.name,
-        className: cls.class_types?.name || 'BOXX Class',
+        className: cls.class_types?.name || 'Class',
         instructor: cls.instructors?.name,
         date: startDate.toLocaleDateString('en-US', {
           weekday: 'long',

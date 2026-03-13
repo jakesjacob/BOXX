@@ -274,7 +274,7 @@ async function sendPlatformAlert(type, details) {
       .join('')
 
     await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'BOXX Thailand <noreply@boxxthailand.com>',
+      from: process.env.EMAIL_FROM || 'Zatrovo <noreply@zatrovo.com>',
       to: PLATFORM_ALERT_EMAIL,
       subject,
       html: `

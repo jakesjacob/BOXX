@@ -24,6 +24,7 @@ const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'a0000000-0000-0000-0
 // Tenant plan cache: tenantId → { plan, fetchedAt }
 const _planCache = new Map()
 const PLAN_CACHE_TTL = 60_000 // 1 minute
+const MAX_PLAN_CACHE = 500
 
 function getRequestTenantId(request) {
   if (request) {
@@ -205,6 +206,11 @@ export async function getTenantPlan(tenantId) {
     .single()
 
   const plan = data?.plan || 'free'
+  if (_planCache.size >= MAX_PLAN_CACHE) {
+    const now = Date.now()
+    for (const [k, v] of _planCache) { if (now - v.fetchedAt >= PLAN_CACHE_TTL) _planCache.delete(k) }
+    if (_planCache.size >= MAX_PLAN_CACHE) _planCache.clear()
+  }
   _planCache.set(tenantId, { plan, fetchedAt: Date.now() })
   return plan
 }
