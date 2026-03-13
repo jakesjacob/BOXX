@@ -36,7 +36,7 @@ export async function GET(request) {
       }
     }
 
-    const html = renderEmailPreview(slug, customSubject, customBody)
+    const html = await renderEmailPreview(slug, customSubject, customBody, tenantId)
     if (!html) {
       return NextResponse.json({ error: 'Unknown email type' }, { status: 404 })
     }

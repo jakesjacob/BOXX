@@ -7,6 +7,47 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://boxxthailand.com'
 
 const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || 'a0000000-0000-0000-0000-000000000001'
 
+// ─── Tenant brand cache (avoids re-fetching for every email in a batch) ─────
+
+const brandCache = new Map()
+const BRAND_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+async function getTenantBrand(tenantId) {
+  const tid = tenantId || DEFAULT_TENANT_ID
+  const cached = brandCache.get(tid)
+  if (cached && Date.now() - cached.ts < BRAND_CACHE_TTL) return cached.brand
+
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase/admin')
+    if (!supabaseAdmin) return null
+
+    const [{ data: tenant }, { data: settings }] = await Promise.all([
+      supabaseAdmin.from('tenants').select('name, logo_url, primary_color, slug').eq('id', tid).single(),
+      supabaseAdmin.from('studio_settings').select('key, value').eq('tenant_id', tid).in('key', [
+        'studio_name', 'theme_background', 'theme_surface', 'theme_border', 'theme_primary', 'theme_primaryHover',
+      ]),
+    ])
+
+    const settingsMap = {}
+    if (settings) for (const row of settings) settingsMap[row.key] = row.value
+
+    const brand = {
+      studioName: settingsMap.studio_name || tenant?.name || 'Studio',
+      logoUrl: tenant?.logo_url || null,
+      primaryColor: settingsMap.theme_primary || tenant?.primary_color || '#c8a750',
+      primaryHover: settingsMap.theme_primaryHover || null,
+      background: settingsMap.theme_background || '#0a0a0a',
+      surface: settingsMap.theme_surface || '#111111',
+      border: settingsMap.theme_border || '#1a1a1a',
+    }
+
+    brandCache.set(tid, { brand, ts: Date.now() })
+    return brand
+  } catch {
+    return null
+  }
+}
+
 // HTML-encode user-provided values to prevent XSS/injection in emails
 function escapeHtml(str) {
   if (!str) return ''
@@ -72,6 +113,13 @@ async function sendAndLog({ emailType, to, subject, html, tenantId }) {
     await logEmail({ emailType, recipient: to, subject, status: 'failed', error: err.message || String(err), tenantId })
     throw err
   }
+}
+
+// ─── Branded email template (fetches tenant brand automatically) ─────────────
+
+async function brandedEmailTemplate({ heading, body, ctaUrl, ctaText, tenantId, brand: explicitBrand }) {
+  const brand = explicitBrand || await getTenantBrand(tenantId) || {}
+  return emailTemplate({ heading, body, ctaUrl, ctaText, brand })
 }
 
 // ─── Shared email template wrapper (Mailchimp-style dark theme) ──────────────
@@ -228,9 +276,9 @@ const EMAIL_DEFAULTS = {
 
 /**
  * Render a preview of an email with sample data.
- * Accepts optional custom subject/body overrides.
+ * Accepts optional custom subject/body overrides and tenantId for branding.
  */
-export function renderEmailPreview(slug, customSubject, customBody) {
+export async function renderEmailPreview(slug, customSubject, customBody, tenantId) {
   const sample = SAMPLE_DATA[slug]
   if (!sample) return null
 
@@ -351,11 +399,13 @@ export function renderEmailPreview(slug, customSubject, customBody) {
   const sampleWithCustom = { ...sample, customBody: customBody || null }
   const { heading, body, ctaUrl, ctaText } = builder(sampleWithCustom)
 
+  const brand = await getTenantBrand(tenantId)
   return emailTemplate({
     heading: customSubject || heading,
     body,
     ctaUrl,
     ctaText,
+    brand,
   })
 }
 
@@ -374,7 +424,7 @@ export async function sendBookingConfirmation({ to, name, className, instructor,
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: "You're In",
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>${detailTable([['Class', className], ['Coach', instructor || 'TBA'], ['Date', date], ['Time', time]])}`
@@ -406,7 +456,7 @@ export async function sendClassReminder({ to, name, className, instructor, time,
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Class in 1 Hour',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -430,7 +480,7 @@ export async function sendWaitlistPromotion({ to, name, className, date, time, t
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: "You're Off the Waitlist",
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -457,7 +507,7 @@ export async function sendCreditExpiryWarning({ to, name, packName, creditsRemai
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Credits Expiring',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -487,7 +537,7 @@ export async function sendWelcomeEmail({ to, name, studioName, dashboardUrl, bra
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: `Welcome to ${studio}`,
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -519,7 +569,7 @@ export async function sendCancellationConfirmation({ to, name, className, date, 
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Booking Cancelled',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>${detailTable([['Class', className], ['Date', date], ['Time', time], ['Credit', creditRefunded ? 'Refunded to your pack' : 'Not refunded (late cancellation)']])}`
@@ -551,7 +601,7 @@ export async function sendClassCancelledByAdmin({ to, name, className, date, tim
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Class Cancelled',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -578,7 +628,7 @@ export async function sendPackPurchaseConfirmation({ to, name, packName, credits
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Pack Purchased',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>${detailTable([['Pack', packName], ['Credits', `${credits} class${credits !== 1 ? 'es' : ''}`], ['Valid for', `${validityDays} days`], ['Expires', expiresAt]])}`
@@ -610,7 +660,7 @@ export async function sendCreditsLowWarning({ to, name, creditsRemaining, packNa
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Credits Running Low',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -637,7 +687,7 @@ export async function sendClassChanged({ to, name, className, changes, date, tim
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Class Updated',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -670,7 +720,7 @@ export async function sendRemovedFromClass({ to, name, className, date, time, cr
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Booking Removed',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -697,7 +747,7 @@ export async function sendAdminCancelledBooking({ to, name, className, date, tim
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Booking Cancelled',
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>`
@@ -721,7 +771,7 @@ export async function sendAdminDirectEmail({ to, subject, body, tenantId }) {
     to,
     tenantId,
     subject: escapeHtml(subject),
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: escapeHtml(subject),
       body: `<div style="white-space:pre-wrap;">${escapeHtml(body)}</div>`,
     }),
@@ -737,7 +787,7 @@ export async function sendPasswordResetEmail({ to, name, resetUrl, brand, tenant
     to,
     tenantId,
     subject: `Reset Your Password — ${studioName}`,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Reset Your Password',
       body: `
         <p>Hey ${name || 'there'},</p>
@@ -761,7 +811,7 @@ export async function sendPrivateClassInvitation({ to, name, className, instruct
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: "You're Invited",
       body: custom.body
         ? `<p>${custom.body.replace(/\n/g, '</p><p>')}</p>${detailTable([['Class', className], ['Coach', instructor || 'TBA'], ['Date', date], ['Time', time]])}`
@@ -792,7 +842,7 @@ export async function sendClassInvitationNeedsCredits({ to, name, className, ins
     to,
     subject,
     tenantId,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: "You're Invited",
       body: `
         <p>Hey ${name || 'there'},</p>
@@ -819,7 +869,7 @@ export async function sendPaymentFailedEmail({ to, name, tenantId }) {
     to,
     tenantId,
     subject: 'Payment Failed — Action Required',
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Payment Failed',
       body: `
         <p>Hey ${name || 'there'},</p>
@@ -841,7 +891,7 @@ export async function sendMembershipEndedEmail({ to, name, packName, tenantId })
     to,
     tenantId,
     subject: `Membership Ended — ${packName || 'Your Plan'}`,
-    html: emailTemplate({
+    html: await brandedEmailTemplate({ tenantId,
       heading: 'Membership Ended',
       body: `
         <p>Hey ${name || 'there'},</p>
