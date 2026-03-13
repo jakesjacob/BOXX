@@ -810,3 +810,47 @@ export async function sendClassInvitationNeedsCredits({ to, name, className, ins
     }),
   })
 }
+
+// ─── 16. Payment Failed ──────────────────────────────────────────────────────
+
+export async function sendPaymentFailedEmail({ to, name, tenantId }) {
+  await sendAndLog({
+    emailType: 'payment_failed',
+    to,
+    tenantId,
+    subject: 'Payment Failed — Action Required',
+    html: emailTemplate({
+      heading: 'Payment Failed',
+      body: `
+        <p>Hey ${name || 'there'},</p>
+        <p>We were unable to process your latest payment. Your membership may be affected if this isn't resolved.</p>
+        <p>Please update your payment method to continue your membership without interruption.</p>
+        <p style="color:#888;font-size:14px;">If you believe this is an error, please contact us.</p>
+      `,
+      ctaUrl: `${BASE_URL}/buy-classes`,
+      ctaText: 'Update Payment',
+    }),
+  })
+}
+
+// ─── 17. Membership Ended ────────────────────────────────────────────────────
+
+export async function sendMembershipEndedEmail({ to, name, packName, tenantId }) {
+  await sendAndLog({
+    emailType: 'membership_ended',
+    to,
+    tenantId,
+    subject: `Membership Ended — ${packName || 'Your Plan'}`,
+    html: emailTemplate({
+      heading: 'Membership Ended',
+      body: `
+        <p>Hey ${name || 'there'},</p>
+        <p>Your <strong>${packName || 'membership'}</strong> has been cancelled and is no longer active.</p>
+        <p>You can re-subscribe any time to get back to booking classes.</p>
+        <p style="color:#888;font-size:14px;">Thanks for being a member. We hope to see you again soon.</p>
+      `,
+      ctaUrl: `${BASE_URL}/buy-classes`,
+      ctaText: 'View Plans',
+    }),
+  })
+}

@@ -62,8 +62,6 @@ export async function POST(request) {
       .eq('user_id', userId)
       .order('expires_at', { ascending: true })
 
-    console.log('[accept-invitation] All credits for user:', userId, JSON.stringify(allCredits))
-
     // Filter to usable credits
     const usable = (allCredits || []).filter(
       (c) => c.status === 'active'
@@ -71,20 +69,9 @@ export async function POST(request) {
         && (c.credits_remaining > 0 || c.credits_remaining === null)
     )
 
-    console.log('[accept-invitation] Usable credits:', JSON.stringify(usable))
-
     if (!usable.length) {
       return NextResponse.json({
         error: 'No available credits. Purchase a class pack first.',
-        debug: {
-          totalCredits: allCredits?.length || 0,
-          credits: (allCredits || []).map((c) => ({
-            status: c.status,
-            remaining: c.credits_remaining,
-            expires: c.expires_at,
-            expired: new Date(c.expires_at) <= new Date(),
-          })),
-        },
       }, { status: 400 })
     }
 
@@ -93,11 +80,9 @@ export async function POST(request) {
     // Deduct credit atomically
     if (credit.credits_remaining !== null) {
       const { data: ok, error: rpcErr } = await supabaseAdmin.rpc('deduct_credit', { credit_id: credit.id })
-      console.log('[accept-invitation] deduct_credit result:', { ok, rpcErr, creditId: credit.id })
       if (!ok) {
         return NextResponse.json({
           error: 'Credit deduction failed. Please try again.',
-          debug: { creditId: credit.id, remaining: credit.credits_remaining, rpcResult: ok, rpcErr },
         }, { status: 400 })
       }
     }

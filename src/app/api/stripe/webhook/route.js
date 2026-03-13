@@ -208,13 +208,20 @@ async function handleInvoiceFailed(invoice) {
   // Find the user for this subscription
   const { data: credit } = await supabaseAdmin
     .from('user_credits')
-    .select('user_id, users(email, name)')
+    .select('user_id, tenant_id, users(email, name)')
     .eq('stripe_sub_id', subscriptionId)
     .single()
 
   if (credit) {
     console.log(`[stripe/webhook] Payment failed for user: ${credit.user_id}`)
-    // TODO: Phase 6 — Send "update payment method" email via Resend
+    if (credit.users?.email) {
+      const { sendPaymentFailedEmail } = await import('@/lib/email')
+      sendPaymentFailedEmail({
+        to: credit.users.email,
+        name: credit.users.name,
+        tenantId: credit.tenant_id || undefined,
+      }).catch((err) => console.error('[stripe/webhook] Payment failed email failed:', err))
+    }
   }
 }
 
@@ -222,13 +229,24 @@ async function handleInvoiceFailed(invoice) {
  * Handle subscription cancellation
  */
 async function handleSubscriptionDeleted(subscription) {
-  // stripe_sub_id is globally unique so tenant_id filter not strictly needed,
-  // but included for consistency
+  // Find the credit record first so we can scope by tenant_id and notify the user
+  const { data: credit } = await supabaseAdmin
+    .from('user_credits')
+    .select('id, tenant_id, user_id, class_packs(name), users(email, name)')
+    .eq('stripe_sub_id', subscription.id)
+    .eq('status', 'active')
+    .single()
+
+  if (!credit) {
+    console.log(`[stripe/webhook] No active credit for cancelled subscription: ${subscription.id}`)
+    return
+  }
+
   const { error } = await supabaseAdmin
     .from('user_credits')
     .update({ status: 'cancelled' })
-    .eq('stripe_sub_id', subscription.id)
-    // Note: no tenant_id filter here since we don't have it from subscription object
+    .eq('tenant_id', credit.tenant_id)
+    .eq('id', credit.id)
 
   if (error) {
     console.error('[stripe/webhook] Failed to cancel credit:', error)
@@ -236,5 +254,15 @@ async function handleSubscriptionDeleted(subscription) {
   }
 
   console.log(`[stripe/webhook] Subscription cancelled: ${subscription.id}`)
-  // TODO: Phase 6 — Send "membership ended" email via Resend
+
+  // Send membership ended email
+  if (credit.users?.email) {
+    const { sendMembershipEndedEmail } = await import('@/lib/email')
+    sendMembershipEndedEmail({
+      to: credit.users.email,
+      name: credit.users.name,
+      packName: credit.class_packs?.name || 'Membership',
+      tenantId: credit.tenant_id,
+    }).catch((err) => console.error('[stripe/webhook] Membership ended email failed:', err))
+  }
 }
