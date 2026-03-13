@@ -34,6 +34,7 @@ export default function ClassTypesPage() {
   const [imagePreview, setImagePreview] = useState(null) // local preview URL
   const [uploadingImage, setUploadingImage] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
 
   useEffect(() => {
     if (!toast) return
@@ -42,14 +43,18 @@ export default function ClassTypesPage() {
   }, [toast])
 
   async function fetchClassTypes() {
+    setFetchError(null)
     try {
       const res = await fetch('/api/admin/class-types')
       if (res.ok) {
         const data = await res.json()
         setClassTypes(data.classTypes || [])
+      } else {
+        setFetchError('Failed to load class types')
       }
     } catch (err) {
       console.error('Failed to fetch class types:', err)
+      setFetchError('Unable to connect. Check your internet and try again.')
     } finally {
       setLoading(false)
     }
@@ -230,7 +235,14 @@ export default function ClassTypesPage() {
         </div>
       )}
 
-      {loading ? (
+      {fetchError && !loading ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-red-400 font-medium">{fetchError}</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={fetchClassTypes}>Retry</Button>
+          </CardContent>
+        </Card>
+      ) : loading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => <div key={i} className="h-32 bg-card border border-card-border rounded-lg animate-pulse" />)}
         </div>

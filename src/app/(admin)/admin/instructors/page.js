@@ -17,6 +17,7 @@ export default function AdminInstructorsPage() {
   const [dialog, setDialog] = useState(null) // 'create' | instructor object
   const [form, setForm] = useState({ name: '', bio: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
 
   useEffect(() => {
     if (!toast) return
@@ -25,14 +26,18 @@ export default function AdminInstructorsPage() {
   }, [toast])
 
   async function fetchInstructors() {
+    setFetchError(null)
     try {
       const res = await fetch('/api/admin/instructors')
       if (res.ok) {
         const data = await res.json()
         setInstructors(data.instructors || [])
+      } else {
+        setFetchError('Failed to load instructors')
       }
     } catch (err) {
       console.error(err)
+      setFetchError('Unable to connect. Check your internet and try again.')
     } finally {
       setLoading(false)
     }
@@ -119,7 +124,12 @@ export default function AdminInstructorsPage() {
         </div>
       )}
 
-      {loading ? (
+      {fetchError && !loading ? (
+        <div className="border border-card-border rounded-lg py-12 text-center">
+          <p className="text-red-400 font-medium">{fetchError}</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={fetchInstructors}>Retry</Button>
+        </div>
+      ) : loading ? (
         <div className="space-y-3">
           {[1, 2].map((i) => (
             <div key={i} className="h-20 bg-card border border-card-border rounded-lg animate-pulse" />

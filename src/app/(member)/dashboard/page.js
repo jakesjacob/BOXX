@@ -76,7 +76,17 @@ function DashboardContent() {
   const isGoogleUser = !!data?.user?.google_id
 
   if (loading) return <DashboardSkeleton />
-  if (error) return <p className="text-red-400">{error}</p>
+  if (error) return (
+    <Card>
+      <CardContent className="py-16 text-center">
+        <p className="text-red-400 font-medium">{error}</p>
+        <p className="text-muted text-sm mt-1">Check your internet connection and try again.</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => { setError(null); setLoading(true); fetchDashboard() }}>
+          Retry
+        </Button>
+      </CardContent>
+    </Card>
+  )
   if (!data) return null
 
   return (
@@ -261,6 +271,8 @@ function ProfileSection({ user, credits, onUpdate, creditAnimation }) {
         if (data.avatar_url) {
           setLocalAvatar(data.avatar_url)
         }
+        setSaveMsg({ type: 'success', text: 'Photo updated' })
+        setTimeout(() => setSaveMsg(null), 3000)
         onUpdate()
       } else {
         const data = await res.json()
@@ -773,6 +785,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
   const [shared, setShared] = useState(false)
   const [sharedResolved, setSharedResolved] = useState(!sharedClassId)
   const [toast, setToast] = useState(null) // { message, type: 'error'|'success', link? }
+  const [cancelConfirm, setCancelConfirm] = useState(null) // { bookingId, startsAt }
 
   const maxWeeks = 4 // 1 month in advance
 
@@ -967,14 +980,13 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
     }
   }
 
-  async function handleCancelBooking(bookingId, startsAt) {
-    const hoursUntil = (new Date(startsAt) - Date.now()) / (1000 * 60 * 60)
-    const isLate = hoursUntil <= 24
-    const message = isLate
-      ? 'Less than 24 hours before class. Your credit will NOT be returned. Cancel anyway?'
-      : 'Cancel this booking? Your credit will be returned.'
-    if (!confirm(message)) return
+  function promptCancelBooking(bookingId, startsAt) {
+    setCancelConfirm({ bookingId, startsAt })
+  }
 
+  async function handleCancelBooking(bookingId, startsAt) {
+    setCancelConfirm(null)
+    const hoursUntil = (new Date(startsAt) - Date.now()) / (1000 * 60 * 60)
     setCancelling(bookingId)
     try {
       const res = await fetch('/api/bookings/cancel', {
@@ -1350,7 +1362,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleCancelBooking(cls.booking_id, cls.starts_at)}
+                onClick={() => promptCancelBooking(cls.booking_id, cls.starts_at)}
                 disabled={cancelling === cls.booking_id}
                 className="text-red-400 border-red-400/30 hover:bg-red-400/10 hover:text-red-300"
               >
@@ -1403,8 +1415,55 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
     return () => clearTimeout(t)
   }, [toast])
 
+  // Cancel confirm helper
+  const cancelIsLate = cancelConfirm ? (new Date(cancelConfirm.startsAt) - Date.now()) / 36e5 <= 24 : false
+
   return (
     <div>
+      {/* Cancel Confirmation Modal */}
+      <AnimatePresence>
+        {cancelConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setCancelConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-card-border rounded-lg p-6 max-w-sm w-full shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold text-foreground mb-2">Cancel Booking</h3>
+              {cancelIsLate ? (
+                <div className="space-y-2 mb-5">
+                  <div className="flex items-start gap-2 p-3 rounded bg-red-500/10 border border-red-500/20">
+                    <svg className="w-4 h-4 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <span className="text-sm text-red-400">Less than 24 hours before class. Your credit will <strong>not</strong> be returned.</span>
+                  </div>
+                  <p className="text-sm text-muted">Are you sure you want to cancel?</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted mb-5">Cancel this booking? Your credit will be returned.</p>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setCancelConfirm(null)}>Keep Booking</Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleCancelBooking(cancelConfirm.bookingId, cancelConfirm.startsAt)}
+                  className={cancelIsLate ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+                >
+                  {cancelIsLate ? 'Cancel Anyway' : 'Yes, Cancel'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Toast notification — fixed bottom */}
       <AnimatePresence>
         {toast && (
@@ -1737,6 +1796,7 @@ function BookingsSection({ upcoming, past, waitlist = [], credits = [], onUpdate
   const [expandedId, setExpandedId] = useState(null)
   const [shared, setShared] = useState(false)
   const [toast, setToast] = useState(null)
+  const [cancelConfirm, setCancelConfirm] = useState(null) // { bookingId, isLate }
 
   async function handleShare(classScheduleId) {
     const url = `${window.location.origin}/dashboard?class=${classScheduleId}`
@@ -1751,13 +1811,12 @@ function BookingsSection({ upcoming, past, waitlist = [], credits = [], onUpdate
     setTimeout(() => setShared(false), 2000)
   }
 
+  function promptCancel(bookingId, isLate) {
+    setCancelConfirm({ bookingId, isLate })
+  }
+
   async function handleCancel(bookingId, isLate) {
-    const message = isLate
-      ? 'Less than 24 hours before class. Your credit will NOT be returned. Cancel anyway?'
-      : 'Cancel this booking? Your credit will be returned.'
-
-    if (!confirm(message)) return
-
+    setCancelConfirm(null)
     setCancelling(bookingId)
     try {
       const res = await fetch('/api/bookings/cancel', {
@@ -2003,7 +2062,7 @@ function BookingsSection({ upcoming, past, waitlist = [], credits = [], onUpdate
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleCancel(b.id, isLate)}
+                          onClick={() => promptCancel(b.id, isLate)}
                           disabled={cancelling === b.id}
                           className="text-red-400 border-red-400/30 hover:bg-red-400/10 hover:text-red-300"
                         >
@@ -2071,12 +2130,60 @@ function BookingsSection({ upcoming, past, waitlist = [], credits = [], onUpdate
         )}
       </AnimatePresence>
 
+      {/* Cancel Confirmation Modal */}
+      <AnimatePresence>
+        {cancelConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setCancelConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-card-border rounded-lg p-6 max-w-sm w-full shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold text-foreground mb-2">Cancel Booking</h3>
+              {cancelConfirm.isLate ? (
+                <div className="space-y-2 mb-5">
+                  <div className="flex items-start gap-2 p-3 rounded bg-red-500/10 border border-red-500/20">
+                    <svg className="w-4 h-4 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <span className="text-sm text-red-400">Less than 24 hours before class. Your credit will <strong>not</strong> be returned.</span>
+                  </div>
+                  <p className="text-sm text-muted">Are you sure you want to cancel?</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted mb-5">Cancel this booking? Your credit will be returned.</p>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setCancelConfirm(null)}>Keep Booking</Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleCancel(cancelConfirm.bookingId, cancelConfirm.isLate)}
+                  className={cancelConfirm.isLate ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+                >
+                  {cancelConfirm.isLate ? 'Cancel Anyway' : 'Yes, Cancel'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <h2 className="text-lg font-bold text-foreground mb-4">My Bookings</h2>
 
       {upcoming.length === 0 && past.length === 0 && waitlist.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-muted">No bookings yet. Book a class above to get started!</p>
+            <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+            </div>
+            <p className="text-foreground font-medium mb-1">No bookings yet</p>
+            <p className="text-sm text-muted">Browse the schedule above and book your first class to get started.</p>
           </CardContent>
         </Card>
       ) : (

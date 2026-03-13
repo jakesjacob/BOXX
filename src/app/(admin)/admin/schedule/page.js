@@ -96,6 +96,7 @@ export default function AdminSchedulePage() {
   const [dayOffset, setDayOffset] = useState(0)
   const [monthOffset, setMonthOffset] = useState(0)
   const [toast, setToast] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
 
   // Dialog states
   const [addDialog, setAddDialog] = useState(false)
@@ -173,15 +174,19 @@ export default function AdminSchedulePage() {
   }, [viewMode, weekOffset, dayOffset, monthOffset])
 
   const fetchClasses = useCallback(async () => {
+    setFetchError(null)
     const { start, end } = getDateRange()
     try {
       const res = await fetch(`/api/admin/schedule?start=${start.toISOString()}&end=${end.toISOString()}`)
       if (res.ok) {
         const data = await res.json()
         setClasses(data.classes || [])
+      } else {
+        setFetchError('Failed to load schedule')
       }
     } catch (err) {
       console.error('Failed to fetch schedule:', err)
+      setFetchError('Unable to connect. Check your internet and try again.')
     } finally {
       setLoading(false)
     }
@@ -861,7 +866,14 @@ export default function AdminSchedulePage() {
         </div>
       </div>
 
-      {loading ? (
+      {fetchError && !loading ? (
+        <div className="flex-1 bg-card border border-card-border rounded-lg flex items-center justify-center">
+          <div className="text-center py-12">
+            <p className="text-red-400 font-medium">{fetchError}</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={fetchClasses}>Retry</Button>
+          </div>
+        </div>
+      ) : loading ? (
         <div className="flex-1 bg-card border border-card-border rounded-lg animate-pulse" />
       ) : viewMode === 'month' ? (
         /* ─── Month View ──────────────────────────────────────────────────────── */

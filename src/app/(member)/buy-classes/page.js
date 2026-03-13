@@ -34,6 +34,7 @@ function BuyClassesContent() {
   const [success, setSuccess] = useState(false)
   const [toast, setToast] = useState(null)
   const [confirmPack, setConfirmPack] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') setSuccess(true)
@@ -41,6 +42,7 @@ function BuyClassesContent() {
 
   useEffect(() => {
     async function fetchData() {
+      setFetchError(null)
       try {
         const res = await fetch('/api/packs')
         if (res.ok) {
@@ -48,9 +50,12 @@ function BuyClassesContent() {
           setPacks(data.packs || [])
           setActiveCredits(data.activeCredits || [])
           setPurchaseHistory(data.purchaseHistory || [])
+        } else {
+          setFetchError('Failed to load packs. Please try again.')
         }
       } catch (err) {
         console.error('Failed to fetch packs:', err)
+        setFetchError('Unable to connect. Check your internet and try again.')
       } finally {
         setLoading(false)
       }
@@ -187,7 +192,14 @@ function BuyClassesContent() {
       )}
 
       {/* Pack cards */}
-      {loading ? (
+      {fetchError && !loading ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <p className="text-red-400 font-medium">{fetchError}</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => setSuccess(s => !s)}>Retry</Button>
+          </CardContent>
+        </Card>
+      ) : loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-80 bg-card border border-card-border rounded-xl animate-pulse" />

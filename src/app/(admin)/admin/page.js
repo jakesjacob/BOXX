@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -40,6 +41,7 @@ export default function AdminDashboard() {
   const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'owner'
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   const [expandedClass, setExpandedClass] = useState(null)
   const [dayOffset, setDayOffset] = useState(0)
   const [dayClasses, setDayClasses] = useState(null)
@@ -62,6 +64,7 @@ export default function AdminDashboard() {
         }
       } catch (err) {
         console.error('Failed to fetch dashboard:', err)
+        setFetchError(true)
       } finally {
         setLoading(false)
       }
@@ -106,6 +109,23 @@ export default function AdminDashboard() {
           <div className="h-64 bg-card border border-card-border rounded-lg animate-pulse" />
           <div className="h-64 bg-card border border-card-border rounded-lg animate-pulse" />
         </div>
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold text-foreground mb-6">Dashboard</h1>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-red-400 mb-2">Failed to load dashboard data</p>
+            <p className="text-sm text-muted mb-4">Please check your connection and try again.</p>
+            <Button variant="outline" onClick={() => { setFetchError(false); setLoading(true); window.location.reload() }}>
+              Refresh
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }

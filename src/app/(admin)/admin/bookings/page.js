@@ -53,10 +53,14 @@ export default function AdminEventsPage() {
   const [sortBy, setSortBy] = useState('newest')
   const [expandedId, setExpandedId] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
+  const [toast, setToast] = useState(null)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     async function fetchEvents() {
       setLoading(true)
+      setFetchError(null)
       try {
         const params = new URLSearchParams({ page: page.toString(), limit: '30' })
         if (typeFilter !== 'all') params.set('type', typeFilter)
@@ -70,15 +74,18 @@ export default function AdminEventsPage() {
           const data = await res.json()
           setEvents(data.events || [])
           setTotal(data.total || 0)
+        } else {
+          setFetchError('Failed to load activity. Please try again.')
         }
       } catch (err) {
         console.error('Failed to fetch events:', err)
+        setFetchError('Unable to connect. Check your internet and try again.')
       } finally {
         setLoading(false)
       }
     }
     fetchEvents()
-  }, [page, typeFilter, dateFrom, dateTo, search, sortBy])
+  }, [page, typeFilter, dateFrom, dateTo, search, sortBy, retryKey])
 
   function handleSearch(e) {
     e.preventDefault()
@@ -97,7 +104,10 @@ export default function AdminEventsPage() {
       if (sortBy) params.set('sort', sortBy)
 
       const res = await fetch(`/api/admin/events?${params}`)
-      if (!res.ok) return
+      if (!res.ok) {
+        setToast({ type: 'error', message: 'Export failed. Please try again.' })
+        return
+      }
 
       const data = await res.json()
       const rows = [['Date', 'Type', 'Event', 'Detail', 'Member', 'Email']]
@@ -120,12 +130,21 @@ export default function AdminEventsPage() {
       a.download = `activity-${new Date().toISOString().split('T')[0]}.csv`
       a.click()
       URL.revokeObjectURL(url)
+      setToast({ type: 'success', message: `Exported ${data.events?.length || 0} events` })
     } catch (err) {
       console.error('Export failed:', err)
+      setToast({ type: 'error', message: 'Export failed. Please try again.' })
     } finally {
       setExporting(false)
     }
   }
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const totalPages = Math.ceil(total / 30)
   const grouped = groupByDate(events)
@@ -228,8 +247,35 @@ export default function AdminEventsPage() {
         </div>
       </div>
 
+      {/* Toast */}
+      {toast && (
+        <div className={cn(
+          'mb-4 px-4 py-3 rounded-lg text-sm font-medium border',
+          toast.type === 'success' ? 'bg-green-400/10 text-green-400 border-green-400/20' : 'bg-red-400/10 text-red-400 border-red-400/20'
+        )}>
+          {toast.message}
+        </div>
+      )}
+
+      {/* Fetch error */}
+      {fetchError && !loading && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-red-400 font-medium">{fetchError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => setRetryKey(k => k + 1)}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Loading */}
-      {loading ? (
+      {!fetchError && loading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-20 bg-card border border-card-border rounded-lg animate-pulse" />

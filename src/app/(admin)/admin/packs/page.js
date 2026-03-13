@@ -35,6 +35,7 @@ export default function AdminPacksPage() {
   const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [deleteDialog, setDeleteDialog] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
 
   useEffect(() => {
     if (!toast) return
@@ -43,14 +44,18 @@ export default function AdminPacksPage() {
   }, [toast])
 
   async function fetchPacks() {
+    setFetchError(null)
     try {
       const res = await fetch('/api/admin/packs')
       if (res.ok) {
         const data = await res.json()
         setPacks(data.packs || [])
+      } else {
+        setFetchError('Failed to load packs')
       }
     } catch (err) {
       console.error(err)
+      setFetchError('Unable to connect. Check your internet and try again.')
     } finally {
       setLoading(false)
     }
@@ -178,7 +183,12 @@ export default function AdminPacksPage() {
         </div>
       )}
 
-      {loading ? (
+      {fetchError && !loading ? (
+        <div className="border border-card-border rounded-lg py-12 text-center">
+          <p className="text-red-400 font-medium">{fetchError}</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={fetchPacks}>Retry</Button>
+        </div>
+      ) : loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-20 bg-card border border-card-border rounded-lg animate-pulse" />

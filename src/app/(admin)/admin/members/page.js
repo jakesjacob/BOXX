@@ -46,6 +46,7 @@ export default function AdminMembersPage() {
   const [grantPackId, setGrantPackId] = useState('')
   const [grantNotes, setGrantNotes] = useState('')
   const [grantSubmitting, setGrantSubmitting] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
 
   useEffect(() => {
     if (!toast) return
@@ -55,6 +56,7 @@ export default function AdminMembersPage() {
 
   const fetchMembers = useCallback(async () => {
     setLoading(true)
+    setFetchError(null)
     try {
       const params = new URLSearchParams({ page: page.toString(), limit: '30' })
       if (search) params.set('search', search)
@@ -66,9 +68,12 @@ export default function AdminMembersPage() {
         const data = await res.json()
         setMembers(data.members || [])
         setTotal(data.total || 0)
+      } else {
+        setFetchError('Failed to load members')
       }
     } catch (err) {
       console.error('Failed to fetch members:', err)
+      setFetchError('Unable to connect. Check your internet and try again.')
     } finally {
       setLoading(false)
     }
@@ -621,7 +626,14 @@ export default function AdminMembersPage() {
         </div>
       </div>
 
-      {loading ? (
+      {fetchError && !loading ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-red-400 font-medium">{fetchError}</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={fetchMembers}>Retry</Button>
+          </CardContent>
+        </Card>
+      ) : loading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-16 bg-card border border-card-border rounded-lg animate-pulse" />
