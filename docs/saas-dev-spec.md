@@ -935,6 +935,66 @@ Add to CLAUDE.md:
 
 > **IMPORTANT:** Run migration `20260313_locations_zones_availability.sql` before using new features. Then run `20260314_performance_indexes.sql`.
 
+### Availability System Overhaul (2026-03-14)
+
+**Database (migration: `20260314_availability_overhaul.sql`):**
+- [x] `instructor_availability.instructor_id` now nullable — NULL = "anyone available"
+- [x] `instructor_availability.buffer_mins` — gap between appointments (travel/cleanup time)
+- [x] `locations.buffer_mins` — default buffer for new availability at this location
+
+**Bug Fixes:**
+- [x] `getTenantPlan` imported from wrong module (`feature-flags.js` instead of `api-helpers.js`) in availability + zones routes — caused "Something went wrong" on create/member view
+- [x] Same bug fixed in zones route
+
+**Admin Availability Page — Full Calendar Redesign:**
+- [x] Weekly calendar grid (Mon–Sun, 6am–10pm) replacing list-based view
+- [x] Drag-to-create: click + drag on empty grid space to create new availability block
+- [x] Drag-to-move: drag existing blocks to different days/times
+- [x] Drag-to-resize: resize blocks from bottom edge
+- [x] Lane layout: overlapping blocks rendered side-by-side (same as schedule page)
+- [x] Color-coded by instructor (hue from ID hash), teal for "anyone available"
+- [x] Buffer zone visualization: hatched area below blocks
+- [x] Instructor filter pills (All / Anyone / specific instructors)
+- [x] Location filter pills (All / Open / specific locations)
+- [x] Create/Edit dialog with multi-section form:
+  - Instructor assignment: Specific / Multiple / Anyone Available modes
+  - Multi-instructor checkbox selector (creates one row per instructor)
+  - Session settings: duration, concurrent slots, credits cost
+  - Location/zone selector with "Open location" toggle
+  - Buffer time input with location default auto-fill + reset button
+  - Active/inactive toggle, delete button on edit
+
+**API — Admin Availability:**
+- [x] POST accepts `instructorIds[]` for multi-instructor creation (creates N rows)
+- [x] POST accepts `instructorId: null` for "anyone available"
+- [x] POST/PUT accept `bufferMins` field
+- [x] GET returns `locations.buffer_mins` for auto-fill
+- [x] Graceful fallback if migration not run (buffer_mins column)
+
+**API — Member Availability (slot generation):**
+- [x] Buffer time enforcement: slot step = session_duration + buffer_mins
+- [x] Cross-window conflict detection: checks ALL instructor bookings (not just same window)
+- [x] "Anyone available" slot generation: counts available instructors per slot
+- [x] Returns `anyInstructor`, `availableInstructorCount` fields for UI
+
+**API — Booking:**
+- [x] Auto-assigns instructor for "anyone available" windows
+- [x] Instructor resolution: checks location-scoped instructors → fallback to all active
+- [x] Buffer conflict enforcement on booking
+- [x] Email uses assigned instructor name (not null)
+
+**Member Booking Page:**
+- [x] "Any Available Instructor" group with teal styling and Users icon
+- [x] Shows "X available" count per slot for anyone-available windows
+- [x] Auto-assignment explanation in confirmation dialog
+- [x] Success banner handles anyone-assigned bookings
+
+**Admin Locations Page:**
+- [x] Buffer time input in location create/edit dialog
+- [x] API create/update schemas accept `buffer_mins`
+
+> **IMPORTANT:** Run migration `20260314_availability_overhaul.sql` after the previous migrations.
+
 ### Frontend Component Splitting
 - [ ] Split `src/app/(admin)/admin/schedule/page.js` (~2100 lines) into sub-components: RosterDialog, NotifyDialog, CreateClassDialog, EditClassDialog, DragDropHandler, ScheduleGrid
 - [ ] Split `src/app/(member)/dashboard/page.js` (~2100 lines) into sub-components: ProfileSection, ScheduleSection, BookingsSection, CreditsSection

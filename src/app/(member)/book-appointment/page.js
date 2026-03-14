@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Clock, MapPin, User, Calendar, RefreshCw, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, MapPin, User, Users, Calendar, RefreshCw, Check } from 'lucide-react'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const FULL_DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -23,14 +23,10 @@ export default function BookAppointmentPage() {
   const [fetchError, setFetchError] = useState(null)
   const [toast, setToast] = useState(null)
 
-  // Confirmation dialog
   const [pendingSlot, setPendingSlot] = useState(null)
   const [booking, setBooking] = useState(false)
-
-  // Success state
   const [bookedSlot, setBookedSlot] = useState(null)
 
-  // Filters
   const [selectedInstructor, setSelectedInstructor] = useState('')
   const [selectedDate, setSelectedDate] = useState('')
   const [weekStart, setWeekStart] = useState(() => {
@@ -127,7 +123,6 @@ export default function BookAppointmentPage() {
     slotsByDate[slot.date].push(slot)
   })
 
-  // Generate week days for the header
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart + 'T00:00:00')
     d.setDate(d.getDate() + i)
@@ -135,23 +130,24 @@ export default function BookAppointmentPage() {
   })
 
   const today = new Date().toISOString().split('T')[0]
-
-  // Filter by selected date
   const displaySlots = selectedDate ? (slotsByDate[selectedDate] || []) : slots
 
-  // Group display slots by instructor for better presentation
-  const slotsByInstructor = {}
+  // Group by instructor (or "Anyone Available" group)
+  const slotsByGroup = {}
   displaySlots.forEach((slot) => {
-    const key = slot.instructorId
-    if (!slotsByInstructor[key]) {
-      slotsByInstructor[key] = { instructor: slot.instructor, slots: [] }
+    const key = slot.anyInstructor ? 'anyone' : slot.instructorId
+    if (!slotsByGroup[key]) {
+      slotsByGroup[key] = {
+        instructor: slot.anyInstructor ? null : slot.instructor,
+        anyInstructor: slot.anyInstructor,
+        slots: [],
+      }
     }
-    slotsByInstructor[key].slots.push(slot)
+    slotsByGroup[key].slots.push(slot)
   })
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Book Appointment</h1>
         <p className="text-sm text-muted mt-1">Choose an available time slot with your preferred instructor</p>
@@ -180,6 +176,7 @@ export default function BookAppointmentPage() {
           <p className="text-xs text-muted ml-8">
             {formatTime(bookedSlot.time)} on {FULL_DAY_NAMES[new Date(bookedSlot.date + 'T12:00:00Z').getDay()]}, {new Date(bookedSlot.date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             {bookedSlot.instructor?.name && ` with ${bookedSlot.instructor.name}`}
+            {bookedSlot.anyInstructor && ' (instructor assigned automatically)'}
             {bookedSlot.location?.name && ` at ${bookedSlot.location.name}`}
           </p>
         </div>
@@ -276,9 +273,7 @@ export default function BookAppointmentPage() {
                 <div className="h-5 w-32 bg-card-border rounded" />
               </div>
               <div className="flex gap-2">
-                {[1, 2, 3, 4].map((j) => (
-                  <div key={j} className="h-16 w-20 bg-card-border rounded-lg" />
-                ))}
+                {[1, 2, 3, 4].map((j) => <div key={j} className="h-16 w-20 bg-card-border rounded-lg" />)}
               </div>
             </div>
           ))}
@@ -296,9 +291,7 @@ export default function BookAppointmentPage() {
              'No appointments available this week'}
           </p>
           <div className="flex gap-2 justify-center">
-            {selectedDate && (
-              <Button variant="outline" size="sm" onClick={() => setSelectedDate('')}>Show all days</Button>
-            )}
+            {selectedDate && <Button variant="outline" size="sm" onClick={() => setSelectedDate('')}>Show all days</Button>}
             <Button variant="outline" size="sm" onClick={() => shiftWeek(1)} className="gap-1.5">
               Next week <ChevronRight className="w-3.5 h-3.5" />
             </Button>
@@ -306,37 +299,45 @@ export default function BookAppointmentPage() {
         </div>
       )}
 
-      {/* Slots grouped by instructor */}
-      {!loading && !fetchError && Object.entries(slotsByInstructor).map(([instrId, { instructor, slots: instrSlots }]) => (
-        <Card key={instrId} className="overflow-hidden">
+      {/* Slots grouped by instructor / "Anyone" */}
+      {!loading && !fetchError && Object.entries(slotsByGroup).map(([groupKey, { instructor, anyInstructor, slots: groupSlots }]) => (
+        <Card key={groupKey} className="overflow-hidden">
           <CardContent className="p-4">
-            {/* Instructor header */}
+            {/* Group header */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center overflow-hidden shrink-0">
-                {instructor?.photo_url ? (
+              <div className={cn(
+                'w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0',
+                anyInstructor ? 'bg-teal-500/20' : 'bg-accent/20'
+              )}>
+                {anyInstructor ? (
+                  <Users className="w-5 h-5 text-teal-400" />
+                ) : instructor?.photo_url ? (
                   <Image src={instructor.photo_url} alt={instructor?.name || ''} width={40} height={40} className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-5 h-5 text-accent" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-foreground">{instructor?.name || 'Instructor'}</h3>
-                {instructor?.bio && (
+                <h3 className="font-semibold text-foreground">
+                  {anyInstructor ? 'Any Available Instructor' : (instructor?.name || 'Instructor')}
+                </h3>
+                {anyInstructor ? (
+                  <p className="text-xs text-teal-400/70">An instructor will be automatically assigned</p>
+                ) : instructor?.bio ? (
                   <p className="text-xs text-muted line-clamp-1">{instructor.bio}</p>
-                )}
+                ) : null}
               </div>
             </div>
 
-            {/* Group by date, then by time-of-day */}
+            {/* Group by date, then time-of-day */}
             {Object.entries(
-              instrSlots.reduce((acc, slot) => {
+              groupSlots.reduce((acc, slot) => {
                 if (!acc[slot.date]) acc[slot.date] = []
                 acc[slot.date].push(slot)
                 return acc
               }, {})
             ).map(([dateStr, dateSlots]) => {
               const d = new Date(dateStr + 'T12:00:00Z')
-              // Group by time-of-day (Morning <12, Afternoon 12-17, Evening 17+)
               const morning = dateSlots.filter(s => parseInt(s.time) < 12)
               const afternoon = dateSlots.filter(s => { const h = parseInt(s.time); return h >= 12 && h < 17 })
               const evening = dateSlots.filter(s => parseInt(s.time) >= 17)
@@ -360,21 +361,31 @@ export default function BookAppointmentPage() {
                       </span>
                     )}
                   </div>
-                  {timeGroups.map(({ label, slots: groupSlots }) => (
+                  {timeGroups.map(({ label, slots: tSlots }) => (
                     <div key={label} className="mb-3 last:mb-0">
                       {timeGroups.length > 1 && (
                         <p className="text-[10px] text-muted/50 uppercase tracking-wider font-medium mb-1.5 ml-0.5">{label}</p>
                       )}
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                        {groupSlots.map((slot) => {
+                        {tSlots.map((slot) => {
                           const slotKey = `${slot.availabilityId}:${slot.date}:${slot.time}`
                           return (
                             <button
                               key={slotKey}
                               onClick={() => handleSlotClick(slot)}
-                              className="flex flex-col items-center px-2 py-2.5 rounded-lg border border-card-border bg-card hover:border-accent/50 hover:bg-accent/5 active:scale-95 transition-all text-sm group"
+                              className={cn(
+                                'flex flex-col items-center px-2 py-2.5 rounded-lg border bg-card active:scale-95 transition-all text-sm group',
+                                slot.anyInstructor
+                                  ? 'border-teal-500/20 hover:border-teal-500/40 hover:bg-teal-500/5'
+                                  : 'border-card-border hover:border-accent/50 hover:bg-accent/5'
+                              )}
                             >
-                              <span className="font-semibold text-foreground group-hover:text-accent transition-colors">{formatTime(slot.time)}</span>
+                              <span className={cn(
+                                'font-semibold transition-colors',
+                                slot.anyInstructor ? 'text-foreground group-hover:text-teal-400' : 'text-foreground group-hover:text-accent'
+                              )}>
+                                {formatTime(slot.time)}
+                              </span>
                               <span className="text-[10px] text-muted flex items-center gap-0.5 mt-0.5">
                                 <Clock className="w-2.5 h-2.5" />{slot.duration}min
                               </span>
@@ -383,7 +394,12 @@ export default function BookAppointmentPage() {
                               ) : (
                                 <span className="text-[9px] text-muted mt-0.5">{slot.creditsCost} credit{slot.creditsCost !== 1 ? 's' : ''}</span>
                               )}
-                              {slot.concurrentSlots > 1 && (
+                              {slot.anyInstructor && (
+                                <span className="text-[9px] text-teal-400/60 font-medium mt-0.5">
+                                  {slot.availableInstructorCount} available
+                                </span>
+                              )}
+                              {!slot.anyInstructor && slot.concurrentSlots > 1 && (
                                 <span className={cn(
                                   'text-[9px] mt-0.5 font-medium',
                                   slot.slotsRemaining <= 2 ? 'text-orange-400' : 'text-accent/60'
@@ -415,9 +431,18 @@ export default function BookAppointmentPage() {
             <div className="space-y-3 py-2">
               <div className="bg-card border border-card-border rounded-lg p-4 space-y-2.5">
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-accent shrink-0" />
-                  <span className="text-sm text-foreground font-medium">{pendingSlot.instructor?.name || 'Instructor'}</span>
+                  {pendingSlot.anyInstructor ? (
+                    <Users className="w-4 h-4 text-teal-400 shrink-0" />
+                  ) : (
+                    <User className="w-4 h-4 text-accent shrink-0" />
+                  )}
+                  <span className="text-sm text-foreground font-medium">
+                    {pendingSlot.anyInstructor ? 'Any Available Instructor' : (pendingSlot.instructor?.name || 'Instructor')}
+                  </span>
                 </div>
+                {pendingSlot.anyInstructor && (
+                  <p className="text-xs text-teal-400/70 ml-6">An instructor will be automatically assigned to you</p>
+                )}
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-accent shrink-0" />
                   <span className="text-sm text-foreground">

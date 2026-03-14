@@ -14,11 +14,10 @@ const bookSchema = z.object({
 /**
  * POST /api/availability/book — Book an appointment slot
  *
- * Creates a class_schedule entry (is_appointment=true) + booking atomically.
- * For concurrent slots (e.g., 10 masseuses), reuses existing class_schedule if one exists.
- *
- * Times are treated consistently with the GET /api/availability endpoint:
- * availability window times are stored as local times and treated as UTC for matching.
+ * Supports:
+ * - Standard instructor-specific bookings
+ * - "Anyone available" bookings (auto-assigns an available instructor)
+ * - Buffer time enforcement between appointments
  */
 export async function POST(request) {
   try {
@@ -47,7 +46,7 @@ export async function POST(request) {
     // 1. Fetch the availability window
     const { data: window, error: windowError } = await supabaseAdmin
       .from('instructor_availability')
-      .select('*, instructors(name)')
+      .select('*, instructors(id, name)')
       .eq('tenant_id', tenantId)
       .eq('id', availabilityId)
       .eq('is_active', true)
@@ -57,41 +56,59 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Availability window not found or inactive' }, { status: 404 })
     }
 
-    // 2. Validate the slot time — consistent with GET /api/availability
-    // Availability times are treated as UTC for matching (same as slot generation)
+    // 2. Validate the slot time
     const slotDateTime = new Date(`${date}T${time}:00Z`)
     const slotEnd = new Date(slotDateTime.getTime() + window.session_duration * 60000)
+    const bufferMs = (window.buffer_mins || 0) * 60000
 
     if (slotDateTime <= new Date()) {
       return NextResponse.json({ error: 'This time slot has already passed' }, { status: 400 })
     }
 
-    // Validate day of week — use UTC day to match GET endpoint's dateObj.getDay()
     const dayOfWeek = slotDateTime.getUTCDay()
     if (dayOfWeek !== window.day_of_week) {
       return NextResponse.json({ error: 'This slot is not available on this day' }, { status: 400 })
     }
 
-    // Validate time fits within the availability window
     if (time < window.start_time.slice(0, 5) || time >= window.end_time.slice(0, 5)) {
       return NextResponse.json({ error: 'This time is outside the availability window' }, { status: 400 })
     }
 
-    // Check instructor unavailability
-    const { data: unavail } = await supabaseAdmin
-      .from('instructor_unavailability')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('instructor_id', window.instructor_id)
-      .lte('start_date', date)
-      .gte('end_date', date)
-      .limit(1)
+    // 3. Resolve instructor — auto-assign for "anyone available"
+    let assignedInstructorId = window.instructor_id
+    let assignedInstructorName = window.instructors?.name
 
-    if (unavail && unavail.length > 0) {
-      return NextResponse.json({ error: 'Instructor is unavailable on this date' }, { status: 400 })
+    if (!assignedInstructorId) {
+      // "Anyone available" — find an available instructor
+      const resolved = await resolveAvailableInstructor(tenantId, window, date, slotDateTime, slotEnd, bufferMs)
+      if (!resolved) {
+        return NextResponse.json({ error: 'No instructors available for this time slot' }, { status: 400 })
+      }
+      assignedInstructorId = resolved.id
+      assignedInstructorName = resolved.name
+    } else {
+      // Check instructor unavailability
+      const { data: unavail } = await supabaseAdmin
+        .from('instructor_unavailability')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('instructor_id', assignedInstructorId)
+        .lte('start_date', date)
+        .gte('end_date', date)
+        .limit(1)
+
+      if (unavail && unavail.length > 0) {
+        return NextResponse.json({ error: 'Instructor is unavailable on this date' }, { status: 400 })
+      }
+
+      // Check cross-window buffer conflicts
+      const hasConflict = await checkBufferConflict(tenantId, assignedInstructorId, slotDateTime, slotEnd, bufferMs)
+      if (hasConflict) {
+        return NextResponse.json({ error: 'This slot conflicts with another appointment (buffer time)' }, { status: 400 })
+      }
     }
 
-    // 3. Check if a class_schedule already exists for this slot (for concurrent slots)
+    // 4. Check if a class_schedule already exists for this slot (concurrent slots)
     let classScheduleId = null
 
     const { data: existing } = await supabaseAdmin
@@ -132,12 +149,12 @@ export async function POST(request) {
         return NextResponse.json({ error: 'This slot is fully booked' }, { status: 400 })
       }
     } else {
-      // Create the class_schedule entry for this appointment
+      // Create the class_schedule entry
       const { data: newClass, error: classError } = await supabaseAdmin
         .from('class_schedule')
         .insert({
           tenant_id: tenantId,
-          instructor_id: window.instructor_id,
+          instructor_id: assignedInstructorId,
           location_id: window.location_id,
           zone_id: window.zone_id,
           starts_at: slotDateTime.toISOString(),
@@ -159,7 +176,7 @@ export async function POST(request) {
       classScheduleId = newClass.id
     }
 
-    // 4. Handle credits (skip for free appointments)
+    // 5. Handle credits
     let creditId = null
 
     if (window.credits_cost > 0) {
@@ -194,7 +211,7 @@ export async function POST(request) {
       }
     }
 
-    // 5. Create booking
+    // 6. Create booking
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
       .insert({
@@ -209,14 +226,13 @@ export async function POST(request) {
 
     if (bookingError) {
       console.error('[availability/book] Booking error:', bookingError)
-      // Restore credit if we deducted
       if (creditId) {
         await supabaseAdmin.rpc('restore_credit', { credit_id: creditId })
       }
       return NextResponse.json({ error: 'Failed to create booking. Please try again.' }, { status: 500 })
     }
 
-    // 6. Resolve timezone for email display
+    // 7. Resolve timezone for email
     let displayTz = 'UTC'
     if (window.location_id) {
       const { data: loc } = await supabaseAdmin
@@ -229,13 +245,14 @@ export async function POST(request) {
     if (displayTz === 'UTC') {
       const { data: settings } = await supabaseAdmin
         .from('studio_settings')
-        .select('timezone')
+        .select('value')
         .eq('tenant_id', tenantId)
+        .eq('key', 'timezone')
         .single()
-      if (settings?.timezone) displayTz = settings.timezone
+      if (settings?.value) displayTz = settings.value
     }
 
-    // 7. Send confirmation email (non-blocking)
+    // 8. Send confirmation email (non-blocking)
     const { data: emailUser } = await supabaseAdmin
       .from('users')
       .select('email, name')
@@ -247,8 +264,8 @@ export async function POST(request) {
       sendBookingConfirmation({
         to: emailUser.email,
         name: emailUser.name,
-        className: `Appointment with ${window.instructors?.name || 'Instructor'}`,
-        instructor: window.instructors?.name,
+        className: `Appointment with ${assignedInstructorName || 'Instructor'}`,
+        instructor: assignedInstructorName,
         date: slotDateTime.toLocaleDateString('en-US', {
           weekday: 'long', month: 'long', day: 'numeric', timeZone: displayTz,
         }),
@@ -285,10 +302,114 @@ export async function POST(request) {
 
     return NextResponse.json({
       booking,
-      message: `Appointment booked with ${window.instructors?.name || 'instructor'}!`,
+      message: `Appointment booked with ${assignedInstructorName || 'instructor'}!`,
     })
   } catch (error) {
     console.error('[availability/book] Error:', error)
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
   }
+}
+
+/**
+ * Find an available instructor for an "anyone available" window.
+ * Checks unavailability, existing bookings, and buffer conflicts.
+ */
+async function resolveAvailableInstructor(tenantId, window, dateStr, slotStart, slotEnd, bufferMs) {
+  // Get eligible instructors — by location or all active
+  let instructors = []
+  if (window.location_id) {
+    const { data } = await supabaseAdmin
+      .from('instructor_locations')
+      .select('instructor_id, instructors(id, name)')
+      .eq('tenant_id', tenantId)
+      .in('location_id', [window.location_id])
+    instructors = (data || []).map(li => li.instructors).filter(Boolean)
+  } else {
+    const { data } = await supabaseAdmin
+      .from('instructors')
+      .select('id, name')
+      .eq('tenant_id', tenantId)
+      .eq('active', true)
+    instructors = data || []
+  }
+
+  if (!instructors.length) return null
+
+  // Check unavailability
+  const { data: unavail } = await supabaseAdmin
+    .from('instructor_unavailability')
+    .select('instructor_id')
+    .eq('tenant_id', tenantId)
+    .in('instructor_id', instructors.map(i => i.id))
+    .lte('start_date', dateStr)
+    .gte('end_date', dateStr)
+
+  const unavailIds = new Set((unavail || []).map(u => u.instructor_id))
+  const available = instructors.filter(i => !unavailIds.has(i.id))
+
+  if (!available.length) return null
+
+  // Check booking conflicts for each available instructor
+  const startMs = slotStart.getTime()
+  const endMs = slotEnd.getTime()
+
+  // Fetch appointments for all candidates in a ±2 hour window for efficiency
+  const rangeStart = new Date(startMs - 2 * 60 * 60000).toISOString()
+  const rangeEnd = new Date(endMs + 2 * 60 * 60000).toISOString()
+
+  const { data: appointments } = await supabaseAdmin
+    .from('class_schedule')
+    .select('instructor_id, starts_at, ends_at, bookings(id, status)')
+    .eq('tenant_id', tenantId)
+    .eq('is_appointment', true)
+    .eq('status', 'active')
+    .in('instructor_id', available.map(i => i.id))
+    .gte('starts_at', rangeStart)
+    .lte('starts_at', rangeEnd)
+
+  const bookedInstructors = new Set()
+  ;(appointments || []).forEach(appt => {
+    const confirmed = (appt.bookings || []).filter(b => b.status === 'confirmed').length
+    if (confirmed > 0) {
+      const apptEnd = new Date(appt.ends_at).getTime()
+      const apptStart = new Date(appt.starts_at).getTime()
+      // Check with buffer
+      if (startMs < apptEnd + bufferMs && endMs > apptStart - bufferMs) {
+        bookedInstructors.add(appt.instructor_id)
+      }
+    }
+  })
+
+  const freeInstructors = available.filter(i => !bookedInstructors.has(i.id))
+  return freeInstructors[0] || null
+}
+
+/**
+ * Check if an instructor has a buffer conflict at the given time.
+ */
+async function checkBufferConflict(tenantId, instructorId, slotStart, slotEnd, bufferMs) {
+  if (bufferMs <= 0) return false
+
+  const startMs = slotStart.getTime()
+  const endMs = slotEnd.getTime()
+  const rangeStart = new Date(startMs - bufferMs - 60000).toISOString()
+  const rangeEnd = new Date(endMs + bufferMs + 60000).toISOString()
+
+  const { data: nearby } = await supabaseAdmin
+    .from('class_schedule')
+    .select('starts_at, ends_at, bookings(id, status)')
+    .eq('tenant_id', tenantId)
+    .eq('instructor_id', instructorId)
+    .eq('is_appointment', true)
+    .eq('status', 'active')
+    .gte('starts_at', rangeStart)
+    .lte('starts_at', rangeEnd)
+
+  return (nearby || []).some(appt => {
+    const confirmed = (appt.bookings || []).filter(b => b.status === 'confirmed').length
+    if (confirmed === 0) return false
+    const apptStart = new Date(appt.starts_at).getTime()
+    const apptEnd = new Date(appt.ends_at).getTime()
+    return startMs < apptEnd + bufferMs && endMs > apptStart - bufferMs
+  })
 }

@@ -43,6 +43,7 @@ const createSchema = z.object({
   country: z.string().max(100).nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
   timezone: z.string().max(100).nullable().optional(),
+  buffer_mins: z.number().int().min(0).max(120).optional(),
 })
 
 /**
@@ -81,6 +82,7 @@ export async function POST(request) {
         country: parsed.data.country || null,
         phone: parsed.data.phone || null,
         timezone: parsed.data.timezone || null,
+        buffer_mins: parsed.data.buffer_mins ?? 0,
         is_active: true,
       })
       .select()
@@ -115,6 +117,7 @@ const updateSchema = z.object({
   country: z.string().max(100).nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
   timezone: z.string().max(100).nullable().optional(),
+  buffer_mins: z.number().int().min(0).max(120).optional(),
   is_active: z.boolean().optional(),
 })
 

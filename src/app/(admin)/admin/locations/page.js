@@ -17,7 +17,7 @@ export default function AdminLocationsPage() {
 
   // Location dialog
   const [locDialog, setLocDialog] = useState(null) // 'create' | location object
-  const [locForm, setLocForm] = useState({ name: '', address: '', city: '', country: '', phone: '', timezone: '' })
+  const [locForm, setLocForm] = useState({ name: '', address: '', city: '', country: '', phone: '', timezone: '', buffer_mins: 0 })
   const [submitting, setSubmitting] = useState(false)
 
   // Zone dialog
@@ -53,7 +53,7 @@ export default function AdminLocationsPage() {
   useEffect(() => { fetchLocations() }, [])
 
   function openCreateLocation() {
-    setLocForm({ name: '', address: '', city: '', country: '', phone: '', timezone: '' })
+    setLocForm({ name: '', address: '', city: '', country: '', phone: '', timezone: '', buffer_mins: 0 })
     setLocDialog('create')
   }
 
@@ -65,6 +65,7 @@ export default function AdminLocationsPage() {
       country: loc.country || '',
       phone: loc.phone || '',
       timezone: loc.timezone || '',
+      buffer_mins: loc.buffer_mins || 0,
     })
     setLocDialog(loc)
   }
@@ -384,6 +385,14 @@ export default function AdminLocationsPage() {
                   ].map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>)}
                 </select>
               </div>
+            </div>
+            <div>
+              <Label htmlFor="locBuffer">Default Buffer Time (minutes between appointments)</Label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Input id="locBuffer" type="number" min={0} max={120} step={5} value={locForm.buffer_mins} onChange={(e) => setLocForm((f) => ({ ...f, buffer_mins: parseInt(e.target.value) || 0 }))} className="w-24" />
+                <span className="text-xs text-muted">min</span>
+              </div>
+              <p className="text-[10px] text-muted/50 mt-1">Auto-fills when creating availability windows at this location</p>
             </div>
           </div>
           <DialogFooter>

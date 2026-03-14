@@ -30,7 +30,7 @@ export async function GET(request) {
         .order('name'),
       supabaseAdmin
         .from('locations')
-        .select('id, name, zones(id, name, capacity, is_active)')
+        .select('id, name, buffer_mins, zones(id, name, capacity, is_active)')
         .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .order('name'),

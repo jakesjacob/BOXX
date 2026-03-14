@@ -38,6 +38,7 @@ CREATE TABLE locations (
   country     TEXT,
   phone       TEXT,
   timezone    TEXT,
+  buffer_mins INT NOT NULL DEFAULT 0, -- default buffer between appointments at this location
   is_active   BOOLEAN DEFAULT true,
   created_at  TIMESTAMPTZ DEFAULT now()
 );
@@ -183,7 +184,7 @@ CREATE INDEX idx_instructor_locations_location ON instructor_locations(location_
 CREATE TABLE instructor_availability (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  instructor_id     UUID NOT NULL REFERENCES instructors(id) ON DELETE CASCADE,
+  instructor_id     UUID REFERENCES instructors(id) ON DELETE CASCADE, -- NULL = any available instructor
   location_id       UUID REFERENCES locations(id) ON DELETE SET NULL,
   zone_id           UUID REFERENCES zones(id) ON DELETE SET NULL,
   day_of_week       INT NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
@@ -192,6 +193,7 @@ CREATE TABLE instructor_availability (
   session_duration  INT NOT NULL DEFAULT 60,
   concurrent_slots  INT NOT NULL DEFAULT 1,
   credits_cost      INT NOT NULL DEFAULT 1,
+  buffer_mins       INT NOT NULL DEFAULT 0, -- minutes gap between appointments
   is_active         BOOLEAN DEFAULT true,
   created_at        TIMESTAMPTZ DEFAULT now(),
   CHECK (end_time > start_time)

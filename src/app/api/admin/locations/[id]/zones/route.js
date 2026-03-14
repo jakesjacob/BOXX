@@ -61,7 +61,8 @@ export async function POST(request, { params }) {
     const { id: locationId } = await params
 
     // Check zones feature flag
-    const { isFeatureEnabled, getTenantPlan } = await import('@/lib/feature-flags')
+    const { isFeatureEnabled } = await import('@/lib/feature-flags')
+    const { getTenantPlan } = await import('@/lib/api-helpers')
     const plan = await getTenantPlan(tenantId)
     if (!await isFeatureEnabled(tenantId, 'zones', plan)) {
       return NextResponse.json({ error: 'Zones feature not available on your plan' }, { status: 402 })
