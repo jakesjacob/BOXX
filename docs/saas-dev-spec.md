@@ -1,7 +1,7 @@
 # Studio SaaS — Development Spec & Task Tracker
 
 > Source of truth for all development work. Read at start of every session.
-> Last updated: 2026-03-13
+> Last updated: 2026-03-14
 
 ---
 
@@ -994,6 +994,50 @@ Add to CLAUDE.md:
 - [x] API create/update schemas accept `buffer_mins`
 
 > **IMPORTANT:** Run migration `20260314_availability_overhaul.sql` after the previous migrations.
+
+### Admin Inline Creation UX Overhaul (2026-03-14)
+
+> Replaced dialog-based CRUD with inline row creation + progressive disclosure across all admin entity pages. Dialogs reserved only for destructive actions (delete confirmations) and complex edit flows (image upload, roster management).
+
+**Instructors Page:**
+- [x] Inline row creation — dashed "Add instructor" button at bottom of list, reveals inline form
+- [x] Inline row editing — click instructor row → transforms to editable inputs
+- [x] Progressive disclosure — Name shown by default, "More" toggle reveals Bio
+- [x] Keyboard shortcuts — Enter to save, Esc to cancel
+- [x] Dialog removed entirely (no create or edit dialog)
+
+**Locations Page:**
+- [x] Inline location creation — dashed button at bottom, reveals inline form with Name only
+- [x] Progressive disclosure — "More options" reveals Address, City, Country, Phone, Timezone, Buffer Time
+- [x] Inline location editing — Edit button opens inline edit panel within the card (not dialog)
+- [x] Inline zone creation — dashed "Add zone" button within expanded zone section
+- [x] Inline zone editing — Edit button opens inline form below zone row
+- [x] Both location and zone dialogs removed
+
+**Class Types (Events) Page:**
+- [x] Inline "Add event" card at end of grid — transforms into creation form
+- [x] Progressive disclosure — Name, Duration, Color by default; "More options" reveals Description, Icon, Private toggle, Image upload
+- [x] Edit dialog kept (image upload/delete, activate/deactivate, delete — too complex for inline)
+- [x] Delete confirmation dialog kept (destructive action)
+
+**Packs (Products) Page:**
+- [x] Inline row creation — dashed "Add pack" button at bottom of table
+- [x] Primary fields — Name, Credits, Validity, Price
+- [x] Progressive disclosure — "More options" reveals Description, Display Order, Badge, Stripe ID, Intro/Membership toggles
+- [x] Inline row editing — Edit button transforms row into editable form
+- [x] Delete confirmation dialog kept (destructive action)
+
+**Schedule Calendar Exploration (`/admin/ux-test/schedule`):**
+- [x] Built exploration page with inline slide-down panel for class creation
+- [x] Click/drag on grid → form slides down from top of calendar (not a modal)
+- [x] Calendar stays visible below for conflict detection
+- [x] Progressive disclosure — Event, Instructor, Start, End by default; Location, Zone, Capacity, Notes behind toggle
+- [x] Recommendation: inline panel for create, keep edit dialog (roster, notify, cancel/delete too complex)
+
+**UX Test Comparison Page (`/admin/ux-test`):**
+- [x] Side-by-side comparison of Dialog vs Inline Row vs Expand Panel patterns
+- [x] Analysis card with pros/cons of each approach
+- [x] Research notes on inline UX best practices
 
 ### Frontend Component Splitting
 - [ ] Split `src/app/(admin)/admin/schedule/page.js` (~2100 lines) into sub-components: RosterDialog, NotifyDialog, CreateClassDialog, EditClassDialog, DragDropHandler, ScheduleGrid

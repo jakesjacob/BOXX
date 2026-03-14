@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { X, Upload, Trash2, ImageIcon } from 'lucide-react'
+import { X, Upload, Trash2, ImageIcon, Plus, Check, ChevronDown, Camera } from 'lucide-react'
 import Image from 'next/image'
 
 const COLOR_OPTIONS = [
@@ -26,15 +26,22 @@ export default function ClassTypesPage() {
   const [classTypes, setClassTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
-  const [addDialog, setAddDialog] = useState(false)
   const [editDialog, setEditDialog] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', duration_mins: 60, color: '#c8a750', icon: '', is_private: false, image_url: null })
-  const [imageFile, setImageFile] = useState(null) // pending upload
-  const [imagePreview, setImagePreview] = useState(null) // local preview URL
-  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
   const [deleteDialog, setDeleteDialog] = useState(null)
   const [fetchError, setFetchError] = useState(null)
+
+  // Inline add state
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addForm, setAddForm] = useState({ name: '', description: '', duration_mins: 60, color: '#c8a750', icon: '', is_private: false })
+  const [addMoreOptions, setAddMoreOptions] = useState(false)
+  const [addImageFile, setAddImageFile] = useState(null)
+  const [addImagePreview, setAddImagePreview] = useState(null)
+  const [addSubmitting, setAddSubmitting] = useState(false)
+  const nameInputRef = useRef(null)
 
   useEffect(() => {
     if (!toast) return
@@ -62,11 +69,21 @@ export default function ClassTypesPage() {
 
   useEffect(() => { fetchClassTypes() }, [])
 
-  function openAdd() {
-    setForm({ name: '', description: '', duration_mins: 60, color: '#c8a750', icon: '', is_private: false, image_url: null })
-    setImageFile(null)
-    setImagePreview(null)
-    setAddDialog(true)
+  function openAddInline() {
+    setAddForm({ name: '', description: '', duration_mins: 60, color: '#c8a750', icon: '', is_private: false })
+    setAddMoreOptions(false)
+    setAddImageFile(null)
+    setAddImagePreview(null)
+    setShowAddForm(true)
+    setTimeout(() => nameInputRef.current?.focus(), 50)
+  }
+
+  function cancelAdd() {
+    setShowAddForm(false)
+    setAddForm({ name: '', description: '', duration_mins: 60, color: '#c8a750', icon: '', is_private: false })
+    setAddMoreOptions(false)
+    setAddImageFile(null)
+    setAddImagePreview(null)
   }
 
   function openEdit(ct) {
@@ -85,36 +102,34 @@ export default function ClassTypesPage() {
   }
 
   async function handleCreate() {
-    if (!form.name.trim()) { setToast({ message: 'Name is required', type: 'error' }); return }
-    setSubmitting(true)
+    if (!addForm.name.trim()) { setToast({ message: 'Name is required', type: 'error' }); return }
+    setAddSubmitting(true)
     try {
       const res = await fetch('/api/admin/class-types', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: form.name,
-          description: form.description || undefined,
-          duration_mins: form.duration_mins,
-          color: form.color,
-          icon: form.icon || undefined,
-          is_private: form.is_private,
+          name: addForm.name,
+          description: addForm.description || undefined,
+          duration_mins: addForm.duration_mins,
+          color: addForm.color,
+          icon: addForm.icon || undefined,
+          is_private: addForm.is_private,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setToast({ message: data.error || 'Failed to create', type: 'error' }); return }
       // Upload image if selected
-      if (imageFile && data.classType?.id) {
-        await uploadClassImage(data.classType.id, imageFile)
+      if (addImageFile && data.classType?.id) {
+        await uploadClassImage(data.classType.id, addImageFile)
       }
       setToast({ message: `"${data.classType.name}" created`, type: 'success' })
-      setAddDialog(false)
-      setImageFile(null)
-      setImagePreview(null)
+      cancelAdd()
       fetchClassTypes()
     } catch {
       setToast({ message: 'Something went wrong', type: 'error' })
     } finally {
-      setSubmitting(false)
+      setAddSubmitting(false)
     }
   }
 
@@ -225,7 +240,6 @@ export default function ClassTypesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-foreground">Events</h1>
-        <Button onClick={openAdd}>+ New Event</Button>
       </div>
 
       {toast && (
@@ -246,12 +260,6 @@ export default function ClassTypesPage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => <div key={i} className="h-32 bg-card border border-card-border rounded-lg animate-pulse" />)}
         </div>
-      ) : classTypes.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted text-sm">No class types yet. Create your first one to get started.</p>
-          </CardContent>
-        </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {classTypes.map((ct) => (
@@ -307,26 +315,190 @@ export default function ClassTypesPage() {
               </div>
             </button>
           ))}
+
+          {/* Inline Add Card */}
+          {!showAddForm ? (
+            <button
+              onClick={openAddInline}
+              className="rounded-lg border-2 border-dashed border-card-border/60 hover:border-accent/40 bg-transparent hover:bg-card/50 transition-all flex flex-col items-center justify-center gap-2 min-h-[160px] group"
+            >
+              <div className="w-10 h-10 rounded-full border-2 border-dashed border-card-border/60 group-hover:border-accent/40 flex items-center justify-center transition-colors">
+                <Plus className="w-5 h-5 text-muted group-hover:text-accent transition-colors" />
+              </div>
+              <span className="text-sm text-muted group-hover:text-foreground transition-colors">Add event</span>
+            </button>
+          ) : (
+            <div
+              className="rounded-lg border border-card-border bg-card overflow-hidden"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { e.preventDefault(); cancelAdd() }
+              }}
+            >
+              {/* Colored top strip */}
+              <div className="h-2 transition-colors" style={{ backgroundColor: addForm.color }} />
+
+              <div className="p-3 space-y-3">
+                {/* Name input */}
+                <div>
+                  <Input
+                    ref={nameInputRef}
+                    value={addForm.name}
+                    onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCreate() }
+                    }}
+                    placeholder="Event name"
+                    className="text-sm font-medium h-9"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Duration */}
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted shrink-0">Duration</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={300}
+                    value={addForm.duration_mins}
+                    onChange={(e) => setAddForm((f) => ({ ...f, duration_mins: parseInt(e.target.value) || 60 }))}
+                    className="h-8 text-xs w-20"
+                  />
+                  <span className="text-xs text-muted">min</span>
+                </div>
+
+                {/* Color dots */}
+                <div>
+                  <Label className="text-xs text-muted">Color</Label>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {COLOR_OPTIONS.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setAddForm((f) => ({ ...f, color: c.value }))}
+                        className={cn(
+                          'w-6 h-6 rounded-full border-2 transition-all',
+                          addForm.color === c.value ? 'border-foreground scale-110' : 'border-transparent hover:border-card-border'
+                        )}
+                        style={{ backgroundColor: c.value }}
+                        title={c.label}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* More options toggle */}
+                <button
+                  type="button"
+                  onClick={() => setAddMoreOptions((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs text-muted hover:text-foreground transition-colors w-full"
+                >
+                  <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', addMoreOptions && 'rotate-180')} />
+                  <span>More options</span>
+                </button>
+
+                {/* Expanded options */}
+                {addMoreOptions && (
+                  <div className="space-y-3 pt-1 border-t border-card-border/50">
+                    {/* Description */}
+                    <div>
+                      <Label className="text-xs text-muted">Description</Label>
+                      <textarea
+                        value={addForm.description}
+                        onChange={(e) => setAddForm((f) => ({ ...f, description: e.target.value }))}
+                        placeholder="Brief description"
+                        rows={2}
+                        className="mt-1 w-full rounded-lg bg-background/50 border border-card-border/60 px-3 py-2 text-xs text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 resize-none"
+                      />
+                    </div>
+
+                    {/* Icon */}
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted shrink-0">Icon</Label>
+                      <Input
+                        value={addForm.icon}
+                        onChange={(e) => setAddForm((f) => ({ ...f, icon: e.target.value }))}
+                        placeholder="e.g. 🥊"
+                        className="h-8 text-xs w-20"
+                      />
+                    </div>
+
+                    {/* Private toggle */}
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={addForm.is_private}
+                        onChange={(e) => setAddForm((f) => ({ ...f, is_private: e.target.checked }))}
+                        className="w-3.5 h-3.5 rounded border-card-border bg-card accent-accent"
+                      />
+                      <span className="text-xs text-foreground">Private</span>
+                    </label>
+
+                    {/* Image upload */}
+                    <div>
+                      {addImagePreview ? (
+                        <div className="relative rounded-lg overflow-hidden h-20 bg-card border border-card-border group">
+                          <Image src={addImagePreview} alt="Preview" fill className="object-cover" sizes="400px" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() => { setAddImageFile(null); setAddImagePreview(null) }}
+                              className="w-7 h-7 rounded-full bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 text-xs text-muted hover:text-foreground cursor-pointer transition-colors">
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Add image</span>
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (f) {
+                              setAddImageFile(f)
+                              setAddImagePreview(URL.createObjectURL(f))
+                            }
+                          }} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Save / Cancel */}
+                <div className="flex items-center justify-end gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={cancelAdd}
+                    disabled={addSubmitting}
+                    className="w-8 h-8 rounded-lg border border-card-border/60 hover:bg-white/[0.04] flex items-center justify-center transition-colors text-muted hover:text-foreground"
+                    title="Cancel"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={addSubmitting}
+                    className={cn(
+                      'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+                      addSubmitting ? 'bg-accent/50 cursor-not-allowed' : 'bg-accent hover:bg-accent-dim'
+                    )}
+                    title="Save"
+                  >
+                    {addSubmitting ? (
+                      <div className="w-3.5 h-3.5 border-2 border-background/40 border-t-background rounded-full animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4 text-background" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
-
-      {/* Add Dialog */}
-      <Dialog open={addDialog} onOpenChange={(open) => !open && setAddDialog(false)}>
-        <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>New Class Type</DialogTitle>
-            <DialogDescription>Create a new type of class that can be scheduled.</DialogDescription>
-          </DialogHeader>
-          <ClassTypeForm form={form} setForm={setForm} imagePreview={imagePreview} onImageSelect={(file) => {
-            setImageFile(file)
-            setImagePreview(file ? URL.createObjectURL(file) : null)
-          }} />
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setAddDialog(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={submitting}>{submitting ? 'Creating...' : 'Create'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation */}
       <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
