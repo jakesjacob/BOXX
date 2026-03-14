@@ -145,6 +145,24 @@ export async function PUT(request, { params }) {
 
     const { id, ...updates } = parsed.data
 
+    // Prevent deactivation if future active classes reference this zone
+    if (updates.is_active === false) {
+      const { count } = await supabaseAdmin
+        .from('class_schedule')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('zone_id', id)
+        .eq('status', 'active')
+        .gt('starts_at', new Date().toISOString())
+
+      if (count > 0) {
+        return NextResponse.json(
+          { error: `Cannot deactivate: ${count} upcoming class${count !== 1 ? 'es' : ''} use this zone. Cancel or reassign them first.` },
+          { status: 409 }
+        )
+      }
+    }
+
     const { data: zone, error } = await supabaseAdmin
       .from('zones')
       .update(updates)

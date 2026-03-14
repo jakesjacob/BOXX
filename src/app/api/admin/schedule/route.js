@@ -171,7 +171,7 @@ export async function POST(request) {
 
     if (overlaps && overlaps.length > 0) {
       const clash = overlaps[0]
-      const clashTime = new Date(clash.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok' })
+      const clashTime = new Date(clash.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
       return NextResponse.json({
         error: `Time clash: instructor already has "${clash.class_types?.name}" at ${clashTime}`,
       }, { status: 409 })
@@ -308,7 +308,7 @@ export async function PUT(request) {
 
       if (overlaps && overlaps.length > 0) {
         const clash = overlaps[0]
-        const clashTime = new Date(clash.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Bangkok' })
+        const clashTime = new Date(clash.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
         return NextResponse.json({
           error: `Time clash: instructor already has "${clash.class_types?.name}" at ${clashTime}`,
         }, { status: 409 })

@@ -126,7 +126,7 @@ export default function AdminLocationsPage() {
   function openEditZone(locationId, zone) {
     setZoneForm({
       name: zone.name || '',
-      capacity: zone.capacity === null ? '' : String(zone.capacity),
+      capacity: zone.capacity == null ? '' : String(zone.capacity),
       description: zone.description || '',
     })
     setZoneDialog({ locationId, zone })
@@ -137,9 +137,11 @@ export default function AdminLocationsPage() {
     setSubmitting(true)
     try {
       const isCreate = zoneDialog.zone === 'create'
+      const rawCapacity = zoneForm.capacity.trim()
+      const parsedCapacity = rawCapacity === '' ? null : parseInt(rawCapacity, 10)
       const payload = {
         name: zoneForm.name,
-        capacity: zoneForm.capacity === '' ? null : parseInt(zoneForm.capacity),
+        capacity: Number.isNaN(parsedCapacity) ? null : parsedCapacity,
         description: zoneForm.description || null,
       }
       const res = await fetch(`/api/admin/locations/${zoneDialog.locationId}/zones`, {
@@ -304,11 +306,16 @@ export default function AdminLocationsPage() {
                         'ml-7 flex items-center justify-between py-2 px-3 rounded-md bg-card/50 border border-card-border/50',
                         !zone.is_active && 'opacity-50'
                       )}>
-                        <div>
-                          <span className="text-sm text-foreground">{zone.name}</span>
-                          <span className="text-xs text-muted ml-2">
-                            {zone.capacity === null ? 'Unlimited' : `Capacity: ${zone.capacity}`}
-                          </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-foreground">{zone.name}</span>
+                            <span className="text-[10px] text-muted px-1.5 py-0.5 bg-card-border/50 rounded">
+                              {zone.capacity == null ? 'Unlimited' : `Cap: ${zone.capacity}`}
+                            </span>
+                            {!zone.is_active && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-red-500/10 text-red-400 rounded">Inactive</span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
@@ -364,7 +371,18 @@ export default function AdminLocationsPage() {
               </div>
               <div>
                 <Label htmlFor="locTimezone">Timezone</Label>
-                <Input id="locTimezone" value={locForm.timezone} onChange={(e) => setLocForm((f) => ({ ...f, timezone: e.target.value }))} placeholder="Asia/Bangkok" className="mt-1.5" />
+                <select id="locTimezone" value={locForm.timezone} onChange={(e) => setLocForm((f) => ({ ...f, timezone: e.target.value }))} className="mt-1.5 w-full rounded-md bg-background border border-card-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent">
+                  <option value="">Select timezone</option>
+                  {[
+                    'Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Kolkata', 'Asia/Dubai',
+                    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Amsterdam', 'Europe/Madrid', 'Europe/Rome',
+                    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Toronto',
+                    'America/Sao_Paulo', 'America/Mexico_City',
+                    'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland',
+                    'Africa/Johannesburg', 'Africa/Cairo',
+                    'UTC',
+                  ].map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>)}
+                </select>
               </div>
             </div>
           </div>

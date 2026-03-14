@@ -49,13 +49,48 @@ export async function POST(request) {
     // Generate a recurring_id to group these classes
     const recurringId = crypto.randomUUID()
 
+    // Resolve timezone from location or studio_settings
+    let tz = '+00:00'
+    if (locationId) {
+      const { data: loc } = await supabaseAdmin
+        .from('locations')
+        .select('timezone')
+        .eq('id', locationId)
+        .eq('tenant_id', tenantId)
+        .single()
+      if (loc?.timezone) {
+        // Convert IANA timezone to offset for this date
+        try {
+          const testDate = new Date(`${startDate}T12:00:00Z`)
+          const parts = new Intl.DateTimeFormat('en-US', { timeZone: loc.timezone, timeZoneName: 'shortOffset' }).formatToParts(testDate)
+          const tzPart = parts.find(p => p.type === 'timeZoneName')?.value || ''
+          const match = tzPart.match(/GMT([+-]\d{1,2}(?::\d{2})?)/)
+          if (match) tz = match[1].includes(':') ? match[1] : match[1] + ':00'
+        } catch { /* use default */ }
+      }
+    }
+    if (tz === '+00:00') {
+      const { data: settings } = await supabaseAdmin
+        .from('studio_settings')
+        .select('timezone')
+        .eq('tenant_id', tenantId)
+        .single()
+      if (settings?.timezone) {
+        try {
+          const testDate = new Date(`${startDate}T12:00:00Z`)
+          const parts = new Intl.DateTimeFormat('en-US', { timeZone: settings.timezone, timeZoneName: 'shortOffset' }).formatToParts(testDate)
+          const tzPart = parts.find(p => p.type === 'timeZoneName')?.value || ''
+          const match = tzPart.match(/GMT([+-]\d{1,2}(?::\d{2})?)/)
+          if (match) tz = match[1].includes(':') ? match[1] : match[1] + ':00'
+        } catch { /* use default */ }
+      }
+    }
+
     const classesToInsert = []
-    const start = new Date(startDate + 'T00:00:00+07:00')
+    const start = new Date(startDate + `T00:00:00${tz}`)
 
     for (let week = 0; week < weeks; week++) {
       for (const dayOfWeek of days) {
-        // For week 0, start from the exact startDate
-        // The startDate's day-of-week should match the requested day
         const date = new Date(start)
         date.setDate(start.getDate() + week * 7)
 
@@ -69,8 +104,8 @@ export async function POST(request) {
         if (date < start) continue
 
         const dateStr = date.toLocaleDateString('en-CA') // YYYY-MM-DD
-        const startsAt = new Date(`${dateStr}T${startTime}:00+07:00`).toISOString()
-        const endsAt = new Date(`${dateStr}T${endTime}:00+07:00`).toISOString()
+        const startsAt = new Date(`${dateStr}T${startTime}:00${tz}`).toISOString()
+        const endsAt = new Date(`${dateStr}T${endTime}:00${tz}`).toISOString()
 
         classesToInsert.push({
           tenant_id: tenantId,

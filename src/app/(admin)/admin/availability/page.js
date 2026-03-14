@@ -95,6 +95,18 @@ export default function AdminAvailabilityPage() {
 
   async function handleSave() {
     if (!form.instructorId) return
+    // Client-side time validation
+    if (form.endTime <= form.startTime) {
+      setToast({ message: 'End time must be after start time', type: 'error' })
+      return
+    }
+    const [sh, sm] = form.startTime.split(':').map(Number)
+    const [eh, em] = form.endTime.split(':').map(Number)
+    const windowMins = (eh * 60 + em) - (sh * 60 + sm)
+    if (form.sessionDuration > windowMins) {
+      setToast({ message: `Session duration (${form.sessionDuration}min) exceeds the time window (${windowMins}min)`, type: 'error' })
+      return
+    }
     setSubmitting(true)
     try {
       const isCreate = dialog === 'create'
@@ -129,7 +141,10 @@ export default function AdminAvailabilityPage() {
     }
   }
 
+  const [deleting, setDeleting] = useState(false)
+
   async function handleDelete(id) {
+    setDeleting(true)
     try {
       const res = await fetch('/api/admin/availability', {
         method: 'DELETE',
@@ -146,6 +161,8 @@ export default function AdminAvailabilityPage() {
       fetchData()
     } catch {
       setToast({ message: 'Something went wrong', type: 'error' })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -270,8 +287,12 @@ export default function AdminAvailabilityPage() {
                     <span className="text-xs text-muted">{w.session_duration}min</span>
                     {w.concurrent_slots > 1 && <span className="text-[10px] px-1.5 py-0.5 bg-accent/10 text-accent rounded">{w.concurrent_slots} concurrent</span>}
                     {w.credits_cost === 0 && <span className="text-[10px] px-1.5 py-0.5 bg-green-500/15 text-green-400 rounded">Free</span>}
+                    {w.credits_cost > 1 && <span className="text-[10px] text-muted/60">{w.credits_cost} credits</span>}
                     {w.locations?.name && (
-                      <span className="text-[10px] text-muted/60 flex items-center gap-0.5"><MapPin className="w-3 h-3" />{w.locations.name}</span>
+                      <span className="text-[10px] text-muted/60 flex items-center gap-0.5">
+                        <MapPin className="w-3 h-3" />{w.locations.name}
+                        {w.zones?.name && <span> &middot; {w.zones.name}</span>}
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -370,7 +391,9 @@ export default function AdminAvailabilityPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => handleDelete(deleteConfirm)}>Delete</Button>
+            <Button variant="destructive" onClick={() => handleDelete(deleteConfirm)} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -900,6 +900,41 @@ Add to CLAUDE.md:
 - [x] Feature-flagged: `appointment_booking`, `instructor_availability`
 - [x] Sidebar links in admin layout (Locations, Availability) and member layout (Appointments)
 
+### Bug Fixes, Optimization & UX Polish (2026-03-14)
+
+**Critical Bug Fixes:**
+- [x] Schedule API: `locations/zones` joins crash if migration not applied — added graceful fallback
+- [x] Member schedule + Dashboard APIs: same fallback pattern
+- [x] Availability booking: hardcoded `+07:00` timezone → consistent UTC handling (matches slot generation)
+- [x] Availability slot key mismatch: `toLocaleTimeString` vs padded string → consistent `HH:MM` format
+- [x] Recurring schedule: hardcoded `+07:00` → resolved from location or studio_settings timezone
+- [x] Locations page: `parseInt('')` → `NaN` and `String(null)` → `"null"` capacity bugs fixed
+- [x] Schedule route: hardcoded `Asia/Bangkok` in time clash display removed
+
+**Validation & Data Integrity:**
+- [x] Availability: endTime > startTime, session fits window (server + client)
+- [x] Availability: zone must belong to location, time within window hours
+- [x] Zones: deactivation guard (blocks if upcoming classes reference zone)
+- [x] Availability PUT: missing audit log added
+- [x] Schedule insert: new columns graceful if migration not run
+
+**UX Improvements:**
+- [x] Book Appointment: confirmation dialog, success banner, responsive grid, empty state actions
+- [x] Book Appointment: location/zone in slot headers, low-availability warning, time-of-day grouping (Morning/Afternoon/Evening)
+- [x] Admin Availability: delete loading state, zone name in list, credits display
+- [x] Admin Locations: timezone dropdown (IANA), zone capacity badges
+- [x] Dashboard API: locations/zones in schedule + bookings queries
+- [x] Member Dashboard: class-type + location filter chips (horizontal scroll)
+- [x] Member Dashboard: content-shaped skeleton loaders (profile, tabs, class cards)
+- [x] Member Dashboard: optimistic UI for booking (instant "Booked" badge, reverts on failure)
+- [x] Member Dashboard: credit cost shown on collapsed cards (before expand)
+- [x] Member Dashboard: location/zone displayed on all class cards + booking cards
+- [x] Member Dashboard: improved empty state with icon, context-aware message, clear filters/next week buttons
+- [x] Member Dashboard: delayed card collapse after booking (800ms to show "Booked" badge)
+- [x] Performance indexes migration (`20260314_performance_indexes.sql`)
+
+> **IMPORTANT:** Run migration `20260313_locations_zones_availability.sql` before using new features. Then run `20260314_performance_indexes.sql`.
+
 ### Frontend Component Splitting
 - [ ] Split `src/app/(admin)/admin/schedule/page.js` (~2100 lines) into sub-components: RosterDialog, NotifyDialog, CreateClassDialog, EditClassDialog, DragDropHandler, ScheduleGrid
 - [ ] Split `src/app/(member)/dashboard/page.js` (~2100 lines) into sub-components: ProfileSection, ScheduleSection, BookingsSection, CreditsSection

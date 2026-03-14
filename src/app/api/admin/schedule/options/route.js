@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 /**
- * GET /api/admin/schedule/options — Get class types and instructors for dropdowns
+ * GET /api/admin/schedule/options — Get class types, instructors, and locations for dropdowns
  */
 export async function GET(request) {
   try {

@@ -24,10 +24,47 @@ export default function DashboardPage() {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8">
-      <div className="h-40 bg-card border border-card-border rounded-lg animate-pulse" />
-      <div className="h-64 bg-card border border-card-border rounded-lg animate-pulse" />
-      <div className="h-96 bg-card border border-card-border rounded-lg animate-pulse" />
+    <div className="space-y-6">
+      {/* Profile header skeleton */}
+      <div className="bg-card border border-card-border rounded-lg p-6 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-card-border" />
+          <div className="space-y-2 flex-1">
+            <div className="h-5 w-40 bg-card-border rounded" />
+            <div className="h-3 w-28 bg-card-border/50 rounded" />
+          </div>
+          <div className="hidden sm:flex gap-3">
+            <div className="w-20 h-16 bg-card-border/50 rounded-lg" />
+            <div className="w-20 h-16 bg-card-border/50 rounded-lg" />
+          </div>
+        </div>
+      </div>
+      {/* Tabs skeleton */}
+      <div className="flex gap-2">
+        <div className="h-8 w-20 bg-card-border rounded-full animate-pulse" />
+        <div className="h-8 w-24 bg-card-border/50 rounded-full animate-pulse" />
+      </div>
+      {/* Class cards skeleton */}
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-card border border-card-border rounded-lg p-5 animate-pulse" style={{ borderLeftWidth: '4px', borderLeftColor: '#333' }}>
+            <div className="flex items-center gap-4">
+              <div className="shrink-0 w-10 space-y-1">
+                <div className="h-3 w-8 bg-card-border rounded mx-auto" />
+                <div className="h-2 w-10 bg-card-border/50 rounded mx-auto" />
+              </div>
+              <div className="shrink-0 w-14 space-y-1">
+                <div className="h-4 w-12 bg-card-border rounded mx-auto" />
+                <div className="h-2 w-8 bg-card-border/50 rounded mx-auto" />
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <div className="h-4 w-32 bg-card-border rounded" />
+                <div className="h-3 w-20 bg-card-border/50 rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -778,6 +815,8 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState(null)
   const [confirming, setConfirming] = useState(null)
+  const [filterClassType, setFilterClassType] = useState('')
+  const [filterLocation, setFilterLocation] = useState('')
   const [cancelling, setCancelling] = useState(null)
   const [joiningWaitlist, setJoiningWaitlist] = useState(null)
   const [leavingWaitlist, setLeavingWaitlist] = useState(null)
@@ -892,9 +931,16 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
     setTimeout(() => setShared(false), 2000)
   }
 
+  // Apply filters
+  const filteredSchedule = schedule.filter((cls) => {
+    if (filterClassType && cls.class_types?.id !== filterClassType) return false
+    if (filterLocation && cls.locations?.id !== filterLocation) return false
+    return true
+  })
+
   // Group classes by day key
   const days = {}
-  schedule.forEach((cls) => {
+  filteredSchedule.forEach((cls) => {
     const d = new Date(cls.starts_at)
     const day = d.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -943,6 +989,14 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
 
   async function handleBook(classId) {
     setConfirming(classId)
+
+    // Optimistic UI: immediately mark as booked
+    setSchedule((prev) => prev.map((cls) =>
+      cls.id === classId
+        ? { ...cls, is_booked: true, booked_count: (cls.booked_count || 0) + 1, spots_left: cls.spots_left !== null ? cls.spots_left - 1 : null }
+        : cls
+    ))
+
     try {
       const res = await fetch('/api/bookings/create', {
         method: 'POST',
@@ -951,6 +1005,12 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
       })
       const data = await res.json()
       if (!res.ok) {
+        // Revert optimistic update
+        setSchedule((prev) => prev.map((cls) =>
+          cls.id === classId
+            ? { ...cls, is_booked: false, booked_count: Math.max(0, (cls.booked_count || 1) - 1), spots_left: cls.spots_left !== null ? cls.spots_left + 1 : null }
+            : cls
+        ))
         const isNoCredits = data.error?.toLowerCase().includes('no available credits')
         setToast({
           message: isNoCredits ? 'No credits remaining.' : (data.error || 'Booking failed'),
@@ -960,11 +1020,10 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
         return
       }
       setToast({ message: 'Class booked!', type: 'success' })
-      // Re-fetch both schedule and dashboard data
-      setWeekOffset((w) => { /* trigger re-fetch */ return w })
       onUpdate()
-      setExpandedId(null)
-      // Force schedule re-fetch
+      // Keep expanded for a moment so user sees "Booked" badge, then collapse
+      setTimeout(() => setExpandedId(null), 800)
+      // Full re-fetch to get accurate data
       const start = getWeekStart(weekOffset)
       const end = new Date(start)
       end.setDate(end.getDate() + 7)
@@ -974,6 +1033,12 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
         setSchedule(d.schedule || [])
       }
     } catch (err) {
+      // Revert optimistic update
+      setSchedule((prev) => prev.map((cls) =>
+        cls.id === classId
+          ? { ...cls, is_booked: false, booked_count: Math.max(0, (cls.booked_count || 1) - 1), spots_left: cls.spots_left !== null ? cls.spots_left + 1 : null }
+          : cls
+      ))
       setToast({ message: 'Something went wrong. Please try again.', type: 'error' })
     } finally {
       setConfirming(null)
@@ -1222,6 +1287,9 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
                   )}
                   {cls.credits_cost === 0 && (
                     <span className="text-[9px] px-1.5 py-0.5 bg-green-500/15 text-green-400 rounded-full shrink-0">Free</span>
+                  )}
+                  {!cls.is_booked && !cls.waitlist_position && cls.credits_cost > 0 && cls.spots_left !== 0 && (
+                    <span className="text-[9px] text-muted/60 shrink-0">{cls.credits_cost} credit{cls.credits_cost !== 1 ? 's' : ''}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -1577,34 +1645,102 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
         </div>
       </div>
 
-      {/* Loading state */}
+      {/* Class type + location filter chips */}
+      {!loading && schedule.length > 0 && (() => {
+        const classTypes = [...new Map(schedule.filter(c => c.class_types?.name).map(c => [c.class_types.id, c.class_types])).values()]
+        const locations = [...new Map(schedule.filter(c => c.locations?.name).map(c => [c.locations.id, c.locations])).values()]
+        const showFilters = classTypes.length > 1 || locations.length > 0
+        if (!showFilters) return null
+        return (
+          <div className="flex gap-2 overflow-x-auto pb-1 mb-3 -mt-1">
+            {classTypes.length > 1 && (
+              <>
+                <button
+                  onClick={() => setFilterClassType?.('')}
+                  className={cn('px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors', !filterClassType ? 'bg-accent/15 text-accent' : 'bg-card border border-card-border text-muted hover:text-foreground')}
+                >All Types</button>
+                {classTypes.map(ct => (
+                  <button
+                    key={ct.id}
+                    onClick={() => setFilterClassType?.(filterClassType === ct.id ? '' : ct.id)}
+                    className={cn('px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors', filterClassType === ct.id ? 'bg-accent/15 text-accent' : 'bg-card border border-card-border text-muted hover:text-foreground')}
+                    style={filterClassType === ct.id && ct.color ? { backgroundColor: ct.color + '20', color: ct.color } : {}}
+                  >{ct.name}</button>
+                ))}
+              </>
+            )}
+            {locations.length > 0 && classTypes.length > 1 && <div className="w-px bg-card-border shrink-0 my-0.5" />}
+            {locations.length > 0 && (
+              <>
+                {locations.map(loc => (
+                  <button
+                    key={loc.id}
+                    onClick={() => setFilterLocation?.(filterLocation === loc.id ? '' : loc.id)}
+                    className={cn('px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors flex items-center gap-1', filterLocation === loc.id ? 'bg-accent/15 text-accent' : 'bg-card border border-card-border text-muted hover:text-foreground')}
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    {loc.name}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Loading state — content-shaped skeletons */}
       {loading && (
         <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-card border border-card-border rounded-lg animate-pulse" />
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-card border border-card-border rounded-lg p-5 animate-pulse" style={{ borderLeftWidth: '4px', borderLeftColor: '#333' }}>
+              <div className="flex items-center gap-4">
+                <div className="shrink-0 w-10 text-center space-y-1">
+                  <div className="h-3 w-8 bg-card-border rounded mx-auto" />
+                  <div className="h-2 w-10 bg-card-border/50 rounded mx-auto" />
+                </div>
+                <div className="shrink-0 w-14 text-center space-y-1">
+                  <div className="h-4 w-12 bg-card-border rounded mx-auto" />
+                  <div className="h-2 w-8 bg-card-border/50 rounded mx-auto" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="h-4 w-32 bg-card-border rounded" />
+                  <div className="h-3 w-20 bg-card-border/50 rounded" />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}
 
       {/* Empty state */}
-      {!loading && schedule.length === 0 && (
+      {!loading && filteredSchedule.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-muted">No classes scheduled this week.</p>
-            {weekOffset < maxWeeks && (
-              <button
-                onClick={() => setWeekOffset(weekOffset + 1)}
-                className="text-xs text-accent hover:underline mt-2 inline-block"
-              >
-                Check next week →
-              </button>
-            )}
+            <svg className="w-10 h-10 text-muted/40 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-foreground font-medium mb-1">
+              {(filterClassType || filterLocation) ? 'No matching classes' : 'No classes scheduled this week'}
+            </p>
+            <p className="text-sm text-muted mb-3">
+              {(filterClassType || filterLocation) ? 'Try removing a filter or check another week.' : 'Check the next week for upcoming sessions.'}
+            </p>
+            <div className="flex gap-2 justify-center">
+              {(filterClassType || filterLocation) && (
+                <Button variant="outline" size="sm" onClick={() => { setFilterClassType(''); setFilterLocation('') }}>Clear Filters</Button>
+              )}
+              {weekOffset < maxWeeks && (
+                <Button variant="outline" size="sm" onClick={() => setWeekOffset(weekOffset + 1)}>
+                  Next week →
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* ── CALENDAR VIEW ── */}
-      {!loading && schedule.length > 0 && view === 'calendar' && (
+      {!loading && filteredSchedule.length > 0 && view === 'calendar' && (
         <div>
           <div className="overflow-x-auto -mx-1 px-1 pb-2 relative">
           {/* 7-column calendar grid — scrollable on mobile */}
@@ -1740,7 +1876,11 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-muted mt-0.5">{cls.instructors?.name || 'TBA'}</p>
+                              <p className="text-xs text-muted mt-0.5">
+                                {cls.instructors?.name || 'TBA'}
+                                {cls.locations?.name ? ` · ${cls.locations.name}` : ''}
+                                {cls.zones?.name ? ` · ${cls.zones.name}` : ''}
+                              </p>
                             </div>
                           </div>
                           <button onClick={() => setExpandedId(null)} className="text-muted hover:text-foreground transition-colors shrink-0 z-10">
@@ -1764,7 +1904,7 @@ function ScheduleSection({ credits, onUpdate, sharedClassId, view, onViewChange,
       )}
 
       {/* ── LIST VIEW ── */}
-      {!loading && schedule.length > 0 && view === 'list' && (
+      {!loading && filteredSchedule.length > 0 && view === 'list' && (
         <>
           {/* Day pills */}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
@@ -1935,7 +2075,11 @@ function BookingsSection({ upcoming, past, waitlist = [], credits = [], onUpdate
                   {statusPill.label}
                 </span>
               </div>
-              <p className="text-xs text-muted mt-0.5">{cls.instructors?.name || 'TBA'}</p>
+              <p className="text-xs text-muted mt-0.5">
+                {cls.instructors?.name || 'TBA'}
+                {cls.locations?.name ? ` · ${cls.locations.name}` : ''}
+                {cls.zones?.name ? ` · ${cls.zones.name}` : ''}
+              </p>
               {cls.is_private && (
                 <Badge className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20 mt-1">Private</Badge>
               )}

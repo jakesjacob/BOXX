@@ -86,6 +86,33 @@ export async function POST(request) {
 
     const { instructorId, locationId, zoneId, dayOfWeek, startTime, endTime, sessionDuration, concurrentSlots, creditsCost } = parsed.data
 
+    // Validate endTime > startTime
+    if (endTime <= startTime) {
+      return NextResponse.json({ error: 'End time must be after start time' }, { status: 400 })
+    }
+
+    // Validate session duration fits in window
+    const [sh, sm] = startTime.split(':').map(Number)
+    const [eh, em] = endTime.split(':').map(Number)
+    const windowMins = (eh * 60 + em) - (sh * 60 + sm)
+    const duration = sessionDuration || 60
+    if (duration > windowMins) {
+      return NextResponse.json({ error: `Session duration (${duration}min) exceeds the availability window (${windowMins}min)` }, { status: 400 })
+    }
+
+    // Validate zone belongs to location
+    if (zoneId && locationId) {
+      const { data: zone } = await supabaseAdmin
+        .from('zones')
+        .select('location_id')
+        .eq('id', zoneId)
+        .eq('tenant_id', tenantId)
+        .single()
+      if (!zone || zone.location_id !== locationId) {
+        return NextResponse.json({ error: 'Zone does not belong to the selected location' }, { status: 400 })
+      }
+    }
+
     const { data: avail, error } = await supabaseAdmin
       .from('instructor_availability')
       .insert({
@@ -145,7 +172,7 @@ export async function PUT(request) {
   try {
     const result = await requireStaff(request)
     if (result.response) return result.response
-    const { tenantId } = result
+    const { session, tenantId } = result
 
     if (!supabaseAdmin) {
       return NextResponse.json({ error: 'Database unavailable' }, { status: 500 })
@@ -182,6 +209,15 @@ export async function PUT(request) {
       console.error('[admin/availability] Update error:', error)
       return NextResponse.json({ error: 'Failed to update availability' }, { status: 500 })
     }
+
+    await supabaseAdmin.from('admin_audit_log').insert({
+      tenant_id: tenantId,
+      admin_id: session.user.id,
+      action: 'update_availability',
+      target_type: 'instructor_availability',
+      target_id: id,
+      details: updates,
+    })
 
     return NextResponse.json({ availability: avail })
   } catch (error) {

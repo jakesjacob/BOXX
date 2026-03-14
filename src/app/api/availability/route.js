@@ -88,8 +88,9 @@ export async function GET(request) {
     existingAppointments.forEach((appt) => {
       const confirmedCount = (appt.bookings || []).filter((b) => b.status === 'confirmed').length
       if (confirmedCount > 0 && appt.availability_id) {
-        const dateStr = new Date(appt.starts_at).toISOString().split('T')[0]
-        const timeStr = new Date(appt.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+        const apptDate = new Date(appt.starts_at)
+        const dateStr = apptDate.toISOString().split('T')[0]
+        const timeStr = `${String(apptDate.getUTCHours()).padStart(2, '0')}:${String(apptDate.getUTCMinutes()).padStart(2, '0')}`
         const key = `${appt.availability_id}:${dateStr}:${timeStr}`
         bookingCounts[key] = (bookingCounts[key] || 0) + confirmedCount
       }

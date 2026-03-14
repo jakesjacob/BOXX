@@ -53,13 +53,15 @@ export async function GET() {
         .eq('active', true)
         .order('display_order', { ascending: true }),
 
-      // Upcoming classes (next 7 days)
+      // Upcoming classes (next 7 days) — try with locations/zones, fall back without
       supabaseAdmin
         .from('class_schedule')
         .select(`
           *,
           class_types(id, name, description, duration_mins, color, icon),
-          instructors(id, name, photo_url, bio)
+          instructors(id, name, photo_url, bio),
+          locations(id, name),
+          zones(id, name)
         `)
         .eq('tenant_id', tenantId)
         .eq('status', 'active')
@@ -75,7 +77,9 @@ export async function GET() {
           class_schedule(
             *,
             class_types(name, icon, color),
-            instructors(name, photo_url)
+            instructors(name, photo_url),
+            locations(id, name),
+            zones(id, name)
           )
         `)
         .eq('tenant_id', tenantId)

@@ -16,6 +16,9 @@ const bookSchema = z.object({
  *
  * Creates a class_schedule entry (is_appointment=true) + booking atomically.
  * For concurrent slots (e.g., 10 masseuses), reuses existing class_schedule if one exists.
+ *
+ * Times are treated consistently with the GET /api/availability endpoint:
+ * availability window times are stored as local times and treated as UTC for matching.
  */
 export async function POST(request) {
   try {
@@ -54,15 +57,24 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Availability window not found or inactive' }, { status: 404 })
     }
 
-    // 2. Validate the slot time fits within the window
-    const slotDateTime = new Date(`${date}T${time}:00+07:00`)
+    // 2. Validate the slot time — consistent with GET /api/availability
+    // Availability times are treated as UTC for matching (same as slot generation)
+    const slotDateTime = new Date(`${date}T${time}:00Z`)
+    const slotEnd = new Date(slotDateTime.getTime() + window.session_duration * 60000)
+
     if (slotDateTime <= new Date()) {
       return NextResponse.json({ error: 'This time slot has already passed' }, { status: 400 })
     }
 
-    const dayOfWeek = new Date(date + 'T12:00:00Z').getDay()
+    // Validate day of week — use UTC day to match GET endpoint's dateObj.getDay()
+    const dayOfWeek = slotDateTime.getUTCDay()
     if (dayOfWeek !== window.day_of_week) {
       return NextResponse.json({ error: 'This slot is not available on this day' }, { status: 400 })
+    }
+
+    // Validate time fits within the availability window
+    if (time < window.start_time.slice(0, 5) || time >= window.end_time.slice(0, 5)) {
+      return NextResponse.json({ error: 'This time is outside the availability window' }, { status: 400 })
     }
 
     // Check instructor unavailability
@@ -80,8 +92,6 @@ export async function POST(request) {
     }
 
     // 3. Check if a class_schedule already exists for this slot (for concurrent slots)
-    const slotEnd = new Date(slotDateTime.getTime() + window.session_duration * 60000)
-
     let classScheduleId = null
 
     const { data: existing } = await supabaseAdmin
@@ -206,7 +216,26 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Failed to create booking. Please try again.' }, { status: 500 })
     }
 
-    // 6. Send confirmation email (non-blocking)
+    // 6. Resolve timezone for email display
+    let displayTz = 'UTC'
+    if (window.location_id) {
+      const { data: loc } = await supabaseAdmin
+        .from('locations')
+        .select('timezone')
+        .eq('id', window.location_id)
+        .single()
+      if (loc?.timezone) displayTz = loc.timezone
+    }
+    if (displayTz === 'UTC') {
+      const { data: settings } = await supabaseAdmin
+        .from('studio_settings')
+        .select('timezone')
+        .eq('tenant_id', tenantId)
+        .single()
+      if (settings?.timezone) displayTz = settings.timezone
+    }
+
+    // 7. Send confirmation email (non-blocking)
     const { data: emailUser } = await supabaseAdmin
       .from('users')
       .select('email, name')
@@ -221,10 +250,10 @@ export async function POST(request) {
         className: `Appointment with ${window.instructors?.name || 'Instructor'}`,
         instructor: window.instructors?.name,
         date: slotDateTime.toLocaleDateString('en-US', {
-          weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
+          weekday: 'long', month: 'long', day: 'numeric', timeZone: displayTz,
         }),
         time: slotDateTime.toLocaleTimeString('en-US', {
-          hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Bangkok',
+          hour: 'numeric', minute: '2-digit', timeZone: displayTz,
         }),
       }).catch((err) => console.error('[availability/book] Email failed:', err))
 
