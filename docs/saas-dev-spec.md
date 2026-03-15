@@ -1,7 +1,7 @@
 # Studio SaaS — Development Spec & Task Tracker
 
 > Source of truth for all development work. Read at start of every session.
-> Last updated: 2026-03-14
+> Last updated: 2026-03-15
 
 ---
 
@@ -1038,6 +1038,22 @@ Add to CLAUDE.md:
 - [x] Side-by-side comparison of Dialog vs Inline Row vs Expand Panel patterns
 - [x] Analysis card with pros/cons of each approach
 - [x] Research notes on inline UX best practices
+
+### Deep Code Review & Bug Fixes (2026-03-15)
+
+> Full codebase review across all API routes, admin pages, member pages, lib utilities, middleware, schema, and components.
+
+**Critical Bug Fix:**
+- [x] Waitlist position reorder bug — after promoting a user, `.filter()` before `.map()` caused remaining entries to get wrong position indices (data corruption). Fixed to map-then-filter pattern.
+
+**Missing Tenant Context in Emails:**
+- [x] `cron/expire-credits`: added `tenant_id` to select, passed to `sendCreditExpiryWarning` for correct branding
+- [x] `cron/reminders`: added `tenant_id` to select, passed to `sendClassReminder` for correct branding
+- [x] `waitlist.js`: `sendWaitlistPromotion` now receives `tenantId` from `cls.tenant_id`
+- [x] `confirm-pending-invitations.js`: `sendBookingConfirmation` now receives `tenantId` parameter
+
+**UX Bug Fix:**
+- [x] Analytics retry button was a no-op — `setRange(range)` with same value doesn't trigger React re-render. Fixed with `retryCount` state in useEffect deps.
 
 ### Frontend Component Splitting
 - [ ] Split `src/app/(admin)/admin/schedule/page.js` (~2100 lines) into sub-components: RosterDialog, NotifyDialog, CreateClassDialog, EditClassDialog, DragDropHandler, ScheduleGrid
