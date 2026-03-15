@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import { MapPin, Plus, ChevronDown, ChevronRight, Layers, RefreshCw, Check, X, ChevronUp } from 'lucide-react'
+import { MapPin, Plus, ChevronDown, ChevronRight, Layers, RefreshCw, Check, X, ChevronUp, Trash2, Info } from 'lucide-react'
 
 export default function AdminLocationsPage() {
   const [locations, setLocations] = useState([])
@@ -31,16 +31,47 @@ export default function AdminLocationsPage() {
   // Expanded locations (for zone visibility)
   const [expanded, setExpanded] = useState(new Set())
 
+  // Validation errors
+  const [locError, setLocError] = useState(null)
+  const [zoneError, setZoneError] = useState(null)
+
+  // Delete confirmation
+  const [deletingLoc, setDeletingLoc] = useState(null)
+  const [deletingZone, setDeletingZone] = useState(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+
   const createLocNameRef = useRef(null)
   const editLocNameRef = useRef(null)
   const createZoneNameRef = useRef(null)
   const editZoneNameRef = useRef(null)
+  const locFormRef = useRef(null)
+  const zoneFormRef = useRef(null)
 
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), 4000)
+    const t = setTimeout(() => setToast(null), 3000)
     return () => clearTimeout(t)
   }, [toast])
+
+  // Click outside to close inline forms
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (showCreateLoc && locFormRef.current && !locFormRef.current.contains(e.target)) {
+        cancelCreateLocation()
+      }
+      if (editingLocId && locFormRef.current && !locFormRef.current.contains(e.target)) {
+        cancelEditLocation()
+      }
+      if (creatingZoneForLoc && zoneFormRef.current && !zoneFormRef.current.contains(e.target)) {
+        cancelCreateZone()
+      }
+      if (editingZoneId && zoneFormRef.current && !zoneFormRef.current.contains(e.target)) {
+        cancelEditZone()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCreateLoc, editingLocId, creatingZoneForLoc, editingZoneId])
 
   async function fetchLocations() {
     setFetchError(null)
@@ -81,6 +112,7 @@ export default function AdminLocationsPage() {
   function startCreateLocation() {
     setLocForm({ name: '', address: '', city: '', country: '', phone: '', timezone: '', buffer_mins: 0 })
     setLocMoreOptions(false)
+    setLocError(null)
     setShowCreateLoc(true)
     setEditingLocId(null)
   }
@@ -88,6 +120,7 @@ export default function AdminLocationsPage() {
   function cancelCreateLocation() {
     setShowCreateLoc(false)
     setLocMoreOptions(false)
+    setLocError(null)
   }
 
   function startEditLocation(loc) {
@@ -113,11 +146,14 @@ export default function AdminLocationsPage() {
   }
 
   async function saveLocation(mode) {
-    if (!locForm.name.trim()) return
+    if (!locForm.name.trim()) {
+      setLocError('Name is required')
+      return
+    }
+    setLocError(null)
     setSubmitting(true)
     try {
       const isCreate = mode === 'create'
-      const editLoc = !isCreate ? locations.find((l) => l.id === editingLocId) : null
       const res = await fetch('/api/admin/locations', {
         method: isCreate ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -143,7 +179,55 @@ export default function AdminLocationsPage() {
     }
   }
 
+  async function deleteLocation(loc) {
+    setDeleteSubmitting(true)
+    try {
+      const res = await fetch('/api/admin/locations', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: loc.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setToast({ message: data.error || 'Cannot delete location', type: 'error' })
+        return
+      }
+      setToast({ message: 'Location deleted', type: 'success' })
+      setDeletingLoc(null)
+      fetchLocations()
+    } catch {
+      setToast({ message: 'Something went wrong', type: 'error' })
+    } finally {
+      setDeleteSubmitting(false)
+    }
+  }
+
+  async function deleteZone(locationId, zone) {
+    setDeleteSubmitting(true)
+    try {
+      const res = await fetch(`/api/admin/locations/${locationId}/zones`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: zone.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setToast({ message: data.error || 'Cannot delete zone', type: 'error' })
+        return
+      }
+      setToast({ message: 'Zone deleted', type: 'success' })
+      setDeletingZone(null)
+      fetchLocations()
+    } catch {
+      setToast({ message: 'Something went wrong', type: 'error' })
+    } finally {
+      setDeleteSubmitting(false)
+    }
+  }
+
   async function toggleLocationActive(loc) {
+    // Optimistic update
+    setLocations((prev) => prev.map((l) => l.id === loc.id ? { ...l, is_active: !l.is_active } : l))
     const res = await fetch('/api/admin/locations', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -151,10 +235,12 @@ export default function AdminLocationsPage() {
     })
     const data = await res.json()
     if (!res.ok) {
+      // Revert
+      setLocations((prev) => prev.map((l) => l.id === loc.id ? { ...l, is_active: loc.is_active } : l))
       setToast({ message: data.error || 'Failed to update', type: 'error' })
       return
     }
-    fetchLocations()
+    setToast({ message: !loc.is_active ? 'Location activated' : 'Location deactivated', type: 'success' })
   }
 
   function toggleExpanded(id) {
@@ -170,6 +256,7 @@ export default function AdminLocationsPage() {
   function startCreateZone(locationId) {
     setZoneForm({ name: '', capacity: '', description: '' })
     setZoneMoreOptions(false)
+    setZoneError(null)
     setCreatingZoneForLoc(locationId)
     setEditingZoneId(null)
     setEditingZoneLocId(null)
@@ -178,6 +265,7 @@ export default function AdminLocationsPage() {
   function cancelCreateZone() {
     setCreatingZoneForLoc(null)
     setZoneMoreOptions(false)
+    setZoneError(null)
   }
 
   function startEditZone(locationId, zone) {
@@ -199,7 +287,11 @@ export default function AdminLocationsPage() {
   }
 
   async function saveZone(mode) {
-    if (!zoneForm.name.trim()) return
+    if (!zoneForm.name.trim()) {
+      setZoneError('Name is required')
+      return
+    }
+    setZoneError(null)
     setSubmitting(true)
     const locationId = mode === 'create' ? creatingZoneForLoc : editingZoneLocId
     try {
@@ -238,6 +330,11 @@ export default function AdminLocationsPage() {
   }
 
   async function toggleZoneActive(locationId, zone) {
+    // Optimistic update
+    setLocations((prev) => prev.map((l) => l.id === locationId
+      ? { ...l, zones: (l.zones || []).map((z) => z.id === zone.id ? { ...z, is_active: !z.is_active } : z) }
+      : l
+    ))
     const res = await fetch(`/api/admin/locations/${locationId}/zones`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -245,10 +342,15 @@ export default function AdminLocationsPage() {
     })
     const data = await res.json()
     if (!res.ok) {
+      // Revert
+      setLocations((prev) => prev.map((l) => l.id === locationId
+        ? { ...l, zones: (l.zones || []).map((z) => z.id === zone.id ? { ...z, is_active: zone.is_active } : z) }
+        : l
+      ))
       setToast({ message: data.error || 'Failed to update', type: 'error' })
       return
     }
-    fetchLocations()
+    setToast({ message: !zone.is_active ? 'Zone activated' : 'Zone deactivated', type: 'success' })
   }
 
   function handleLocKeyDown(e, mode) {
@@ -340,7 +442,15 @@ export default function AdminLocationsPage() {
           </select>
         </div>
         <div>
-          <Label className="text-xs text-muted">Buffer Time</Label>
+          <Label className="text-xs text-muted flex items-center gap-1.5">
+            Buffer Time
+            <span className="relative group">
+              <Info className="w-3 h-3 text-muted/50 cursor-help" />
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 text-[11px] text-foreground bg-card border border-card-border rounded-md shadow-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">
+                Gap between appointments for cleanup or travel
+              </span>
+            </span>
+          </Label>
           <div className="flex items-center gap-2 mt-1">
             <Input
               type="number"
@@ -367,13 +477,48 @@ export default function AdminLocationsPage() {
         <p className="text-sm text-muted mt-1">Manage your studio locations and areas within them</p>
       </div>
 
-      {/* Toast */}
+      {/* Toast — fixed position */}
       {toast && (
         <div className={cn(
-          'px-4 py-3 rounded-lg text-sm',
-          toast.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'
+          'fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 px-4 py-3 rounded-lg border flex items-center gap-3 shadow-lg backdrop-blur-sm sm:max-w-sm',
+          toast.type === 'error'
+            ? 'bg-red-500/10 border-red-500/20 text-red-400'
+            : 'bg-green-500/10 border-green-500/20 text-green-400'
         )}>
-          {toast.message}
+          <span className="text-sm flex-1">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="opacity-60 hover:opacity-100 shrink-0"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+
+      {/* Delete confirmation dialog */}
+      {(deletingLoc || deletingZone) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-card-border rounded-lg p-6 max-w-sm mx-4 shadow-xl">
+            <h3 className="text-foreground font-semibold mb-2">
+              Delete {deletingLoc ? 'Location' : 'Zone'}
+            </h3>
+            <p className="text-sm text-muted mb-4">
+              Are you sure you want to delete <span className="text-foreground font-medium">{deletingLoc?.name || deletingZone?.zone?.name}</span>? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setDeletingLoc(null); setDeletingZone(null) }}
+                disabled={deleteSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => deletingLoc ? deleteLocation(deletingLoc) : deleteZone(deletingZone.locationId, deletingZone.zone)}
+                disabled={deleteSubmitting}
+                className="bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20"
+              >
+                {deleteSubmitting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -420,14 +565,18 @@ export default function AdminLocationsPage() {
             const zones = loc.zones || []
             return (
               <div key={loc.id} className={cn('bg-card border border-card-border rounded-lg overflow-hidden', !loc.is_active && 'opacity-60')}>
-                {/* Location header */}
-                <div className="p-4 flex items-start gap-3">
-                  <button
-                    onClick={() => toggleExpanded(loc.id)}
-                    className="mt-0.5 text-muted hover:text-foreground transition-colors"
-                  >
+                {/* Location header — entire row clickable to expand/collapse */}
+                <div
+                  className="p-4 flex items-start gap-3 cursor-pointer select-none"
+                  onClick={(e) => {
+                    // Don't toggle if clicking on buttons/inputs/switch
+                    if (e.target.closest('button, input, [role="switch"], [data-no-expand]')) return
+                    toggleExpanded(loc.id)
+                  }}
+                >
+                  <div className="mt-0.5 text-muted">
                     {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  </button>
+                  </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -449,57 +598,66 @@ export default function AdminLocationsPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0" data-no-expand>
                     <Switch
                       checked={loc.is_active}
                       onCheckedChange={() => toggleLocationActive(loc)}
                     />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => isEditing ? cancelEditLocation() : startEditLocation(loc)}
-                      className={cn(isEditing && 'text-accent')}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); isEditing ? cancelEditLocation() : startEditLocation(loc) }}
+                      className={cn(
+                        'px-2.5 py-1.5 text-xs rounded-md border border-card-border hover:bg-white/[0.03] transition-colors',
+                        isEditing && 'text-accent border-accent/30'
+                      )}
                     >
                       {isEditing ? 'Cancel' : 'Edit'}
-                    </Button>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeletingLoc(loc) }}
+                      className="p-1.5 rounded-md text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Delete location"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
 
                 {/* Inline edit panel */}
                 {isEditing && (
-                  <div className="border-t border-card-border bg-background/50 px-4 py-4 ml-7 mr-4">
-                    <div className="flex items-center gap-2">
+                  <div ref={locFormRef} className="border-t border-card-border bg-background/50 px-4 py-4 ml-7 mr-4">
+                    <div className="flex items-center gap-3">
                       <div className="flex-1">
                         <Label className="text-xs text-muted">Name *</Label>
                         <Input
                           ref={editLocNameRef}
                           value={locForm.name}
-                          onChange={(e) => setLocForm((f) => ({ ...f, name: e.target.value }))}
+                          onChange={(e) => { setLocForm((f) => ({ ...f, name: e.target.value })); setLocError(null) }}
                           placeholder="Location name"
-                          className="mt-1 h-8 text-sm bg-background border-card-border"
+                          className={cn('mt-1 h-8 text-sm bg-background border-card-border', locError && 'border-red-500/50')}
                           onKeyDown={(e) => handleLocKeyDown(e, 'edit')}
                         />
+                        {locError && <p className="text-[11px] text-red-400 mt-1">{locError}</p>}
                       </div>
                       <div className="flex items-center gap-1 pt-5">
                         <button
                           onClick={() => saveLocation('edit')}
-                          disabled={submitting || !locForm.name.trim()}
+                          disabled={submitting}
                           className={cn(
-                            'p-1.5 rounded-md transition-colors',
-                            submitting || !locForm.name.trim()
+                            'w-8 h-8 rounded-md flex items-center justify-center transition-colors',
+                            submitting
                               ? 'text-muted cursor-not-allowed'
                               : 'text-green-400 hover:bg-green-500/10'
                           )}
-                          title="Save"
+                          title="Save (Enter)"
                         >
-                          <Check className="w-4 h-4" />
+                          <Check className="w-5 h-5" />
                         </button>
                         <button
                           onClick={cancelEditLocation}
-                          className="p-1.5 rounded-md text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                          title="Cancel"
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          title="Cancel (Esc)"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
@@ -514,6 +672,7 @@ export default function AdminLocationsPage() {
                     </button>
 
                     {locMoreOptions && renderLocOptionalFields()}
+                    <p className="text-[10px] text-muted mt-3">Enter to save · Esc to cancel</p>
                   </div>
                 )}
 
@@ -555,31 +714,37 @@ export default function AdminLocationsPage() {
                                 checked={zone.is_active}
                                 onCheckedChange={() => toggleZoneActive(loc.id, zone)}
                               />
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={cn('h-7 text-xs', isZoneEditing && 'text-accent')}
+                              <button
+                                className={cn('px-2 py-1 text-xs rounded-md border border-card-border hover:bg-white/[0.03] transition-colors', isZoneEditing && 'text-accent border-accent/30')}
                                 onClick={() => isZoneEditing ? cancelEditZone() : startEditZone(loc.id, zone)}
                               >
                                 {isZoneEditing ? 'Cancel' : 'Edit'}
-                              </Button>
+                              </button>
+                              <button
+                                onClick={() => setDeletingZone({ locationId: loc.id, zone })}
+                                className="p-1 rounded-md text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                title="Delete zone"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             </div>
                           </div>
 
                           {/* Inline zone edit */}
                           {isZoneEditing && (
-                            <div className="ml-7 mt-1 px-3 py-3 rounded-md bg-background/50 border border-card-border/50">
+                            <div ref={zoneFormRef} className="ml-7 mt-1 px-3 py-3 rounded-md bg-background/50 border border-card-border/50">
                               <div className="flex items-end gap-2">
                                 <div className="flex-1">
                                   <Label className="text-xs text-muted">Name *</Label>
                                   <Input
                                     ref={editZoneNameRef}
                                     value={zoneForm.name}
-                                    onChange={(e) => setZoneForm((f) => ({ ...f, name: e.target.value }))}
+                                    onChange={(e) => { setZoneForm((f) => ({ ...f, name: e.target.value })); setZoneError(null) }}
                                     placeholder="Zone name"
-                                    className="mt-1 h-7 text-sm bg-background border-card-border"
+                                    className={cn('mt-1 h-7 text-sm bg-background border-card-border', zoneError && 'border-red-500/50')}
                                     onKeyDown={(e) => handleZoneKeyDown(e, 'edit')}
                                   />
+                                  {zoneError && <p className="text-[11px] text-red-400 mt-1">{zoneError}</p>}
                                 </div>
                                 <div className="w-24">
                                   <Label className="text-xs text-muted">Capacity</Label>
@@ -596,23 +761,23 @@ export default function AdminLocationsPage() {
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => saveZone('edit')}
-                                    disabled={submitting || !zoneForm.name.trim()}
+                                    disabled={submitting}
                                     className={cn(
-                                      'p-1 rounded-md transition-colors',
-                                      submitting || !zoneForm.name.trim()
+                                      'w-7 h-7 rounded-md flex items-center justify-center transition-colors',
+                                      submitting
                                         ? 'text-muted cursor-not-allowed'
                                         : 'text-green-400 hover:bg-green-500/10'
                                     )}
-                                    title="Save"
+                                    title="Save (Enter)"
                                   >
-                                    <Check className="w-3.5 h-3.5" />
+                                    <Check className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={cancelEditZone}
-                                    className="p-1 rounded-md text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                    title="Cancel"
+                                    className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                    title="Cancel (Esc)"
                                   >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-4 h-4" />
                                   </button>
                                 </div>
                               </div>
@@ -646,18 +811,19 @@ export default function AdminLocationsPage() {
 
                     {/* Inline zone create */}
                     {creatingZoneForLoc === loc.id && (
-                      <div className="ml-7 px-3 py-3 rounded-md border border-dashed border-card-border bg-background/50">
+                      <div ref={zoneFormRef} className="ml-7 px-3 py-3 rounded-md border border-dashed border-card-border bg-background/50">
                         <div className="flex items-end gap-2">
                           <div className="flex-1">
                             <Label className="text-xs text-muted">Name *</Label>
                             <Input
                               ref={createZoneNameRef}
                               value={zoneForm.name}
-                              onChange={(e) => setZoneForm((f) => ({ ...f, name: e.target.value }))}
+                              onChange={(e) => { setZoneForm((f) => ({ ...f, name: e.target.value })); setZoneError(null) }}
                               placeholder="e.g. Ring A, Studio 2"
-                              className="mt-1 h-7 text-sm bg-background border-card-border"
+                              className={cn('mt-1 h-7 text-sm bg-background border-card-border', zoneError && 'border-red-500/50')}
                               onKeyDown={(e) => handleZoneKeyDown(e, 'create')}
                             />
+                            {zoneError && <p className="text-[11px] text-red-400 mt-1">{zoneError}</p>}
                           </div>
                           <div className="w-24">
                             <Label className="text-xs text-muted">Capacity</Label>
@@ -674,23 +840,23 @@ export default function AdminLocationsPage() {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => saveZone('create')}
-                              disabled={submitting || !zoneForm.name.trim()}
+                              disabled={submitting}
                               className={cn(
-                                'p-1 rounded-md transition-colors',
-                                submitting || !zoneForm.name.trim()
+                                'w-7 h-7 rounded-md flex items-center justify-center transition-colors',
+                                submitting
                                   ? 'text-muted cursor-not-allowed'
                                   : 'text-green-400 hover:bg-green-500/10'
                               )}
-                              title="Save"
+                              title="Save (Enter)"
                             >
-                              <Check className="w-3.5 h-3.5" />
+                              <Check className="w-4 h-4" />
                             </button>
                             <button
                               onClick={cancelCreateZone}
-                              className="p-1 rounded-md text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                              title="Cancel"
+                              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Cancel (Esc)"
                             >
-                              <X className="w-3.5 h-3.5" />
+                              <X className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -737,39 +903,40 @@ export default function AdminLocationsPage() {
 
           {/* Inline create location form */}
           {showCreateLoc && (
-            <div className="bg-card border border-dashed border-card-border rounded-lg p-4">
-              <div className="flex items-center gap-2">
+            <div ref={locFormRef} className="bg-card border border-dashed border-card-border rounded-lg p-4">
+              <div className="flex items-center gap-3">
                 <MapPin className="w-4 h-4 text-accent shrink-0" />
                 <div className="flex-1">
                   <Input
                     ref={createLocNameRef}
                     value={locForm.name}
-                    onChange={(e) => setLocForm((f) => ({ ...f, name: e.target.value }))}
+                    onChange={(e) => { setLocForm((f) => ({ ...f, name: e.target.value })); setLocError(null) }}
                     placeholder="Location name"
-                    className="h-8 text-sm bg-background border-card-border"
+                    className={cn('h-8 text-sm bg-background border-card-border', locError && 'border-red-500/50')}
                     onKeyDown={(e) => handleLocKeyDown(e, 'create')}
                   />
+                  {locError && <p className="text-[11px] text-red-400 mt-1">{locError}</p>}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => saveLocation('create')}
-                    disabled={submitting || !locForm.name.trim()}
+                    disabled={submitting}
                     className={cn(
-                      'p-1.5 rounded-md transition-colors',
-                      submitting || !locForm.name.trim()
+                      'w-8 h-8 rounded-md flex items-center justify-center transition-colors',
+                      submitting
                         ? 'text-muted cursor-not-allowed'
                         : 'text-green-400 hover:bg-green-500/10'
                     )}
-                    title="Save"
+                    title="Save (Enter)"
                   >
-                    <Check className="w-4 h-4" />
+                    <Check className="w-5 h-5" />
                   </button>
                   <button
                     onClick={cancelCreateLocation}
-                    className="p-1.5 rounded-md text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    title="Cancel"
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title="Cancel (Esc)"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -788,6 +955,7 @@ export default function AdminLocationsPage() {
                   {renderLocOptionalFields()}
                 </div>
               )}
+              <p className="text-[10px] text-muted mt-3 ml-6">Enter to save · Esc to cancel</p>
             </div>
           )}
 

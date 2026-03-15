@@ -184,10 +184,27 @@ export default function AdminInstructorsPage() {
     }
   }, [editForm, submitting, editingId])
 
+  // Click outside to close inline forms
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (showCreate) {
+        const createEl = document.querySelector('[data-instructor-create]')
+        if (createEl && !createEl.contains(e.target)) cancelCreate()
+      }
+      if (editingId) {
+        const editEl = document.querySelector('[data-instructor-edit]')
+        if (editEl && !editEl.contains(e.target)) cancelEdit()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showCreate, editingId])
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div>
         <h1 className="text-2xl font-bold text-foreground">Instructors</h1>
+        <p className="text-sm text-muted mt-1">Manage your team of instructors and coaches</p>
       </div>
 
       {/* Toast */}
@@ -234,6 +251,7 @@ export default function AdminInstructorsPage() {
               /* Inline edit row */
               <div
                 key={inst.id}
+                data-instructor-edit
                 className="border-2 border-accent/40 rounded-lg p-3 sm:p-4 bg-card animate-in fade-in duration-200"
                 onKeyDown={handleEditKeyDown}
               >
@@ -352,6 +370,7 @@ export default function AdminInstructorsPage() {
           {/* Inline create row */}
           {showCreate ? (
             <div
+              data-instructor-create
               className="border-2 border-dashed border-accent/40 rounded-lg p-3 sm:p-4 bg-card animate-in slide-in-from-bottom-2 fade-in duration-300"
               onKeyDown={handleCreateKeyDown}
             >

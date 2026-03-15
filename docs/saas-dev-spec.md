@@ -1065,6 +1065,551 @@ Add to CLAUDE.md:
 
 ---
 
+## Full Feature Testing Checklist (March 13–15 batch)
+
+> Run all migrations first (see SQL block below), then work through these systematically.
+> Mark items [x] as you verify them. If something fails, note the issue inline.
+
+### Prerequisites — SQL Migrations
+
+Run these **in order** in Supabase SQL Editor:
+
+1. `20260313_locations_zones_availability.sql` — zones, instructor_locations, instructor_availability, instructor_unavailability, class_schedule columns
+2. `20260314_availability_overhaul.sql` — nullable instructor_id, buffer_mins on availability + locations
+3. `20260314_performance_indexes.sql` — composite indexes for new tables
+4. `add_composite_indexes.sql` — composite indexes for existing tables (if not already run)
+
+After running, verify:
+- [ ] `SELECT * FROM zones LIMIT 1;` — table exists
+- [ ] `SELECT * FROM instructor_locations LIMIT 1;` — table exists
+- [ ] `SELECT * FROM instructor_availability LIMIT 1;` — table exists, has `buffer_mins` column
+- [ ] `SELECT * FROM instructor_unavailability LIMIT 1;` — table exists
+- [ ] `SELECT column_name FROM information_schema.columns WHERE table_name = 'class_schedule' AND column_name IN ('zone_id', 'is_appointment', 'availability_id');` — 3 rows
+- [ ] `SELECT column_name FROM information_schema.columns WHERE table_name = 'locations' AND column_name = 'buffer_mins';` — 1 row
+- [ ] `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_limits' AND column_name = 'max_zones';` — 1 row
+- [ ] `SELECT * FROM feature_flags WHERE key = 'zones';` — exists
+- [ ] RLS enabled: `SELECT tablename, rowsecurity FROM pg_tables WHERE tablename IN ('zones','instructor_locations','instructor_availability','instructor_unavailability');` — all `t`
+
+---
+
+### 1. Locations CRUD (Admin → Locations) ✅
+
+**Create:**
+- [x] Click "Add location" dashed button → inline form appears with Name field
+- [x] Type a name, press Enter → location created, appears in list
+- [x] Click "More options" → reveals Address, City, Country, Phone, Timezone, Buffer Time fields
+- [x] Create location with all fields filled → all values saved correctly
+- [x] Press Esc during creation → form cancelled, no location created
+- [x] Plan limit: create locations up to plan limit → next attempt shows upgrade message
+
+**Edit:**
+- [x] Click Edit on a location → inline edit panel appears within the card
+- [x] Change name → save → name updated
+- [x] Change address/city/country/phone → save → all updated
+- [x] Change timezone (IANA dropdown) → save → timezone updated
+- [x] Change buffer time → save → buffer_mins updated
+- [x] Toggle active/inactive switch → location deactivated
+- [x] Try deactivating location with upcoming classes → blocked with 409 error + class count
+
+**Delete:**
+- [x] Delete location with no classes → succeeds
+- [x] Delete location with existing classes → blocked with 409 error + class count
+
+**UX issues found (to fix):**
+- [ ] Toast messages should never be inline — found inline toast on location creation. Use separate toast component.
+- [ ] Location cards should be clickable to expand/collapse (not just the chevron)
+- [ ] Clicking outside inline creation form should close it (dismiss on outside click)
+- [ ] Buffer time needs better UX — unclear what it means. Add tooltip/helper text explaining "gap between appointments for travel/cleanup"
+- [ ] Check (✓) and cross (✗) save/cancel buttons too hard to find — make larger/more prominent
+- [ ] Missing feedback on save — after pressing Enter/check, small delay with no confirmation. Add brief success indicator
+
+---
+
+### 2. Zones CRUD (Admin → Locations → expand location) ✅
+
+**Create:**
+- [x] Expand a location → see "Add zone" dashed button
+- [x] Click it → inline form appears with Name and Capacity fields
+- [x] Create zone with name only → works (capacity nullable)
+- [x] Create zone with name + capacity → capacity badge shows
+- [x] Click "More options" → Description field appears
+- [x] Press Enter to save, Esc to cancel
+- [x] Plan limit: `max_zones` enforced → shows upgrade message when exceeded
+- [x] Feature flag: `zones` flag disabled → zone creation blocked (402)
+
+**Edit:**
+- [x] Click Edit on zone → inline form appears below zone row
+- [x] Change name/capacity/description → save → updated
+- [x] Toggle active/inactive → zone deactivated
+- [x] Try deactivating zone with upcoming classes → blocked with 409 + class count
+
+**Delete:**
+- [x] Delete zone with no classes → succeeds
+- [x] Delete zone with existing classes → blocked with 409
+
+**UX issues found (to fix — same batch as Section 1):**
+- [ ] No delete button visible for locations or zones — add trash icon
+- [ ] Active toggle needs faster visual feedback
+
+---
+
+### 3. Schedule Enhancements (Admin → Schedule)
+
+**Class creation with new fields:**
+- [ ] Open create class form → see Location dropdown, Zone dropdown
+- [ ] Select location → zone dropdown filters to zones within that location
+- [ ] Select instructor → instructor list filters by selected location (if instructor_locations configured)
+- [ ] "Free class" toggle → sets credits_cost to 0
+- [ ] "Unlimited capacity" toggle → sets capacity to null
+- [ ] Credits cost field → can set custom credit cost
+- [ ] Create class with location + zone → saved correctly
+
+**Class display:**
+- [ ] Calendar event blocks show location badge (if set)
+- [ ] Calendar event blocks show zone badge (if set)
+- [ ] Calendar event blocks show "Free" badge for credits_cost=0 classes
+- [ ] Recurring class creation respects location/zone/free/unlimited settings
+
+**Member schedule view:**
+- [ ] Free classes show "Free" badge
+- [ ] Unlimited capacity classes show "X booked" instead of "X/Y spots"
+- [ ] Location and zone displayed on class cards
+- [ ] Booking a free class → no credit deduction
+- [ ] Booking an unlimited class → always succeeds (no capacity check)
+
+---
+
+### 4. Instructor Location Scoping (Admin → Instructors)
+
+- [ ] Create instructor → see location multi-select
+- [ ] Assign instructor to 1+ locations → instructor_locations rows created
+- [ ] Edit instructor → change locations → updated
+- [ ] In schedule ClassForm, select a location → instructor dropdown filters to instructors assigned to that location
+- [ ] Instructor with no locations → appears for all locations (backward compatible)
+
+---
+
+### 5. Availability System (Admin → Availability)
+
+**Calendar view:**
+- [ ] Page loads weekly calendar grid (Mon–Sun, 6am–10pm)
+- [ ] Instructor filter pills at top (All / Anyone / specific instructors)
+- [ ] Location filter pills (All / specific locations)
+- [ ] Existing availability blocks render in correct day/time positions
+
+**Drag-to-create:**
+- [ ] Click + drag on empty grid space → creates ghost block
+- [ ] Release → create dialog opens with pre-filled day/start/end from drag position
+- [ ] Fill form → save → new availability block appears on calendar
+
+**Drag-to-move:**
+- [ ] Drag existing block to different day/time → block moves
+- [ ] Release → updates day_of_week, start_time, end_time
+
+**Drag-to-resize:**
+- [ ] Drag bottom edge of block down → block expands
+- [ ] Release → end_time updated
+
+**Create/Edit dialog:**
+- [ ] Instructor assignment: "Specific" mode → single instructor dropdown
+- [ ] Instructor assignment: "Multiple" mode → checkbox list, creates N rows
+- [ ] Instructor assignment: "Anyone Available" mode → instructor_id = null
+- [ ] Session duration field (15–480 min)
+- [ ] Concurrent slots field (1–100)
+- [ ] Credits cost field
+- [ ] Location/zone selectors
+- [ ] "Open location" toggle (no location)
+- [ ] Buffer time input → auto-fills from location default when location selected
+- [ ] Buffer time reset button → clears to location default
+- [ ] Active/inactive toggle
+- [ ] Delete button on edit dialog
+
+**Color coding:**
+- [ ] Blocks color-coded by instructor (hue from ID hash)
+- [ ] "Anyone available" blocks in teal
+- [ ] Buffer zone visualized as hatched area below blocks
+
+**Lane layout:**
+- [ ] Overlapping blocks on same day render side-by-side (not stacked)
+
+**Validation:**
+- [ ] endTime must be > startTime → error if not
+- [ ] sessionDuration cannot exceed window length → error if not
+- [ ] Zone must belong to selected location → error if mismatch
+- [ ] Feature flag: `appointment_booking` disabled → page inaccessible (402)
+
+---
+
+### 6. Member Appointment Booking (Book Appointment page)
+
+**Slot display:**
+- [ ] Page loads with current week's available slots
+- [ ] Week navigation arrows (prev/next week)
+- [ ] Instructor filter dropdown
+- [ ] Slots grouped by time of day: Morning / Afternoon / Evening
+- [ ] Location and zone shown in slot headers
+- [ ] Low-availability warning on slots with few remaining
+
+**"Anyone Available" slots:**
+- [ ] Slots from anyone-available windows show "Any Available Instructor" group with teal styling + Users icon
+- [ ] Shows "X available" count per slot
+- [ ] Confirmation dialog explains auto-assignment
+
+**Booking flow:**
+- [ ] Click slot → confirmation dialog appears with class details
+- [ ] Confirm → booking created
+- [ ] Success banner appears with booking details
+- [ ] For anyone-available: success banner shows assigned instructor name
+- [ ] Credits deducted correctly (or skipped for free slots)
+- [ ] Already-booked slots show as disabled/booked
+
+**Buffer time enforcement:**
+- [ ] Slot step = session_duration + buffer_mins (e.g., 60min session + 15min buffer = slots every 75min)
+- [ ] Back-to-back bookings for same instructor blocked if within buffer window
+
+**Cross-window conflict detection:**
+- [ ] Instructor booked in window A → their slots in overlapping window B also removed
+
+**Concurrent slots:**
+- [ ] Window with concurrent_slots=3 → allows 3 bookings per time slot
+- [ ] 4th booking attempt blocked when 3 already booked
+
+---
+
+### 7. Inline Creation UX — Instructors
+
+- [ ] "Add instructor" dashed button at bottom of instructor list
+- [ ] Click → inline form with Name field
+- [ ] "More" toggle → reveals Bio field
+- [ ] Enter to save → instructor created, row appears in list
+- [ ] Esc to cancel → form dismissed
+- [ ] Click existing instructor row → transforms to inline edit
+- [ ] Edit name/bio → save → updated
+- [ ] Active/inactive toggle via Switch on each row
+
+---
+
+### 8. Inline Creation UX — Class Types (Events)
+
+- [ ] "Add event" card at end of grid → transforms into creation form
+- [ ] Default fields: Name, Duration, Color picker
+- [ ] "More options" → reveals Description, Icon, Private toggle, Image upload
+- [ ] Enter to save → event created, card appears in grid
+- [ ] Esc to cancel
+- [ ] Click existing card → edit dialog (not inline — kept for image upload complexity)
+- [ ] Delete → confirmation dialog → deleted
+
+---
+
+### 9. Inline Creation UX — Packs (Products)
+
+- [ ] "Add pack" dashed button at bottom of table
+- [ ] Default fields: Name, Credits, Validity (days), Price
+- [ ] "More options" → Description, Display Order, Badge, Stripe Price ID, Intro/Membership toggles
+- [ ] Enter to save → pack created
+- [ ] Esc to cancel
+- [ ] Click Edit on existing row → row transforms to editable form (left gold border)
+- [ ] Edit and save → updated
+- [ ] Active/inactive Switch on each row
+- [ ] Delete → confirmation dialog → deleted
+
+---
+
+### 10. Member Dashboard Enhancements
+
+**Skeleton loaders:**
+- [ ] On page load → content-shaped skeletons for profile, tabs, class cards (not spinner)
+
+**Filter chips:**
+- [ ] Class-type filter chips (horizontal scroll) above schedule
+- [ ] Location filter chips
+- [ ] Selecting a filter → schedule filters accordingly
+- [ ] "Clear filters" button works
+
+**Optimistic booking UI:**
+- [ ] Click Book → instant "Booked" badge appears on card
+- [ ] Card stays expanded 800ms after booking to show badge
+- [ ] If booking fails → badge reverts, error shown
+
+**Class cards:**
+- [ ] Credit cost shown on collapsed cards (visible before expanding)
+- [ ] Location and zone displayed on all class cards + booking cards
+- [ ] "Free" badge on free classes
+
+**Empty states:**
+- [ ] No classes matching filters → icon + context-aware message + "Clear filters" / "Next week" buttons
+- [ ] No bookings → calendar icon + helpful message
+
+---
+
+### 11. Bug Fixes Verification
+
+**Waitlist reorder (critical):**
+- [ ] Add 3+ users to waitlist for a full class
+- [ ] Cancel booking (or admin removes) → top waitlist user promoted
+- [ ] Remaining waitlist users' positions renumbered correctly (1, 2, 3... not gaps)
+- [ ] Promoted user gets booking + confirmation email with correct tenant branding
+
+**Email tenant branding:**
+- [ ] Cron: expire-credits → expiry warning email shows correct tenant logo/colors
+- [ ] Cron: reminders → class reminder email shows correct tenant branding
+- [ ] Waitlist promotion → email shows correct tenant branding
+- [ ] Pending invitation confirmation → email shows correct tenant branding
+
+**Analytics retry:**
+- [ ] Admin → Analytics → if data fails to load, click "Retry" → actually re-fetches (not a no-op)
+
+**Timezone fixes:**
+- [ ] Availability slots: times match correctly across timezones (no +07:00 hardcode)
+- [ ] Recurring schedule: uses location or studio_settings timezone
+- [ ] Schedule time clash display: no hardcoded timezone
+
+**Locations page data bugs:**
+- [ ] Create zone with empty capacity → no NaN errors
+- [ ] Create zone with null values → no "null" string display
+
+---
+
+### 12. Error States & Feedback (all admin pages)
+
+- [ ] Admin dashboard: disconnect internet → error card with refresh button
+- [ ] Admin schedule: API failure → error state with retry button
+- [ ] Admin activity/bookings: failure → error state; CSV export → success/error toast
+- [ ] Admin members: failure → error state with retry
+- [ ] Admin class types: failure → error state with retry
+- [ ] Admin instructors: failure → error state with retry
+- [ ] Admin packs: failure → error state with retry
+- [ ] Member dashboard: failure → improved error state with retry
+- [ ] Member buy-classes: failure → error state with retry
+
+---
+
+### 13. Cancel Confirmation Modals (Member Dashboard)
+
+- [ ] Cancel booking → custom modal (not native `confirm()`)
+- [ ] Late-cancel warning shown when within cancellation window
+- [ ] Cancel class from schedule section → same custom modal pattern
+
+---
+
+### 14. Existing MVP Readiness Tests
+
+**Stripe & Payments:**
+- [ ] Buy a class pack → credits appear
+- [ ] Buy a subscription → credits appear, `stripe_sub_id` set
+- [ ] "Manage Subscription" button on buy-classes for active subscribers
+- [ ] Opens Stripe Customer Portal
+- [ ] Webhook `customer.subscription.deleted` → credits deactivated, membership ended email
+- [ ] Webhook `invoice.payment_failed` → payment failed email
+- [ ] Stripe keys are per-tenant (Settings → Stripe tab)
+
+**Email Branding:**
+- [ ] Admin → Emails → Preview → shows tenant logo + branded header/footer
+- [ ] Booking confirmation email → correct studio name, logo, colors
+- [ ] Change primary color → next email reflects new header bar color
+- [ ] Tenant without logo → falls back to text studio name
+
+**Branding & Theme:**
+- [ ] Admin → Settings → Branding tab loads
+- [ ] 6 theme presets → preview updates live
+- [ ] ColorPicker HSL sliders → preview reflects changes
+- [ ] Font selector → preview text updates
+- [ ] Upload logo → appears in preview + member layout header
+- [ ] Save branding → member pages reflect new theme (after reload)
+- [ ] Social links: add Instagram URL → appears in member footer
+- [ ] Remove all social URLs → no social section in member footer
+
+**Auth & Security:**
+- [ ] Login email/password → redirects correctly (staff→/admin, member→/dashboard)
+- [ ] Login Google OAuth → redirects via /auth/redirect
+- [ ] Register → consent checkbox required
+- [ ] Password fields have correct `autoComplete` attributes
+- [ ] No debug logs in production console
+
+---
+
+## Combined Migration SQL
+
+> Copy-paste this single block into Supabase SQL Editor. It combines all 4 pending migrations in dependency order. Safe to run — all statements use `IF NOT EXISTS` / `IF EXISTS` guards.
+
+```sql
+-- ═══════════════════════════════════════════════════════════════
+-- COMBINED MIGRATION: Locations, Zones, Availability, Indexes
+-- Combines: 20260313_locations_zones_availability.sql
+--           20260314_availability_overhaul.sql
+--           20260314_performance_indexes.sql
+--           add_composite_indexes.sql
+-- ═══════════════════════════════════════════════════════════════
+
+BEGIN;
+
+-- ─────────────────────────────────────
+-- PART 1: Zones (areas within locations)
+-- ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS zones (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  location_id UUID NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  capacity    INT,
+  description TEXT,
+  is_active   BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_zones_tenant_id ON zones(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_zones_location_id ON zones(location_id);
+
+ALTER TABLE zones ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'public_read_zones') THEN
+    CREATE POLICY "public_read_zones" ON zones FOR SELECT USING (true);
+  END IF;
+END $$;
+
+-- ─────────────────────────────────────
+-- PART 2: Instructor ↔ Location junction
+-- ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS instructor_locations (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  instructor_id UUID NOT NULL REFERENCES instructors(id) ON DELETE CASCADE,
+  location_id   UUID NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(instructor_id, location_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_instructor_locations_tenant ON instructor_locations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_locations_instructor ON instructor_locations(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_locations_location ON instructor_locations(location_id);
+
+ALTER TABLE instructor_locations ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'public_read_instructor_locations') THEN
+    CREATE POLICY "public_read_instructor_locations" ON instructor_locations FOR SELECT USING (true);
+  END IF;
+END $$;
+
+-- ─────────────────────────────────────
+-- PART 3: Instructor Availability (Calendly-style)
+-- ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS instructor_availability (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  instructor_id     UUID REFERENCES instructors(id) ON DELETE CASCADE,  -- NULL = anyone available
+  location_id       UUID REFERENCES locations(id) ON DELETE SET NULL,
+  zone_id           UUID REFERENCES zones(id) ON DELETE SET NULL,
+  day_of_week       INT NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
+  start_time        TIME NOT NULL,
+  end_time          TIME NOT NULL,
+  session_duration  INT NOT NULL DEFAULT 60,
+  concurrent_slots  INT NOT NULL DEFAULT 1,
+  credits_cost      INT NOT NULL DEFAULT 1,
+  buffer_mins       INT NOT NULL DEFAULT 0,
+  is_active         BOOLEAN DEFAULT true,
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  CHECK (end_time > start_time)
+);
+
+CREATE INDEX IF NOT EXISTS idx_instructor_availability_tenant ON instructor_availability(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_availability_instructor ON instructor_availability(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_availability_day ON instructor_availability(tenant_id, day_of_week);
+
+ALTER TABLE instructor_availability ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'public_read_instructor_availability') THEN
+    CREATE POLICY "public_read_instructor_availability" ON instructor_availability FOR SELECT USING (true);
+  END IF;
+END $$;
+
+COMMENT ON COLUMN instructor_availability.instructor_id IS 'NULL = any available instructor at this location';
+COMMENT ON COLUMN instructor_availability.buffer_mins IS 'Minutes gap between appointments (travel/cleanup time)';
+
+-- ─────────────────────────────────────
+-- PART 4: Instructor Unavailability (holidays/exceptions)
+-- ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS instructor_unavailability (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  instructor_id UUID NOT NULL REFERENCES instructors(id) ON DELETE CASCADE,
+  start_date    DATE NOT NULL,
+  end_date      DATE NOT NULL,
+  reason        TEXT,
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  CHECK (end_date >= start_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_instructor_unavailability_tenant ON instructor_unavailability(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_unavailability_instructor ON instructor_unavailability(instructor_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_unavailability_dates ON instructor_unavailability(instructor_id, start_date, end_date);
+
+ALTER TABLE instructor_unavailability ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'public_read_instructor_unavailability') THEN
+    CREATE POLICY "public_read_instructor_unavailability" ON instructor_unavailability FOR SELECT USING (true);
+  END IF;
+END $$;
+
+-- ─────────────────────────────────────
+-- PART 5: class_schedule new columns
+-- ─────────────────────────────────────
+ALTER TABLE class_schedule ADD COLUMN IF NOT EXISTS zone_id UUID REFERENCES zones(id) ON DELETE SET NULL;
+ALTER TABLE class_schedule ADD COLUMN IF NOT EXISTS is_appointment BOOLEAN DEFAULT false;
+ALTER TABLE class_schedule ADD COLUMN IF NOT EXISTS availability_id UUID REFERENCES instructor_availability(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_class_schedule_zone_id ON class_schedule(zone_id);
+
+-- ─────────────────────────────────────
+-- PART 6: locations.buffer_mins
+-- ─────────────────────────────────────
+ALTER TABLE locations ADD COLUMN IF NOT EXISTS buffer_mins INT NOT NULL DEFAULT 0;
+
+COMMENT ON COLUMN locations.buffer_mins IS 'Default buffer time for availability windows at this location';
+
+-- ─────────────────────────────────────
+-- PART 7: Feature flags & plan limits
+-- ─────────────────────────────────────
+INSERT INTO feature_flags (key, description, default_enabled, enabled_for_plans)
+VALUES
+  ('zones', 'Zones/areas within locations', false, '{growth,pro,enterprise}')
+ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE plan_limits ADD COLUMN IF NOT EXISTS max_zones INT NOT NULL DEFAULT 0;
+
+UPDATE plan_limits SET max_zones = 0 WHERE plan = 'free';
+UPDATE plan_limits SET max_zones = 5 WHERE plan = 'starter';
+UPDATE plan_limits SET max_zones = 20 WHERE plan = 'growth';
+UPDATE plan_limits SET max_zones = 50 WHERE plan = 'pro';
+UPDATE plan_limits SET max_zones = 9999 WHERE plan = 'enterprise';
+
+-- ─────────────────────────────────────
+-- PART 8: Performance indexes (new tables)
+-- ─────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_zones_tenant_location ON zones(tenant_id, location_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_availability_tenant_location ON instructor_availability(tenant_id, location_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_availability_zone ON instructor_availability(zone_id);
+CREATE INDEX IF NOT EXISTS idx_instructor_availability_any ON instructor_availability(tenant_id, day_of_week) WHERE instructor_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_class_schedule_availability_id ON class_schedule(availability_id);
+CREATE INDEX IF NOT EXISTS idx_class_schedule_is_appointment ON class_schedule(tenant_id, is_appointment) WHERE is_appointment = true;
+CREATE INDEX IF NOT EXISTS idx_instructor_locations_location_tenant ON instructor_locations(location_id, tenant_id);
+
+-- ─────────────────────────────────────
+-- PART 9: Performance indexes (existing tables)
+-- ─────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_bookings_tenant_status_created ON bookings(tenant_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_class_schedule_tenant_status_starts ON class_schedule(tenant_id, status, starts_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_tenant_role ON users(tenant_id, role);
+CREATE INDEX IF NOT EXISTS idx_user_credits_tenant_status_expires ON user_credits(tenant_id, status, expires_at DESC);
+CREATE INDEX IF NOT EXISTS idx_page_views_tenant_created ON page_views(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_log_tenant_created ON email_log(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_conversations_tenant_updated ON agent_conversations(tenant_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_tenant_created ON agent_messages(tenant_id, created_at DESC);
+
+COMMIT;
+```
+
+---
+
 ## Notes & Decisions
 
 ### Auth flow notes
